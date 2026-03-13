@@ -1,396 +1,248 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>寶貝英文單字複習</title>
+<title>Kids Word Practice</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-/* 基础样式 */
-body{font-family:Arial,微軟雅黑;text-align:center;padding:20px;margin:0;background:#f9f9f9;}
+body{font-family:Arial;text-align:center;padding:20px;margin:0;background:#f9f9f9;}
 .container{max-width:700px;margin:0 auto;background:white;padding:30px;border-radius:20px;box-shadow:0 0 15px rgba(0,0,0,0.1);}
 h1{color:#e67e22;margin-bottom:30px;}
 
-/* 文件选择区域 */
 .file-select{
-  margin: 20px 0;
-  font-size: 24px;
+  margin:20px 0;
+  font-size:24px;
 }
 #fileSelect{
-  width: 200px;
-  height: 50px;
-  font-size: 22px;
-  text-align: center;
-  border: 3px solid #3498db;
-  border-radius: 8px;
-  margin-right: 10px;
+  width:220px;
+  height:50px;
+  font-size:22px;
+  text-align:center;
+  border:3px solid #3498db;
+  border-radius:8px;
 }
 #fileConfirm{
-  height: 50px;
-  font-size: 22px;
-  padding: 0 20px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  height:50px;
+  font-size:22px;
+  padding:0 20px;
+  background:#3498db;
+  color:white;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
 }
 
-/* Day筛选区域 */
 .day-filter{
-  margin: 20px 0;
-  font-size: 24px;
-  display: none;
+  margin:20px 0;
+  font-size:24px;
+  display:none;
 }
 #dayNum{
-  width: 100px;
-  height: 50px;
-  font-size: 24px;
-  text-align: center;
-  border: 3px solid #3498db;
-  border-radius: 8px;
-  margin-right: 10px;
+  width:100px;
+  height:50px;
+  font-size:24px;
+  text-align:center;
+  border:3px solid #3498db;
+  border-radius:8px;
 }
 #filterBtn{
-  height: 50px;
-  font-size: 24px;
-  padding: 0 20px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  height:50px;
+  font-size:24px;
+  padding:0 20px;
+  background:#3498db;
+  color:white;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
 }
 
-/* 导出按钮 */
 .export-switch{
-  margin: 15px 0;
-  display: none;
+  margin:15px 0;
+  display:none;
 }
 #exportBtn{
-  padding: 12px 30px;
-  font-size: 22px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #e74c3c;
-  color: white;
+  padding:12px 30px;
+  font-size:22px;
+  border:none;
+  border-radius:8px;
+  background:#e74c3c;
+  color:white;
+  cursor:pointer;
 }
 
-/* 单词显示区域 */
-.meaning{font-size: 28px;margin: 20px 0;color: #333;}
-.word{font-size: 48px;font-weight: bold;color: #e74c3c;margin: 20px 0;display: none;}
-.btn-group{margin: 20px 0;}
-button{
-  font-size: 22px;
-  padding: 10px 20px;
-  margin: 8px;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-}
-.show-btn{background: #9b59b6;}
-.read-btn{background: #3498db;}
-.next-btn{background: #27ae60;}
-
-/* 提示样式 */
-.tip{font-size: 16px;color: #666;margin-top: 10px;}
-.loading{font-size: 24px;color: #3498db;margin: 20px 0;}
-.error{font-size: 24px;color: #e74c3c;margin: 20px 0;}
+.meaning{font-size:28px;margin:20px 0;}
+.word{font-size:48px;font-weight:bold;color:#e74c3c;margin:20px 0;display:none;}
+button{font-size:22px;padding:10px 20px;margin:8px;border:none;border-radius:8px;color:white;cursor:pointer;}
+.show-btn{background:#9b59b6;}
+.read-btn{background:#3498db;}
+.next-btn{background:#27ae60;}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>🌟 寶貝的英文單字複習 🌟</h1>
+<h1>🌟 Kids Word Practice 🌟</h1>
 
-  <!-- 文件选择区域 -->
-  <div class="file-select">
-    選擇練習文件：
-    <select id="fileSelect">
-      <option value="">載入文件列表中...</option>
-    </select>
-    <button id="fileConfirm">確認選擇</button>
-  </div>
+<div class="file-select">
+Select File:
+<select id="fileSelect">
+  <option value="BQ1.xlsx">BQ1.xlsx</option>
+  <option value="BQ2.xlsx">BQ2.xlsx</option>
+  <option value="BQ3.xlsx">BQ3.xlsx</option>
+  <option value="BQ4.xlsx">BQ4.xlsx</option>
+  <option value="BQ5.xlsx">BQ5.xlsx</option>
+</select>
+<button id="fileConfirm">Confirm</button>
+</div>
 
-  <!-- Day筛选区域 -->
-  <div class="day-filter" id="dayFilterArea">
-    輸入學習天數：
-    <input type="number" id="dayNum" placeholder="1-20" min="1" max="20">
-    <button id="filterBtn">確認篩選</button>
-  </div>
+<div class="day-filter" id="dayFilterArea">
+Enter Day:
+<input type="number" id="dayNum" min="1" max="20" placeholder="1">
+<button id="filterBtn">Filter</button>
+</div>
 
-  <!-- 导出按钮 -->
-  <div class="export-switch" id="exportArea">
-    <button id="exportBtn">📋 顯示所有單字</button>
-  </div>
+<div class="export-switch" id="exportArea">
+<button id="exportBtn">📋 Show All Words</button>
+</div>
 
-  <!-- 单词显示区域 -->
-  <div id="wordContent">請先選擇練習文件</div>
+<div id="wordContent">Please select a file first</div>
 </div>
 
 <script>
-// 全局变量
-let allWords = [];         // 当前文件的所有单词
-let filteredWords = [];    // 筛选后的单词
-let currentIdx = 0;        // 当前单词索引
-let currentFileName = '';  // 当前选中的文件名
+let allWords = [];
+let filteredWords = [];
+let currentIdx = 0;
+let currentFileName = "";
 const synth = window.speechSynthesis;
 
-// ====================== 核心：加载文件列表（从fileList.json读取，无需改主代码） ======================
-async function loadFileList() {
-  const select = document.getElementById('fileSelect');
-  try {
-    // 读取配置文件fileList.json
-    const response = await fetch('https://raw.githubusercontent.com/ximonlam/word-review/main/fileList.json');
-    if (!response.ok) throw new Error('配置文件加載失敗');
-    
-    const config = await response.json();
-    const files = config.files || [];
-
-    // 清空下拉列表
-    select.innerHTML = '';
-    if (files.length === 0) {
-      select.innerHTML = '<option value="">無練習文件</option>';
-      return;
-    }
-
-    // 加载所有文件到下拉列表
-    files.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = file;
-      select.appendChild(option);
-    });
-  } catch (error) {
-    select.innerHTML = `<option value="">加載失敗：${error.message}</option>`;
-    console.error('加載文件列表失敗：', error);
-  }
-}
-
-// ====================== 加载选中的XLSX文件 ======================
 async function loadSelectedFile(fileName) {
-  if (!fileName) {
-    alert('請選擇有效的練習文件！');
-    return;
-  }
-
   currentFileName = fileName;
-  const wordContent = document.getElementById('wordContent');
-  wordContent.innerHTML = '<div class="loading">加載文件中...</div>';
+  document.getElementById("wordContent").innerHTML = "Loading...";
 
   try {
-    // 加载选中的XLSX文件
-    const fileUrl = `https://raw.githubusercontent.com/ximonlam/word-review/main/${fileName}`;
-    const response = await fetch(fileUrl);
-    if (!response.ok) throw new Error('文件不存在或加載失敗');
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const url = `https://raw.githubusercontent.com/ximonlam/word-review/main/${fileName}`;
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
-    // 处理单词数据
-    allWords = data.filter(x => x.word && x.meaning && x.day).map(item => ({
-      word: item.word,
-      meaning: item.meaning,
-      day: Number(item.day)
-    }));
+    allWords = data
+      .filter(x => x.word && x.meaning && x.day)
+      .map(x => ({
+        word: x.word,
+        meaning: x.meaning,
+        day: Number(x.day)
+      }));
 
-    if (allWords.length === 0) {
-      wordContent.innerHTML = '<div class="error">文件中無有效單字</div>';
-      return;
-    }
-
-    // 初始化筛选
     filteredWords = [...allWords];
     currentIdx = 0;
 
-    // 显示Day筛选和导出区域
-    document.getElementById('dayFilterArea').style.display = 'block';
-    document.getElementById('exportArea').style.display = 'block';
-
-    // 显示第一个单词
+    document.getElementById("dayFilterArea").style.display = "block";
+    document.getElementById("exportArea").style.display = "block";
     showWord();
-  } catch (error) {
-    wordContent.innerHTML = `<div class="error">加載失敗：${error.message}</div>`;
-    console.error('加載XLSX失敗：', error);
+  } catch (e) {
+    document.getElementById("wordContent").innerHTML = "Load failed";
   }
 }
 
-// ====================== Day筛选 ======================
 function filterByDay() {
-  if (allWords.length === 0) {
-    alert('請先選擇練習文件！');
-    return;
-  }
-
-  const day = Number(document.getElementById('dayNum').value);
-  if (isNaN(day) || day < 1) {
-    alert('請輸入有效的天數（1以上）！');
-    return;
-  }
-
+  const day = Number(document.getElementById("dayNum").value);
   filteredWords = allWords.filter(x => x.day === day);
   currentIdx = 0;
   showWord();
 }
 
-// ====================== 女声朗读3次（间隔2秒） ======================
 function getVoices() {
   return new Promise(resolve => {
-    let voices = synth.getVoices();
-    if (voices.length) resolve(voices);
-    synth.onvoiceschanged = () => resolve(synth.getVoices());
+    let v = synth.getVoices();
+    if (v.length) resolve(v);
+    else synth.onvoiceschanged = () => resolve(synth.getVoices());
   });
 }
 
-async function speakWord(word) {
-  synth.cancel(); // 停止当前朗读
+async function speak(word) {
   const voices = await getVoices();
-  
-  const utterance = new SpeechSynthesisUtterance(word);
-  utterance.lang = 'en-US'; // 美式英语
-  utterance.rate = 0.8;     // 慢速，适合小朋友
-  
-  // 优先选择女声
-  const femaleVoice = voices.find(v => 
-    v.lang.includes('en') && 
-    (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Google'))
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = "en-US";
+  u.rate = 0.8;
+
+  const female = voices.find(v =>
+    v.lang.includes("en") &&
+    (v.name.includes("Female") || v.name.includes("Samantha") || v.name.includes("Google"))
   );
-  if (femaleVoice) utterance.voice = femaleVoice;
-  
-  synth.speak(utterance);
+  if (female) u.voice = female;
+  synth.speak(u);
 }
 
 function read3Times(word) {
-  clearInterval(window.readTimer); // 清除旧定时器
-  let count = 0;
-  
-  // 第一次朗读
-  speakWord(word);
-  count++;
-  
-  // 每隔2秒读一次，共3次
+  clearInterval(window.readTimer);
+  let c = 0;
+  speak(word); c++;
   window.readTimer = setInterval(() => {
-    if (count < 3) {
-      speakWord(word);
-      count++;
-    } else {
-      clearInterval(window.readTimer);
-    }
+    if (c < 3) { speak(word); c++; }
+    else clearInterval(window.readTimer);
   }, 2000);
 }
 
-// ====================== 显示单词 ======================
 function showWord() {
   clearInterval(window.readTimer);
-  const content = document.getElementById('wordContent');
-  
+  const el = document.getElementById("wordContent");
   if (filteredWords.length === 0) {
-    content.innerHTML = '<div class="error">沒有找到對應天數的單字</div>';
+    el.innerHTML = "No words for this day";
     return;
   }
-  
   if (currentIdx >= filteredWords.length) {
-    content.innerHTML = '<div>🎉 所有單字複習完成！</div>';
+    el.innerHTML = "🎉 Practice Complete!";
     return;
   }
-  
-  const word = filteredWords[currentIdx];
-  content.innerHTML = `
-    <div class="meaning">💡 中文：${word.meaning}</div>
-    <div class="word" id="wordText">${word.word.toUpperCase()}</div>
-    <div class="btn-group">
-      <button class="show-btn" onclick="document.getElementById('wordText').style.display='block'">👀 顯示單字</button>
-      <button class="read-btn" onclick="read3Times('${word.word}')">🔊 朗讀3次</button>
-      <button class="next-btn" onclick="nextWord()">➡️ 下一個</button>
+  const w = filteredWords[currentIdx];
+  el.innerHTML = `
+    <div class="meaning">💡 ${w.meaning}</div>
+    <div class="word" id="w">${w.word.toUpperCase()}</div>
+    <button class="show-btn" onclick="document.getElementById('w').style.display='block'">👀 Show Word</button>
+    <button class="read-btn" onclick="read3Times('${w.word}')">🔊 Read 3x</button>
+    <button class="next-btn" onclick="next()">➡️ Next</button>
+    <div style="font-size:16px;color:#666;margin-top:10px">
+    File: ${currentFileName}  Day: ${w.day}
     </div>
-    <div class="tip">當前文件：${currentFileName} | Day：${word.day} | 剩餘：${filteredWords.length - currentIdx - 1} 個</div>
   `;
 }
 
-// ====================== 下一个单词 ======================
-function nextWord() {
+function next() {
   currentIdx++;
   showWord();
 }
 
-// ====================== 导出所有单词到新窗口 ======================
 function showAllWords() {
-  if (allWords.length === 0) {
-    alert('當前無可顯示的單字！');
-    return;
-  }
-
-  // 打开新窗口
-  const newWindow = window.open('', 'AllWords', 'width=800,height=600,left=200,top=100');
-  if (!newWindow) {
-    alert('請允許彈窗，否則無法顯示所有單字！');
-    return;
-  }
-
-  // 构建新窗口内容
+  let win = window.open("", "_blank", "width=800,height=600");
   let html = `
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8">
-      <title>${currentFileName} - 所有單字列表</title>
-      <style>
-        body{font-family:Arial,微軟雅黑;padding:20px;}
-        h2{color:#e67e22;text-align:center;}
-        table{width:100%;border-collapse:collapse;margin:20px 0;}
-        th,td{border:2px solid #3498db;padding:12px;text-align:center;font-size:20px;}
-        th{background:#f1f9ff;color:#2c3e50;}
-        tr:nth-child(even){background:#f9f9f9;}
-      </style>
-    </head>
-    <body>
-      <h2>📚 ${currentFileName} - 所有學習單字</h2>
-      <table>
-        <tr><th>Day</th><th>英文單字</th><th>中文釋義</th></tr>
+  <html>
+  <head>
+  <meta charset="utf-8">
+  <style>body{font-family:Arial;padding:20px;}
+  table{border-collapse:collapse;width:100%;}
+  th,td{border:1px solid #ccc;padding:10px;text-align:center;}</style>
+  </head>
+  <body>
+  <h2>${currentFileName} - All Words</h2>
+  <table>
+  <tr><th>Day</th><th>Word</th><th>Meaning</th></tr>
   `;
-
-  // 生成单词表格
   allWords.forEach(w => {
-    html += `
-      <tr>
-        <td>${w.day}</td>
-        <td>${w.word}</td>
-        <td>${w.meaning}</td>
-      </tr>
-    `;
+    html += `<tr><td>${w.day}</td><td>${w.word}</td><td>${w.meaning}</td></tr>`;
   });
-
-  html += `
-      </table>
-      <div style="text-align:center;color:#666;">共 ${allWords.length} 個單字</div>
-    </body>
-    </html>
-  `;
-
-  newWindow.document.write(html);
-  newWindow.document.close();
+  html += `</table></body></html>`;
+  win.document.write(html);
+  win.document.close();
 }
 
-// ====================== 初始化 & 绑定事件 ======================
-document.addEventListener('DOMContentLoaded', () => {
-  // 加载文件列表（从fileList.json读取）
-  loadFileList();
-
-  // 绑定文件选择确认按钮
-  document.getElementById('fileConfirm').addEventListener('click', () => {
-    const selectedFile = document.getElementById('fileSelect').value;
-    loadSelectedFile(selectedFile);
-  });
-
-  // 绑定Day筛选按钮
-  document.getElementById('filterBtn').addEventListener('click', filterByDay);
-
-  // 绑定导出按钮
-  document.getElementById('exportBtn').addEventListener('click', showAllWords);
-});
+document.getElementById("fileConfirm").onclick = () => {
+  const f = document.getElementById("fileSelect").value;
+  loadSelectedFile(f);
+};
+document.getElementById("filterBtn").onclick = filterByDay;
+document.getElementById("exportBtn").onclick = showAllWords;
 </script>
 </body>
 </html>
