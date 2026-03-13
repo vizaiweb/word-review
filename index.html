@@ -98,10 +98,18 @@
 
         const XLSX_URL = "words.xlsx";
 
-      function smartConvertDate(dateStr) {
+   function smartConvertDate(dateStr) {
     if (!dateStr) return "";
-    // 直接返回原格式，不做任何修改，因为你现在是 2026-03-13 标准格式
-    return dateStr.trim();
+    // 如果是数字（Excel 日期序列号）
+    if (typeof dateStr === "number") {
+        const date = new Date(1900, 0, dateStr - 1); // Excel 日期从 1900-01-01 开始
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+    // 如果是字符串，直接返回（你现在的格式是 2026-03-13）
+    return dateStr.toString().trim();
 }
 
         async function loadGitHubXLSX() {
