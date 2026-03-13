@@ -7,13 +7,41 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 /* 基础样式 */
-body{font-family:Arial,微軟雅黑;text-align:center;padding:20px;margin:0;}
-h1{color:#e67e22;margin-bottom:20px;}
+body{font-family:Arial,微軟雅黑;text-align:center;padding:20px;margin:0;background:#f9f9f9;}
+.container{max-width:700px;margin:0 auto;background:white;padding:30px;border-radius:20px;box-shadow:0 0 15px rgba(0,0,0,0.1);}
+h1{color:#e67e22;margin-bottom:30px;}
 
-/* 筛选输入框区域 - 显眼样式 */
-.filter-area{
+/* 文件选择区域 */
+.file-select{
   margin: 20px 0;
   font-size: 24px;
+}
+#fileSelect{
+  width: 200px;
+  height: 50px;
+  font-size: 22px;
+  text-align: center;
+  border: 3px solid #3498db;
+  border-radius: 8px;
+  margin-right: 10px;
+  padding: 0 10px;
+}
+#fileConfirm{
+  height: 50px;
+  font-size: 22px;
+  padding: 0 20px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Day筛选区域 */
+.day-filter{
+  margin: 20px 0;
+  font-size: 24px;
+  display: none; /* 选择文件后才显示 */
 }
 #dayNum{
   width: 100px;
@@ -35,9 +63,10 @@ h1{color:#e67e22;margin-bottom:20px;}
   cursor: pointer;
 }
 
-/* 导出开关按钮 - 醒目样式 */
+/* 导出开关按钮 */
 .export-switch{
   margin: 15px 0;
+  display: none; /* 选择文件后才显示 */
 }
 #exportBtn{
   padding: 12px 30px;
@@ -53,6 +82,7 @@ h1{color:#e67e22;margin-bottom:20px;}
 }
 
 /* 单词显示区域 */
+.word-area{margin: 20px 0;}
 .meaning{font-size: 28px;margin: 20px 0;color: #333;}
 .word{font-size: 48px;font-weight: bold;color: #e74c3c;margin: 20px 0;display: none;}
 .btn-group{margin: 20px 0;}
@@ -68,54 +98,165 @@ button{
 .show-btn{background: #9b59b6;}
 .read-btn{background: #3498db;}
 .next-btn{background: #27ae60;}
+
+/* 提示/加载样式 */
 .tip{font-size: 16px;color: #666;margin-top: 10px;}
+.loading{font-size: 24px;color: #3498db;margin: 20px 0;}
+.error{font-size: 24px;color: #e74c3c;margin: 20px 0;}
 </style>
 </head>
 <body>
-<h1>🌟 寶貝的英文單字複習 🌟</h1>
+<div class="container">
+  <h1>🌟 寶貝的英文單字複習 🌟</h1>
 
-<!-- 1. 筛选输入框 -->
-<div class="filter-area">
-  輸入學習天數：
-  <input type="number" id="dayNum" placeholder="1-10" min="1" max="10">
-  <button id="filterBtn">確認篩選</button>
+  <!-- 1. 文件选择区域（核心新增） -->
+  <div class="file-select">
+    選擇練習文件：
+    <select id="fileSelect">
+      <option value="">載入中...</option>
+    </select>
+    <button id="fileConfirm">確認選擇</button>
+  </div>
+
+  <!-- 2. Day筛选区域（选择文件后显示） -->
+  <div class="day-filter" id="dayFilterArea">
+    輸入學習天數：
+    <input type="number" id="dayNum" placeholder="1-10" min="1" max="10">
+    <button id="filterBtn">確認篩選</button>
+  </div>
+
+  <!-- 3. 导出开关按钮（选择文件后显示） -->
+  <div class="export-switch" id="exportArea">
+    <button id="exportBtn">📋 顯示所有單字 (OFF)</button>
+  </div>
+
+  <!-- 4. 单词显示区域 -->
+  <div class="word-area" id="wordContent">請先選擇練習文件</div>
 </div>
-
-<!-- 2. 新增：导出Excel内容开关按钮 -->
-<div class="export-switch">
-  <button id="exportBtn">📋 顯示所有單字 (OFF)</button>
-</div>
-
-<!-- 3. 单词显示区域 -->
-<div id="wordContent">載入中...</div>
 
 <script>
-let allWords = [];         // 存储所有Excel单词
+// 全局变量
+let allWords = [];         // 当前文件的所有单词
 let filteredWords = [];    // 筛选后的单词
 let currentIdx = 0;        // 当前单词索引
-let exportWindow = null;   // 存储新窗口对象
+let exportWindow = null;   // 导出窗口对象
+let currentFileName = '';  // 当前选中的文件名
 const synth = window.speechSynthesis;
+// GitHub仓库信息（替换为你的实际信息）
+const GITHUB_USER = 'ximonlam';
+const GITHUB_REPO = 'word-review';
+const GITHUB_BRANCH = 'main'; // 通常是main或master
 
-// ====================== 核心新增：导出Excel内容到新窗口 ======================
+// ====================== 核心新增：自动检测GitHub中的XLSX文件 ======================
+async function loadXlsxFilesFromGitHub() {
+  const select = document.getElementById('fileSelect');
+  try {
+    // 调用GitHub API获取仓库文件列表
+    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) throw new Error(`API請求失敗：${response.status}`);
+    
+    const files = await response.json();
+    // 筛选出所有.xlsx文件
+    const xlsxFiles = files.filter(file => 
+      file.name.endsWith('.xlsx') && !file.type === 'dir'
+    );
+
+    // 清空下拉列表
+    select.innerHTML = '';
+    if (xlsxFiles.length === 0) {
+      select.innerHTML = '<option value="">無XLSX文件</option>';
+      return;
+    }
+
+    // 添加文件选项
+    xlsxFiles.forEach(file => {
+      const option = document.createElement('option');
+      option.value = file.name;
+      option.textContent = file.name;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    select.innerHTML = `<option value="">加載失敗：${error.message}</option>`;
+    console.error('加載文件列表失敗：', error);
+  }
+}
+
+// ====================== 核心新增：加载选中的XLSX文件 ======================
+async function loadSelectedXlsxFile(fileName) {
+  if (!fileName) {
+    alert('請選擇有效的文件！');
+    return;
+  }
+
+  currentFileName = fileName;
+  const wordContent = document.getElementById('wordContent');
+  wordContent.innerHTML = '<div class="loading">加載文件中...</div>';
+
+  try {
+    // 构建文件的原始URL
+    const fileUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileName}`;
+    const response = await fetch(fileUrl);
+    
+    if (!response.ok) throw new Error(`文件加載失敗：${response.status}`);
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    // 处理单词数据
+    allWords = data.filter(x => x.word && x.meaning && x.day).map(item => ({
+      word: item.word,
+      meaning: item.meaning,
+      day: Number(item.day)
+    }));
+
+    if (allWords.length === 0) {
+      wordContent.innerHTML = '<div class="error">文件中無有效單字</div>';
+      return;
+    }
+
+    // 初始化筛选为所有单词
+    filteredWords = [...allWords];
+    currentIdx = 0;
+
+    // 显示Day筛选和导出区域
+    document.getElementById('dayFilterArea').style.display = 'block';
+    document.getElementById('exportArea').style.display = 'block';
+
+    // 显示第一个单词
+    showWord();
+  } catch (error) {
+    wordContent.innerHTML = `<div class="error">加載失敗：${error.message}</div>`;
+    console.error('加載XLSX失敗：', error);
+  }
+}
+
+// ====================== 导出所有单词到新窗口 ======================
 function toggleExportWords() {
+  if (allWords.length === 0) {
+    alert('當前無可顯示的單字！');
+    return;
+  }
+
   const exportBtn = document.getElementById('exportBtn');
-  
-  // 1. 如果是OFF状态 → 打开新窗口显示所有单词
+  // OFF → ON：打开新窗口
   if (exportBtn.classList.contains('off') || !exportBtn.classList.contains('on')) {
-    // 创建新窗口（宽度800，高度600，居中显示）
     exportWindow = window.open('', 'AllWords', 'width=800,height=600,left=200,top=100');
     if (!exportWindow) {
       alert('請允許彈窗！否則無法顯示所有單字');
       return;
     }
 
-    // 构建新窗口的HTML内容（表格形式展示所有单词）
+    // 构建新窗口HTML
     let htmlContent = `
       <!DOCTYPE html>
       <html lang="zh-CN">
       <head>
         <meta charset="UTF-8">
-        <title>所有學習單字列表</title>
+        <title>${currentFileName} - 所有單字列表</title>
         <style>
           body{font-family:Arial,微軟雅黑;padding:20px;}
           h2{color:#e67e22;text-align:center;}
@@ -126,12 +267,12 @@ function toggleExportWords() {
         </style>
       </head>
       <body>
-        <h2>📚 所有學習單字列表</h2>
+        <h2>📚 ${currentFileName} - 所有學習單字列表</h2>
         <table>
           <tr><th>Day</th><th>英文單字</th><th>中文釋義</th></tr>
     `;
 
-    // 遍历所有单词，生成表格行
+    // 生成单词表格
     allWords.forEach(word => {
       htmlContent += `
         <tr>
@@ -142,7 +283,6 @@ function toggleExportWords() {
       `;
     });
 
-    // 关闭表格和HTML
     htmlContent += `
         </table>
         <div style="text-align:center;color:#666;">共 ${allWords.length} 個單字</div>
@@ -150,7 +290,6 @@ function toggleExportWords() {
       </html>
     `;
 
-    // 写入新窗口内容
     exportWindow.document.write(htmlContent);
     exportWindow.document.close();
 
@@ -159,19 +298,16 @@ function toggleExportWords() {
     exportBtn.classList.remove('off');
     exportBtn.classList.add('on');
   } 
-  // 2. 如果是ON状态 → 关闭新窗口
+  // ON → OFF：关闭窗口
   else {
-    if (exportWindow && !exportWindow.closed) {
-      exportWindow.close();
-    }
-    // 更新按钮状态
+    if (exportWindow && !exportWindow.closed) exportWindow.close();
     exportBtn.textContent = '📋 顯示所有單字 (OFF)';
     exportBtn.classList.remove('on');
     exportBtn.classList.add('off');
   }
 }
 
-// ====================== 原有功能：语音朗读 ======================
+// ====================== 语音朗读功能 ======================
 function getVoices() {
   return new Promise(resolve => {
     let voices = synth.getVoices();
@@ -201,32 +337,19 @@ function read3Times(word) {
   }, 2000);
 }
 
-// ====================== 原有功能：Excel读取 & 筛选 ======================
-async function loadExcel() {
-  try {
-    const res = await fetch('words.xlsx');
-    const buf = await res.arrayBuffer();
-    const wb = XLSX.read(buf, {type: 'array'});
-    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    // 存储所有单词（含day列）
-    allWords = data.filter(x => x.word && x.meaning && x.day).map(item => ({
-      word: item.word,
-      meaning: item.meaning,
-      day: Number(item.day)
-    }));
-    filteredWords = [...allWords];
-    showWord();
-  } catch (e) {
-    document.getElementById('wordContent').innerText = `加載失敗：${e.message}`;
-  }
-}
-
+// ====================== Day筛选 & 单词显示 ======================
 function filterByDay() {
+  if (allWords.length === 0) {
+    alert('請先選擇練習文件！');
+    return;
+  }
+
   const day = Number(document.getElementById('dayNum').value);
   if (isNaN(day) || day < 1 || day > 10) {
     alert('請輸入1-10之間的數字！');
     return;
   }
+
   filteredWords = allWords.filter(x => x.day === day);
   currentIdx = 0;
   showWord();
@@ -235,14 +358,17 @@ function filterByDay() {
 function showWord() {
   clearInterval(window.readTimer);
   const content = document.getElementById('wordContent');
+  
   if (filteredWords.length === 0) {
-    content.innerText = '沒有找到對應天數的單字';
+    content.innerHTML = '<div class="error">沒有找到對應天數的單字</div>';
     return;
   }
+  
   if (currentIdx >= filteredWords.length) {
     content.innerHTML = '<div>🎉 所有單字複習完成！</div>';
     return;
   }
+  
   const w = filteredWords[currentIdx];
   content.innerHTML = `
     <div class="meaning">💡 中文：${w.meaning}</div>
@@ -252,7 +378,7 @@ function showWord() {
       <button class="read-btn" onclick="read3Times('${w.word}')">🔊 朗讀3次</button>
       <button class="next-btn" onclick="nextWord()">➡️ 下一個</button>
     </div>
-    <div class="tip">當前Day：${w.day} | 剩餘：${filteredWords.length - currentIdx - 1} 個</div>
+    <div class="tip">當前文件：${currentFileName} | Day：${w.day} | 剩餘：${filteredWords.length - currentIdx - 1} 個</div>
   `;
 }
 
@@ -261,14 +387,23 @@ function nextWord() {
   showWord();
 }
 
-// ====================== 绑定事件 ======================
-// 筛选按钮事件
-document.getElementById('filterBtn').addEventListener('click', filterByDay);
-// 新增：导出开关按钮事件
-document.getElementById('exportBtn').addEventListener('click', toggleExportWords);
+// ====================== 绑定所有事件 ======================
+document.addEventListener('DOMContentLoaded', () => {
+  // 加载XLSX文件列表
+  loadXlsxFilesFromGitHub();
 
-// 初始化
-loadExcel();
+  // 文件选择确认按钮
+  document.getElementById('fileConfirm').addEventListener('click', () => {
+    const selectedFile = document.getElementById('fileSelect').value;
+    loadSelectedXlsxFile(selectedFile);
+  });
+
+  // Day筛选按钮
+  document.getElementById('filterBtn').addEventListener('click', filterByDay);
+
+  // 导出按钮
+  document.getElementById('exportBtn').addEventListener('click', toggleExportWords);
+});
 </script>
 </body>
 </html>
