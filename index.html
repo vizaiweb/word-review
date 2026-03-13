@@ -11,32 +11,18 @@
             max-width: 600px;
             margin: 30px auto;
             padding: 20px;
-            background-color: #f9f9f9;
+            background: #f9f9f9;
             text-align: center;
         }
         .container {
-            background-color: white;
+            background: white;
             padding: 30px;
             border-radius: 20px;
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
-        h1 {
-            color: #e67e22;
-            font-size: 36px;
-            margin-bottom: 30px;
-        }
-        .meaning {
-            font-size: 28px;
-            color: #2c3e50;
-            margin: 20px 0;
-        }
-        .word {
-            font-size: 48px;
-            font-weight: bold;
-            color: #e74c3c;
-            margin: 30px 0;
-            display: none; /* 默认隐藏单词 */
-        }
+        h1 { color: #e67e22; font-size: 36px; margin-bottom: 30px; }
+        .meaning { font-size: 28px; color: #2c3e50; margin: 20px 0; }
+        .word { font-size: 48px; font-weight: bold; color: #e74c3c; margin: 30px 0; display: none; }
         button {
             font-size: 24px;
             padding: 15px 40px;
@@ -47,17 +33,12 @@
             color: white;
             transition: all 0.3s;
         }
-        .show-btn { background-color: #9b59b6; }
-        .next-btn { background-color: #27ae60; }
-        .read-btn { background-color: #3498db; } /* 朗读按钮样式 */
+        .show-btn { background: #9b59b6; }
+        .next-btn { background: #27ae60; }
+        .read-btn { background: #3498db; }
         button:hover { opacity: 0.9; transform: scale(1.05); }
         .loading { font-size: 24px; color: #3498db; margin: 50px 0; }
         .finish { font-size: 28px; color: #27ae60; margin: 50px 0; }
-        .read-tip {
-            font-size: 16px;
-            color: #666;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -69,9 +50,28 @@
     <script>
         let allWords = [];
         let currentIndex = 0;
-        let readTimer = null; // 用于控制朗读间隔的定时器
+        let synth = window.speechSynthesis; // 提前初始化语音对象
+        let voices = []; // 存储可用语音列表
 
-        // 读取Excel文件（只取word和meaning列）
+        // 第一步：提前加载语音列表（解决浏览器延迟问题）
+        function loadVoices() {
+            voices = synth.getVoices();
+            // 如果没加载到语音，1秒后重试（最多5次）
+            if (voices.length === 0 && loadVoices.retryCount < 5) {
+                loadVoices.retryCount++;
+                setTimeout(loadVoices, 1000);
+            }
+        }
+        loadVoices.retryCount = 0;
+        // 监听语音加载事件
+        synth.onvoiceschanged = loadVoices;
+        // 页面加载时立即触发语音加载
+        window.onload = function() {
+            loadVoices();
+            loadWords();
+        };
+
+        // 读取Excel文件
         async function loadWords() {
             try {
                 const response = await fetch('words.xlsx');
@@ -82,64 +82,67 @@
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 
-                // 转换为JSON，只保留word和meaning
                 allWords = XLSX.utils.sheet_to_json(worksheet).map(item => ({
                     word: item.word || '',
                     meaning: item.meaning || ''
-                })).filter(item => item.word.trim() && item.meaning.trim()); // 过滤空单词
+                })).filter(item => item.word.trim() && item.meaning.trim());
                 
                 if (allWords.length === 0) {
                     document.getElementById('content').innerHTML = '<div class="loading">❌ 沒有找到有效單字</div>';
                     return;
                 }
-                
-                // 显示第一个单词
                 showCurrentWord();
             } catch (error) {
                 document.getElementById('content').innerHTML = `<div class="loading">❌ 載入失敗：${error.message}</div>`;
             }
         }
 
-        // 单个单词朗读（基础函数）
+        // 核心：修复后的朗读函数（兼容所有浏览器）
         function readSingleWord(word) {
-            window.speechSynthesis.cancel(); // 停止当前朗读
+            // 1. 强制停止所有朗读
+            synth.cancel();
+            // 2. 创建朗读对象
             const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'en-US'; // 美式英语
-            utterance.rate = 0.8; // 朗读速度
-            utterance.volume = 1; // 音量
-            window.speechSynthesis.speak(utterance);
+            // 3. 优先选择英文语音（解决语音类型错误）
+            const enVoice = voices.find(voice => voice.lang.includes('en'));
+            if (enVoice) {
+                utterance.voice = enVoice;
+            }
+            // 4. 基础设置（降低速度，更清晰）
+            utterance.lang = 'en-US';
+            utterance.rate = 0.7; // 比之前更慢，适合小朋友
+            utterance.volume = 1;
+            utterance.pitch = 1; // 音调正常
+            // 5. 强制触发朗读（关键！解决浏览器不响应问题）
+            setTimeout(() => {
+                synth.speak(utterance);
+            }, 100);
         }
 
-        // 核心功能：朗读3次，间隔2秒
+        // 朗读3次，间隔2秒
         function readWordThreeTimes(word) {
-            // 清除之前的定时器（避免重复朗读）
-            if (readTimer) clearInterval(readTimer);
-            
-            let readCount = 0; // 朗读次数计数器
-            
-            // 立即朗读第一次
-            readSingleWord(word);
-            readCount++;
+            // 清除旧定时器
+            clearInterval(window.readTimer);
+            let count = 0;
 
-            // 每隔2秒朗读一次，直到读满3次
-            readTimer = setInterval(() => {
-                if (readCount < 3) {
+            // 立即读第一次
+            readSingleWord(word);
+            count++;
+
+            // 间隔2秒读剩下的
+            window.readTimer = setInterval(() => {
+                if (count < 3) {
                     readSingleWord(word);
-                    readCount++;
+                    count++;
                 } else {
-                    // 读满3次后清除定时器
-                    clearInterval(readTimer);
-                    readTimer = null;
+                    clearInterval(window.readTimer);
                 }
-            }, 2000); // 2秒间隔
+            }, 2000);
         }
 
         // 显示当前单词
         function showCurrentWord() {
-            // 切换单词时停止上一个单词的朗读
-            if (readTimer) clearInterval(readTimer);
-            readTimer = null;
-
+            clearInterval(window.readTimer);
             if (currentIndex >= allWords.length) {
                 document.getElementById('content').innerHTML = '<div class="finish">🎉 所有單字複習完成！</div>';
                 return;
@@ -152,10 +155,7 @@
                 <button class="show-btn" onclick="document.getElementById('wordText').style.display='block'">👀 顯示單字</button>
                 <button class="read-btn" onclick="readWordThreeTimes('${wordItem.word}')">🔊 朗讀3次</button>
                 <button class="next-btn" onclick="nextWord()">➡️ 下一個</button>
-                <div class="read-tip">点击朗读按钮，单词会连读3次（间隔2秒）</div>
             `;
-            // 可选：显示单词后自动朗读3次（取消下面注释即可）
-            // readWordThreeTimes(wordItem.word);
         }
 
         // 下一个单词
@@ -163,9 +163,6 @@
             currentIndex++;
             showCurrentWord();
         }
-
-        // 页面加载完成后执行
-        window.onload = loadWords;
     </script>
 </body>
 </html>
