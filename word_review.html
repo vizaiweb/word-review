@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>宝贝的英文单词复习（Google Sheets版）</title>
+    <title>宝贝的英文单词复习</title>
     <style>
         body {
             font-family: Arial, 微软雅黑;
@@ -86,7 +86,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🌟 宝贝的英文单词复习（Google Sheets版）🌟</h1>
+        <h1>🌟 宝贝的英文单词复习 🌟</h1>
         <div class="debug-info" id="debugInfo">正在加载单词表...</div>
         <div class="date-info" id="dateInfo"></div>
         <div id="wordContent">
@@ -101,19 +101,35 @@
         const speechRate = 0.8;
         const pauseTime = 2000;
 
-        // 👇 把这里换成你的 Google Sheets CSV 链接
-        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1XGzNS8syHGCw-s4YEwsQImhBNbKHXhet5AGGA9hHmC0/edit?gid=0#gid=0";
+        // ✅ 已填入你的 Google Sheets CSV 链接（转换为正确格式）
+        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1XGzNS8syHGCw-s4YEwsQImhBNbKHXhet5AGGA9hHmC0/export?format=csv";
 
-        // ✅ 适配新日期格式：2026/3/13 → 2026-03-13
-        function convertDate(dateStr) {
+        // ✨ 智能识别所有日期格式
+        function smartConvertDate(dateStr) {
             if (!dateStr) return "";
-            const parts = dateStr.split("/");
-            if (parts.length === 3) {
+            
+            // 先统一替换分隔符：- → /
+            dateStr = dateStr.replace(/-/g, "/");
+            const parts = dateStr.split("/").filter(p => p); // 过滤空值
+            
+            if (parts.length !== 3) return dateStr;
+
+            // 识别格式：
+            // 情况1：年/月/日 → 2026/3/13
+            if (parts[0].length === 4) {
                 const year = parts[0];
                 const month = parts[1].padStart(2, "0");
                 const day = parts[2].padStart(2, "0");
                 return `${year}-${month}-${day}`;
             }
+            // 情况2：日/月/年 → 13/3/2026
+            else if (parts[2].length === 4) {
+                const day = parts[0].padStart(2, "0");
+                const month = parts[1].padStart(2, "0");
+                const year = parts[2];
+                return `${year}-${month}-${day}`;
+            }
+            // 其他情况直接返回
             return dateStr;
         }
 
@@ -121,34 +137,40 @@
         async function loadGoogleSheetData() {
             try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
+                if (!response.ok) throw new Error(`请求失败：${response.status}`);
+                
                 const csvText = await response.text();
                 
-                // 解析 CSV
-                const lines = csvText.split("\n");
+                // 解析 CSV（处理换行和空行）
+                const lines = csvText.split("\n").filter(line => line.trim());
+                if (lines.length === 0) throw new Error("CSV 内容为空");
+                
                 const headers = lines[0].split(",").map(h => h.trim());
                 const data = lines.slice(1).map(line => {
                     const values = line.split(",").map(v => v.trim());
                     let obj = {};
-                    headers.forEach((h, i) => obj[h] = values[i]);
+                    headers.forEach((h, i) => obj[h] = values[i] || "");
                     return obj;
-                }).filter(item => item.word); // 过滤空行
+                }).filter(item => item.word.trim()); // 过滤空单词行
 
+                // 转换数据格式
                 wordDatabase = data.map(item => ({
-                    word: item.word,
-                    meaning: item.meaning,
-                    date: convertDate(item.date)
+                    word: item.word.trim(),
+                    meaning: item.meaning.trim(),
+                    date: smartConvertDate(item.date)
                 }));
 
                 document.getElementById('debugInfo').textContent = `✅ 加载到 ${wordDatabase.length} 行单词`;
                 init();
             } catch (err) {
                 document.getElementById('debugInfo').textContent = `❌ 加载失败：${err.message}`;
-                console.error(err);
+                console.error("加载详情：", err);
             }
         }
 
         // 初始化：匹配本地日期
         function init() {
+            // 获取本地时区的当天日期
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -156,6 +178,8 @@
             const systemToday = `${year}-${month}-${day}`;
 
             document.getElementById('dateInfo').textContent = `📅 今天：${systemToday}`;
+            
+            // 筛选今日单词
             todayWords = wordDatabase.filter(word => word.date === systemToday);
             document.getElementById('debugInfo').textContent += ` | 匹配到 ${todayWords.length} 个今日单词`;
 
@@ -163,39 +187,51 @@
                 document.getElementById('wordContent').innerHTML = `<div class="no-word">🎉 今天没有需要复习的单词！</div>`;
                 return;
             }
+            
             currentIndex = 0;
             showWord(currentIndex);
         }
 
-        // 朗读单词
+        // 朗读单词（带停顿）
         function speakWord(word, count) {
             const readCountEl = document.querySelector('.read-count');
             if (readCountEl) readCountEl.textContent = `正在读第 ${count} 遍...`;
             
             setTimeout(() => {
+                // 兼容 iOS 语音合成
+                if (!window.speechSynthesis) {
+                    if (readCountEl) readCountEl.textContent = "⚠️ 浏览器不支持发音";
+                    return;
+                }
+                
                 const utterance = new SpeechSynthesisUtterance(word);
-                utterance.lang = 'en-US';
-                utterance.rate = speechRate;
+                utterance.lang = 'en-US'; // 美式发音
+                utterance.rate = speechRate; // 语速适配小朋友
                 window.speechSynthesis.speak(utterance);
+                
                 utterance.onend = () => {
                     if (readCountEl) readCountEl.textContent = `第 ${count} 遍读完啦 ✨`;
                 };
             }, pauseTime);
         }
 
+        // 连续读3遍单词
         function readWordThreeTimes(word) {
             const readCountEl = document.querySelector('.read-count');
             if (readCountEl) readCountEl.textContent = '';
+            
             speakWord(word, 1);
             setTimeout(() => speakWord(word, 2), pauseTime + 2000);
             setTimeout(() => speakWord(word, 3), pauseTime * 2 + 4000);
         }
 
+        // 显示当前单词（默认隐藏英文）
         function showWord(index) {
             if (index >= todayWords.length) {
                 document.getElementById('wordContent').innerHTML = `<div class="no-word">🎊 恭喜！今天单词复习完成！</div>`;
                 return;
             }
+            
             const word = todayWords[index];
             document.getElementById('wordContent').innerHTML = `
                 <div class="word-card">
@@ -207,13 +243,18 @@
                     <button class="next-btn" onclick="nextWord()">➡️ 下一个</button>
                 </div>
             `;
+            
+            // 自动朗读3遍
             readWordThreeTimes(word.word);
         }
 
+        // 显示隐藏的英文单词
         function showCurrentWord() {
-            document.getElementById('currentWord').style.display = 'block';
+            const wordEl = document.getElementById('currentWord');
+            if (wordEl) wordEl.style.display = 'block';
         }
 
+        // 下一个单词
         function nextWord() {
             currentIndex++;
             showWord(currentIndex);
