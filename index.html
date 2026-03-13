@@ -8,7 +8,13 @@
 <style>
 body{font-family:Arial;text-align:center;padding:20px;margin:0;background:#f9f9f9;}
 .container{max-width:700px;margin:0 auto;background:white;padding:30px;border-radius:20px;box-shadow:0 0 15px rgba(0,0,0,0.1);}
-h1{color:#e67e22;margin-bottom:30px;}
+/* 关键修改：让标题在一行显示 */
+h1{
+  color:#e67e22;
+  margin-bottom:30px;
+  white-space: nowrap; /* 防止换行 */
+  font-size: 32px; /* 稍微缩小字号确保一行显示 */
+}
 
 .file-select{
   margin:20px 0;
@@ -86,6 +92,7 @@ button{font-size:22px;padding:10px 20px;margin:8px;border:none;border-radius:8px
 </head>
 <body>
 <div class="container">
+  <!-- 关键修改：把标题放在一行 -->
   <h1>🌟 Kids Word Practice 🌟</h1>
 
   <!-- 文件选择区域（完全读取fileList.json） -->
