@@ -8,81 +8,47 @@
 <style>
 body{font-family:Arial;text-align:center;padding:20px;margin:0;background:#f9f9f9;}
 .container{
-  max-width:700px;
-  margin:0 auto;
-  background:white;
-  padding:20px;
-  border-radius:20px;
-  box-shadow:0 0 15px rgba(0,0,0,0.1);
-  overflow:hidden;
+  max-width:700px;margin:0 auto;background:white;padding:20px;border-radius:20px;box-shadow:0 0 15px rgba(0,0,0,0.1);overflow:hidden;
 }
 h1{
-  color:#e67e22;
-  margin-bottom:20px;
-  white-space: nowrap;
-  font-size: 28px;
-  text-align: center;
+  color:#e67e22;margin-bottom:20px;white-space: nowrap;font-size:28px;text-align:center;
+}
+
+.level-select{
+  margin:20px 0;font-size:22px;
+}
+#levelSelect{
+  width:150px;height:45px;font-size:20px;text-align:center;border:3px solid #e67e22;border-radius:8px;
+}
+#levelConfirm{
+  height:45px;font-size:20px;padding:0 20px;background:#e67e22;color:white;border:none;border-radius:8px;cursor:pointer;
 }
 
 .file-select{
-  margin:20px 0;
-  font-size:22px;
+  margin:20px 0;font-size:22px;display:none;
 }
 #fileSelect{
-  width:200px;
-  height:45px;
-  font-size:20px;
-  text-align:center;
-  border:3px solid #3498db;
-  border-radius:8px;
+  width:220px;height:45px;font-size:20px;text-align:center;border:3px solid #3498db;border-radius:8px;
 }
 #fileConfirm{
-  height:45px;
-  font-size:20px;
-  padding:0 20px;
-  background:#3498db;
-  color:white;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
+  height:45px;font-size:20px;padding:0 20px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;
 }
 
 .day-filter{
-  margin:20px 0;
-  font-size:22px;
-  display:none;
+  margin:20px 0;font-size:22px;display:none;
 }
 #dayNum{
-  width:100px;
-  height:45px;
-  font-size:22px;
-  text-align:center;
-  border:3px solid #3498db;
-  border-radius:8px;
+  width:100px;height:45px;font-size:22px;text-align:center;border:3px solid #3498db;border-radius:8px;
 }
 #filterBtn{
-  height:45px;
-  font-size:22px;
-  padding:0 20px;
-  background:#3498db;
-  color:white;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
+  height:45px;font-size:22px;padding:0 20px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;
 }
 
 .export-switch{
-  margin:15px 0;
-  display:none;
+  margin:15px 0;display:none;
 }
 #exportBtn{
-  padding:10px 25px;
-  font-size:20px;
-  border:none;
-  border-radius:8px;
-  background:#e74c3c;
-  color:white;
-  cursor:pointer;
+  padding:10px 25px;font-size:20px;border:none;border-radius:8px;background:#e74c3c;color:white;cursor:pointer;
 }
 
 .meaning{font-size:26px;margin:20px 0;}
@@ -94,8 +60,6 @@ button{font-size:20px;padding:10px 20px;margin:8px;border:none;border-radius:8px
 .next-btn{background:#27ae60;}
 
 .tip{font-size:16px;color:#666;margin-top:10px;}
-.loading{font-size:22px;color:#3498db;margin:20px 0;}
-.error{font-size:22px;color:#e74c3c;margin:20px 0;}
 .disabled-btn{background:#cccccc;cursor:not-allowed;}
 </style>
 </head>
@@ -103,17 +67,27 @@ button{font-size:20px;padding:10px 20px;margin:8px;border:none;border-radius:8px
 <div class="container">
   <h1>🌟 Kids Word Practice 🌟</h1>
 
-  <div class="file-select">
+  <div class="level-select">
+    Select Level:
+    <select id="levelSelect">
+      <option value="">Select P1/P2</option>
+      <option value="P1">P1</option>
+      <option value="P2">P2</option>
+    </select>
+    <button id="levelConfirm">Confirm Level</button>
+  </div>
+
+  <div class="file-select" id="fileSelectArea">
     Select File:
     <select id="fileSelect">
       <option value="">Loading files...</option>
     </select>
-    <button id="fileConfirm">Confirm</button>
+    <button id="fileConfirm">Confirm File</button>
   </div>
 
   <div class="day-filter" id="dayFilterArea">
     Enter Day:
-    <input type="number" id="dayNum" min="1" max="20" placeholder="1">
+    <input type="number" id="dayNum" min="1" max:20 placeholder="1">
     <button id="filterBtn">Filter</button>
   </div>
 
@@ -121,7 +95,7 @@ button{font-size:20px;padding:10px 20px;margin:8px;border:none;border-radius:8px
     <button id="exportBtn">📋 Show All Words</button>
   </div>
 
-  <div id="wordContent">Please select a file first</div>
+  <div id="wordContent">Please select Level first (P1/P2)</div>
 </div>
 
 <script>
@@ -129,74 +103,99 @@ let allWords = [];
 let filteredWords = [];
 let currentIdx = 0;
 let currentFileName = "";
+let currentLevel = "";
 const synth = window.speechSynthesis;
 
-// ====================== 工具函数：移除文件名的.xlsx后缀 ======================
+// 去掉 .xlsx
 function removeFileExtension(filename) {
-  // 只移除最后的.xlsx后缀，不影响其他内容
   return filename.replace(/\.xlsx$/i, '');
 }
 
-// ====================== 加载文件列表 ======================
-async function loadFileList() {
-  const select = document.getElementById('fileSelect');
+// 讀取對應 P1 / P2 的 fileList.json
+function getFileListUrl(level) {
+  return `https://raw.githubusercontent.com/ximonlam/word-review/main/data/${level}/fileList.json`;
+}
+
+// 讀取對應的 xlsx 檔案
+function getXlsxFileUrl(level, filename) {
+  return `https://raw.githubusercontent.com/ximonlam/word-review/main/data/${level}/${filename}`;
+}
+
+// 載入 P1 / P2 下的檔案列表
+async function loadFileListByLevel(level) {
+  const fileSelect = document.getElementById('fileSelect');
+  const fileSelectArea = document.getElementById('fileSelectArea');
+  
   try {
-    const res = await fetch('https://raw.githubusercontent.com/ximonlam/word-review/main/fileList.json');
-    if (!res.ok) throw new Error('Config file load failed');
+    const res = await fetch(getFileListUrl(level));
+    if (!res.ok) throw new Error(`No file list for ${level}`);
+    
     const config = await res.json();
     const files = config.files || [];
-    select.innerHTML = '';
+    
+    fileSelect.innerHTML = '';
     if (files.length === 0) {
-      select.innerHTML = '<option value="">No files found</option>';
+      fileSelect.innerHTML = `<option value="">No files in ${level}</option>`;
+      fileSelectArea.style.display = 'block';
       return;
     }
+    
     files.forEach(file => {
       const option = document.createElement('option');
       option.value = file;
-      // 下拉列表也显示无后缀的文件名（可选，如需保留后缀可改回file）
       option.textContent = removeFileExtension(file);
-      select.appendChild(option);
+      fileSelect.appendChild(option);
     });
+    
+    fileSelectArea.style.display = 'block';
+    document.getElementById('wordContent').innerHTML = `Please select a file in ${level}`;
   } catch (e) {
-    select.innerHTML = `<option value="">Load error: ${e.message}</option>`;
+    fileSelect.innerHTML = `<option value="">Load error</option>`;
+    fileSelectArea.style.display = 'block';
   }
 }
 
-// ====================== 加载选中文件 ======================
-async function loadSelectedFile(fileName) {
-  if (!fileName) {
-    alert('Please select a valid file!');
+// 載入選中的單字檔
+async function loadSelectedFile(filename) {
+  if (!filename || !currentLevel) {
+    alert('Please select Level and File first!');
     return;
   }
-  currentFileName = fileName; // 保留完整文件名用于加载
-  document.getElementById("wordContent").innerHTML = "Loading file...";
+  
+  currentFileName = filename;
+  document.getElementById("wordContent").innerHTML = "Loading...";
+  
   try {
-    const url = `https://raw.githubusercontent.com/ximonlam/word-review/main/${fileName}`;
+    const url = getXlsxFileUrl(currentLevel, filename);
     const res = await fetch(url);
-    if (!res.ok) throw new Error('File not found');
+    if (!res.ok) throw new Error("File not found");
+    
     const buf = await res.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
     const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    
     allWords = data.filter(x => x.word && x.meaning && x.day).map(x => ({
       word: x.word,
       meaning: x.meaning,
       day: Number(x.day)
     }));
+    
     filteredWords = [...allWords];
     currentIdx = 0;
+    
     document.getElementById("dayFilterArea").style.display = "block";
     document.getElementById("exportArea").style.display = "block";
     showWord();
   } catch (e) {
-    document.getElementById("wordContent").innerHTML = `Load failed: ${e.message}`;
+    document.getElementById("wordContent").innerHTML = "Load failed";
   }
 }
 
-// ====================== Day筛选 ======================
+// 篩選 Day
 function filterByDay() {
   const day = Number(document.getElementById("dayNum").value);
   if (isNaN(day) || day < 1) {
-    alert('Please enter a valid day (1+)!');
+    alert('Please enter a valid day!');
     return;
   }
   filteredWords = allWords.filter(x => x.day === day);
@@ -204,7 +203,7 @@ function filterByDay() {
   showWord();
 }
 
-// ====================== 语音朗读 ======================
+// 發音
 function getVoices() {
   return new Promise(resolve => {
     let v = synth.getVoices();
@@ -237,7 +236,7 @@ function read3Times(word) {
   }, 2000);
 }
 
-// ====================== Previous/Next按钮 ======================
+// 上一頁 / 下一頁
 function prevWord() {
   if (currentIdx <= 0) return;
   currentIdx--;
@@ -249,25 +248,24 @@ function nextWord() {
   showWord();
 }
 
-// ====================== 显示单词（隐藏.xlsx后缀） ======================
+// 顯示單字
 function showWord() {
   clearInterval(window.readTimer);
   const el = document.getElementById("wordContent");
   
   if (filteredWords.length === 0) {
-    el.innerHTML = "No words for this day";
+    el.innerHTML = `No words for this day`;
     return;
   }
   
   if (currentIdx >= filteredWords.length) {
-    el.innerHTML = "🎉 Practice Complete!";
+    el.innerHTML = `🎉 Practice Complete!`;
     return;
   }
   
   const w = filteredWords[currentIdx];
   const prevBtnClass = currentIdx <= 0 ? "prev-btn disabled-btn" : "prev-btn";
   const prevBtnOnclick = currentIdx <= 0 ? "" : "onclick=\"prevWord()\"";
-  // 关键：使用移除后缀后的文件名显示
   const displayFileName = removeFileExtension(currentFileName);
   
   el.innerHTML = `
@@ -277,17 +275,17 @@ function showWord() {
     <button class="read-btn" onclick="read3Times('${w.word}')">🔊 Read 3x</button>
     <button class="${prevBtnClass}" ${prevBtnOnclick}>⬅️ Previous</button>
     <button class="next-btn" onclick="nextWord()">➡️ Next</button>
-    <div class="tip">File: ${displayFileName}  Day: ${w.day} | Current: ${currentIdx + 1}/${filteredWords.length}</div>
+    <div class="tip">Level: ${currentLevel} | File: ${displayFileName} | Day: ${w.day} | Current: ${currentIdx + 1}/${filteredWords.length}</div>
   `;
 }
 
-// ====================== 导出所有单词（导出页面也隐藏后缀） ======================
+// 顯示全部單字
 function showAllWords() {
   if (allWords.length === 0) {
     alert('No words to show!');
     return;
   }
-  let win = window.open("", "_blank", "width=800,height=600");
+  let win = window.open("", "_blank", "width=800,height:600");
   const displayFileName = removeFileExtension(currentFileName);
   let html = `
   <html>
@@ -298,25 +296,35 @@ function showAllWords() {
   th,td{border:1px solid #ccc;padding:10px;text-align:center;}</style>
   </head>
   <body>
-  <h2>${displayFileName} - All Words</h2>
+  <h2>${currentLevel} - ${displayFileName} - All Words</h2>
   <table>
   <tr><th>Day</th><th>Word</th><th>Meaning</th></tr>
   `;
   allWords.forEach(w => {
     html += `<tr><td>${w.day}</td><td>${w.word}</td><td>${w.meaning}</td></tr>`;
   });
-  html += `</table><div style="text-align:center;color:#666;">Total: ${allWords.length} words</div></body></html>`;
+  html += `</table></body></html>`;
   win.document.write(html);
   win.document.close();
 }
 
-// ====================== 初始化 ======================
+// 初始化
 document.addEventListener('DOMContentLoaded', () => {
-  loadFileList();
-  document.getElementById("fileConfirm").onclick = () => {
-    const f = document.getElementById("fileSelect").value;
-    loadSelectedFile(f);
+  document.getElementById("levelConfirm").onclick = () => {
+    const level = document.getElementById("levelSelect").value;
+    if (!level) {
+      alert('Please select P1 or P2!');
+      return;
+    }
+    currentLevel = level;
+    loadFileListByLevel(level);
   };
+
+  document.getElementById("fileConfirm").onclick = () => {
+    const file = document.getElementById("fileSelect").value;
+    loadSelectedFile(file);
+  };
+
   document.getElementById("filterBtn").onclick = filterByDay;
   document.getElementById("exportBtn").onclick = showAllWords;
 });
