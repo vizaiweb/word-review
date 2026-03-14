@@ -42,12 +42,16 @@ function initDaySelectToggle() {
   const daySelect = document.getElementById('daySelect');
   const dayNum = document.getElementById('dayNum');
   
-  // 切换下拉选项时显示/隐藏数字输入框
+  // 切换下拉选项时控制输入框状态
   daySelect.addEventListener('change', function() {
     if (this.value === 'all') {
-      dayNum.classList.add('hidden');
+      // All Words：禁用+隐藏输入框
+      dayNum.disabled = true;
+      dayNum.classList.add('disabled-hidden');
     } else {
-      dayNum.classList.remove('hidden');
+      // Custom Day：启用+显示输入框
+      dayNum.disabled = false;
+      dayNum.classList.remove('disabled-hidden');
     }
   });
 }
@@ -123,7 +127,7 @@ async function loadSelectedFile(filename) {
       day: Number(item.day)
     }));
     
-    // 初始化筛选列表
+    // 初始化筛选列表（默认加载所有）
     filteredWords = [...allWords];
     currentIdx = 0;
     showWord();
@@ -147,15 +151,18 @@ function filterByDay() {
   const daySelect = document.getElementById('daySelect');
   const dayNum = document.getElementById('dayNum');
   
-  // 选择All时加载所有单词
+  // 选择All时强制加载所有单词
   if (daySelect.value === 'all') {
-    filteredWords = [...allWords];
+    // 深拷贝避免引用问题，确保加载完整数据
+    filteredWords = JSON.parse(JSON.stringify(allWords));
     currentIdx = 0;
     showWord();
+    // 可选：提示用户加载的单词数量
+    alert(`✅ Loaded all ${filteredWords.length} words!`);
     return;
   }
   
-  // 按数字Day筛选
+  // 按数字Day筛选（原有逻辑）
   const day = Number(dayNum.value);
   if (isNaN(day) || day < 1) {
     alert('Please enter a valid day number (≥1)!');
@@ -389,7 +396,14 @@ function showAllWords() {
 // ====================== 初始化事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
   const showAllBtn = document.getElementById('showAllBtn');
+  const daySelect = document.getElementById('daySelect');
+  const dayNum = document.getElementById('dayNum');
   
+  // 初始化时重置Day选择框状态
+  daySelect.value = 'custom';
+  dayNum.disabled = false;
+  dayNum.classList.remove('disabled-hidden');
+
   // 初始化Day选择框切换逻辑
   initDaySelectToggle();
 
