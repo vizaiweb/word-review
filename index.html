@@ -11,23 +11,22 @@ body{font-family:Arial;text-align:center;padding:20px;margin:0;background:#f9f9f
   max-width:700px;
   margin:0 auto;
   background:white;
-  padding:20px; /* 稍微缩小内边距，给标题更多空间 */
+  padding:20px;
   border-radius:20px;
   box-shadow:0 0 15px rgba(0,0,0,0.1);
-  overflow:hidden; /* 防止内容溢出 */
+  overflow:hidden;
 }
-/* 关键修改：缩小字号+强制不换行+居中 */
 h1{
   color:#e67e22;
   margin-bottom:20px;
   white-space: nowrap;
-  font-size: 28px; /* 再缩小字号，确保手机端不越界 */
+  font-size: 28px;
   text-align: center;
 }
 
 .file-select{
   margin:20px 0;
-  font-size:22px; /* 稍微缩小，避免和标题抢空间 */
+  font-size:22px;
 }
 #fileSelect{
   width:200px;
@@ -91,11 +90,13 @@ h1{
 button{font-size:20px;padding:10px 20px;margin:8px;border:none;border-radius:8px;color:white;cursor:pointer;}
 .show-btn{background:#9b59b6;}
 .read-btn{background:#3498db;}
+.prev-btn{background:#8e44ad;} /* Previous按钮专属样式 */
 .next-btn{background:#27ae60;}
 
 .tip{font-size:16px;color:#666;margin-top:10px;}
 .loading{font-size:22px;color:#3498db;margin:20px 0;}
 .error{font-size:22px;color:#e74c3c;margin:20px 0;}
+.disabled-btn{background:#cccccc;cursor:not-allowed;} /* 禁用状态样式 */
 </style>
 </head>
 <body>
@@ -130,6 +131,7 @@ let currentIdx = 0;
 let currentFileName = "";
 const synth = window.speechSynthesis;
 
+// ====================== 加载文件列表 ======================
 async function loadFileList() {
   const select = document.getElementById('fileSelect');
   try {
@@ -153,6 +155,7 @@ async function loadFileList() {
   }
 }
 
+// ====================== 加载选中文件 ======================
 async function loadSelectedFile(fileName) {
   if (!fileName) {
     alert('Please select a valid file!');
@@ -182,6 +185,7 @@ async function loadSelectedFile(fileName) {
   }
 }
 
+// ====================== Day筛选 ======================
 function filterByDay() {
   const day = Number(document.getElementById("dayNum").value);
   if (isNaN(day) || day < 1) {
@@ -193,6 +197,7 @@ function filterByDay() {
   showWord();
 }
 
+// ====================== 语音朗读 ======================
 function getVoices() {
   return new Promise(resolve => {
     let v = synth.getVoices();
@@ -225,33 +230,53 @@ function read3Times(word) {
   }, 2000);
 }
 
+// ====================== 核心新增：Previous按钮逻辑 ======================
+function prevWord() {
+  // 已经是第一个单词，不执行操作
+  if (currentIdx <= 0) return;
+  
+  currentIdx--;
+  showWord();
+}
+
+function nextWord() {
+  currentIdx++;
+  showWord();
+}
+
+// ====================== 显示单词（包含Previous按钮） ======================
 function showWord() {
   clearInterval(window.readTimer);
   const el = document.getElementById("wordContent");
+  
   if (filteredWords.length === 0) {
     el.innerHTML = "No words for this day";
     return;
   }
+  
   if (currentIdx >= filteredWords.length) {
     el.innerHTML = "🎉 Practice Complete!";
     return;
   }
+  
   const w = filteredWords[currentIdx];
+  // 判断是否是第一个单词，决定Previous按钮是否禁用
+  const prevBtnClass = currentIdx <= 0 ? "prev-btn disabled-btn" : "prev-btn";
+  const prevBtnOnclick = currentIdx <= 0 ? "" : "onclick=\"prevWord()\"";
+  
   el.innerHTML = `
     <div class="meaning">💡 ${w.meaning}</div>
     <div class="word" id="w">${w.word.toUpperCase()}</div>
     <button class="show-btn" onclick="document.getElementById('w').style.display='block'">👀 Show Word</button>
     <button class="read-btn" onclick="read3Times('${w.word}')">🔊 Read 3x</button>
-    <button class="next-btn" onclick="next()">➡️ Next</button>
-    <div class="tip">File: ${currentFileName}  Day: ${w.day}</div>
+    <!-- 新增Previous按钮 -->
+    <button class="${prevBtnClass}" ${prevBtnOnclick}>⬅️ Previous</button>
+    <button class="next-btn" onclick="nextWord()">➡️ Next</button>
+    <div class="tip">File: ${currentFileName}  Day: ${w.day} | Current: ${currentIdx + 1}/${filteredWords.length}</div>
   `;
 }
 
-function next() {
-  currentIdx++;
-  showWord();
-}
-
+// ====================== 导出所有单词 ======================
 function showAllWords() {
   if (allWords.length === 0) {
     alert('No words to show!');
@@ -279,6 +304,7 @@ function showAllWords() {
   win.document.close();
 }
 
+// ====================== 初始化 ======================
 document.addEventListener('DOMContentLoaded', () => {
   loadFileList();
   document.getElementById("fileConfirm").onclick = () => {
