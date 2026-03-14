@@ -79,7 +79,6 @@ async function loadSelectedFile(filename) {
     currentIdx = 0;
     showWord();
     
-    // ✅ Show the button ONLY after successful file load
     document.getElementById('showAllBtn').style.display = 'inline-block';
     
   } catch (e) {
@@ -281,15 +280,15 @@ function showAllWords() {
   newWindow.document.close();
 }
 
-// ====================== Initialize Events (FIXED) ======================
+// ====================== 修复后的按钮事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
   const showAllBtn = document.getElementById('showAllBtn');
-  const levelConfirmBtn = document.getElementById('levelConfirm');
-  const fileConfirmBtn = document.getElementById('fileConfirm');
-  const filterBtn = document.getElementById('filterBtn');
   
-  // Fix Level Confirm Button (100% responsive)
-  levelConfirmBtn.addEventListener('click', () => {
+  // Level Confirm Button
+  document.getElementById('levelConfirm').addEventListener('click', function(e) {
+    this.style.opacity = '0.7';
+    setTimeout(() => this.style.opacity = '1', 200);
+    
     const level = document.getElementById('levelSelect').value;
     if (!level) {
       alert('Please select P1 or P2 first!');
@@ -297,11 +296,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     currentLevel = level;
     loadFileListByLevel(level);
-    showAllBtn.style.display = 'none'; // Keep hidden
+    showAllBtn.style.display = 'none';
   });
 
-  // Fix File Confirm Button (100% responsive)
-  fileConfirmBtn.addEventListener('click', () => {
+  // File Confirm Button
+  document.getElementById('fileConfirm').addEventListener('click', function(e) {
+    this.style.opacity = '0.7';
+    setTimeout(() => this.style.opacity = '1', 200);
+    
     const file = document.getElementById('fileSelect').value;
     if (!file || file === "Loading..." || file === "No files" || file === "Load error") {
       alert('Please select a valid file first!');
@@ -310,9 +312,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSelectedFile(file);
   });
 
-  // Fix Filter Button
-  filterBtn.addEventListener('click', filterByDay);
+  // Filter Button
+  document.getElementById('filterBtn').addEventListener('click', function(e) {
+    this.style.opacity = '0.7';
+    setTimeout(() => this.style.opacity = '1', 200);
+    filterByDay();
+  });
 
-  // Show All Words Button Click
+  // Show All Words Button
   showAllBtn.addEventListener('click', showAllWords);
 });
