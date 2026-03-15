@@ -36,15 +36,15 @@
                 <button class="btn-file" id="fileConfirm">Confirm</button>
             </div>
 
-            <!-- 新增All选项的Day选择区 -->
+            <!-- Day选择区 -->
             <div class="select-row" id="dayRow" style="display:none;">
                 <label>Day:</label>
                 <div style="display: flex; flex: 1; gap: 8px;">
                     <select id="daySelect" style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
+                        <option value="all" selected>All Words</option>
                         <option value="custom">Custom Day</option>
-                        <option value="all">All Words</option>
                     </select>
-                    <input type="number" id="dayNum" min="1" placeholder="1" value="1" style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
+                    <input type="text" id="dayNum" value="--" readonly style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
                 </div>
                 <button class="btn-filter" id="filterBtn">Filter</button>
             </div>
