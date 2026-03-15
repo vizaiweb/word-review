@@ -36,7 +36,7 @@ function getXlsxFileUrl(level, filename) {
 }
 
 /**
- * 仅修改此函数：初始化Day选择框切换逻辑（All/Custom）
+ * 修复：切回All Words时强制显示--
  */
 function initDaySelectToggle() {
   const daySelect = document.getElementById('daySelect');
@@ -45,15 +45,16 @@ function initDaySelectToggle() {
   // 切换下拉选项时控制输入框状态
   daySelect.addEventListener('change', function() {
     if (this.value === 'all') {
-      // All Words：显示--，只读
+      // 强制重置输入框为--，并设为只读文本类型
+      dayNum.type = 'text'; // 先改类型，避免数字类型无法显示--
       dayNum.value = '--';
       dayNum.readOnly = true;
-      dayNum.type = 'text';
+      dayNum.min = ''; // 清空数字最小值限制
     } else {
-      // Custom Day：显示1，可编辑（数字类型）
+      // Custom Day：恢复数字输入框，显示1
+      dayNum.type = 'number';
       dayNum.value = '1';
       dayNum.readOnly = false;
-      dayNum.type = 'number';
       dayNum.min = '1';
     }
   });
