@@ -309,6 +309,12 @@ function showWord() {
     </div>
     <div class="tip">Level: ${currentLevel} | File: ${displayFileName} | Day: ${wordData.day} | ${currentIdx + 1}/${filteredWords.length}</div>
   `;
+
+  // 新增：超长单词额外缩小字号（长度>10时）
+  const wordEl = document.getElementById('currentWord');
+  if (wordData.word.length > 10) {
+    wordEl.style.fontSize = 'clamp(20px, 6vw, 40px)';
+  }
 }
 
 // ====================== 显示所有单词（新窗口） ======================
