@@ -36,7 +36,7 @@ function getXlsxFileUrl(level, filename) {
 }
 
 /**
- * 初始化Day选择框切换逻辑（All/Custom）
+ * 仅修改此函数：初始化Day选择框切换逻辑（All/Custom）
  */
 function initDaySelectToggle() {
   const daySelect = document.getElementById('daySelect');
@@ -45,13 +45,16 @@ function initDaySelectToggle() {
   // 切换下拉选项时控制输入框状态
   daySelect.addEventListener('change', function() {
     if (this.value === 'all') {
-      // All Words：禁用+隐藏输入框
-      dayNum.disabled = true;
-      dayNum.classList.add('disabled-hidden');
+      // All Words：显示--，只读
+      dayNum.value = '--';
+      dayNum.readOnly = true;
+      dayNum.type = 'text';
     } else {
-      // Custom Day：启用+显示输入框
-      dayNum.disabled = false;
-      dayNum.classList.remove('disabled-hidden');
+      // Custom Day：显示1，可编辑（数字类型）
+      dayNum.value = '1';
+      dayNum.readOnly = false;
+      dayNum.type = 'number';
+      dayNum.min = '1';
     }
   });
 }
@@ -396,14 +399,7 @@ function showAllWords() {
 // ====================== 初始化事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
   const showAllBtn = document.getElementById('showAllBtn');
-  const daySelect = document.getElementById('daySelect');
-  const dayNum = document.getElementById('dayNum');
   
-  // 初始化时重置Day选择框状态
-  daySelect.value = 'custom';
-  dayNum.disabled = false;
-  dayNum.classList.remove('disabled-hidden');
-
   // 初始化Day选择框切换逻辑
   initDaySelectToggle();
 
