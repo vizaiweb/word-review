@@ -43,15 +43,21 @@ body {
   border-bottom: 1px solid #e2e8f0;
 }
 
+/* 核心修改：Day行强制单行布局，其他行保持原有逻辑 */
 .select-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   margin: 8px 0;
-  gap: 8px; /* 统一间距，避免元素重叠 */
+  gap: 8px;
   width: 100%;
-  flex-wrap: nowrap; /* 防止按钮换行 */
-  position: relative; /* 保证z-index生效 */
+  position: relative;
+}
+
+/* 单独给Day行设置：永不换行 + 更紧凑的间距 */
+#dayRow.select-row {
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
 }
 
 .select-row label {
@@ -60,6 +66,19 @@ body {
   min-width: 70px;
   text-align: left;
   flex-shrink: 0; /* 标签不收缩 */
+}
+
+/* Day行内的选择框/输入框：按比例分配宽度，不挤压 */
+#dayRow select, #dayRow input {
+  flex: 1 !important;
+  min-width: 0 !important; /* 取消最小宽度限制，适配单行 */
+  width: calc((100% - 70px - 80px - 10px) / 2) !important; /* 精准计算宽度 */
+}
+
+/* Day行内的Filter按钮：固定宽度，不挤压 */
+#dayRow button {
+  min-width: 80px !important;
+  flex-shrink: 0 !important;
 }
 
 .select-row select,
@@ -72,8 +91,8 @@ body {
   background: white;
   height: 40px;
   box-sizing: border-box;
-  min-width: 120px; /* 防止输入框过小 */
-  flex-shrink: 1; /* 输入框可收缩，优先保证按钮尺寸 */
+  min-width: 120px;
+  flex-shrink: 1;
 }
 
 .select-row button {
@@ -84,13 +103,13 @@ body {
   color: white;
   cursor: pointer;
   height: 40px;
-  min-width: 80px; /* 按钮最小宽度，保证点击区域 */
+  min-width: 80px;
   box-sizing: border-box;
-  flex-shrink: 0; /* 按钮永不收缩（核心修复） */
-  z-index: 10; /* 按钮在最上层，不被遮挡 */
+  flex-shrink: 0;
+  z-index: 10;
   position: relative;
-  touch-action: manipulation; /* 移动端防双击缩放 */
-  transition: opacity 0.2s ease; /* 点击反馈过渡 */
+  touch-action: manipulation;
+  transition: opacity 0.2s ease;
 }
 
 /* 按钮颜色区分 */
@@ -116,12 +135,15 @@ body {
   font-weight: 500;
 }
 
+/* 核心修改：单词动态字号（根据长度自动缩放） */
 .word {
-  font-size: 52px;
+  font-size: clamp(28px, 8vw, 52px); /* 最小28px，最大52px，随屏幕宽度自适应 */
   font-weight: bold;
   color: #ef4444;
   margin-bottom: 25px;
   letter-spacing: 1px;
+  word-break: break-all; /* 超长单词强制换行 */
+  max-width: 100%; /* 不超出容器 */
 }
 
 /* 功能按钮组 */
@@ -171,7 +193,7 @@ body {
   color: white;
   cursor: pointer;
   margin: 10px 0;
-  display: none; /* 默认隐藏 */
+  display: none;
   transition: background 0.2s ease;
 }
 
@@ -218,8 +240,9 @@ body {
 
 /* ====================== 响应式适配（移动端） ====================== */
 @media (max-width: 480px) {
-  .select-row {
-    flex-wrap: wrap; /* 小屏幕允许换行 */
+  /* 其他行允许换行，Day行强制单行 */
+  .select-row:not(#dayRow) {
+    flex-wrap: wrap;
   }
   
   .select-row label {
@@ -243,8 +266,9 @@ body {
     font-size: 24px;
   }
   
+  /* 移动端单词字号进一步缩小 */
   .word {
-    font-size: 42px;
+    font-size: clamp(24px, 7vw, 42px) !important;
   }
   
   .btn-group button {
@@ -253,14 +277,25 @@ body {
   }
   
   /* 可选：Day输入框禁用样式（不隐藏时的灰色效果） */
-#dayNum:disabled {
-  background: #f5f5f5;
-  cursor: not-allowed;
-  border-color: #ddd;
-}
+  #dayNum:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+    border-color: #ddd;
+  }
   
-/* 核心：隐藏禁用的输入框（和JS中的类对应） */
-#dayNum.disabled-hidden {
-  display: none !important;
-}
+  /* 核心：隐藏禁用的输入框（和JS中的类对应） */
+  #dayNum.disabled-hidden {
+    display: none !important;
+  }
+
+  /* 移动端Day行更紧凑 */
+  #dayRow label {
+    min-width: 50px !important;
+    font-size: 13px !important;
+  }
+  #dayRow button {
+    min-width: 70px !important;
+    font-size: 13px !important;
+    padding: 8px 5px !important;
+  }
 }
