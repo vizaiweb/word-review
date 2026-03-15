@@ -36,28 +36,34 @@ function getXlsxFileUrl(level, filename) {
 }
 
 /**
- * 修复：切回All Words时强制显示--
+ * 终极修复：确保切回All Words必显--
  */
 function initDaySelectToggle() {
   const daySelect = document.getElementById('daySelect');
   const dayNum = document.getElementById('dayNum');
-  
-  // 切换下拉选项时控制输入框状态
-  daySelect.addEventListener('change', function() {
-    if (this.value === 'all') {
-      // 强制重置输入框为--，并设为只读文本类型
-      dayNum.type = 'text'; // 先改类型，避免数字类型无法显示--
+
+  // 封装状态切换函数（复用逻辑）
+  function updateDayInputState() {
+    if (daySelect.value === 'all') {
+      // 强制设为文本类型 → 才能显示--
+      dayNum.type = 'text';
+      // 强制赋值--（优先级最高）
       dayNum.value = '--';
       dayNum.readOnly = true;
-      dayNum.min = ''; // 清空数字最小值限制
+      dayNum.min = ''; // 清空数字限制
     } else {
-      // Custom Day：恢复数字输入框，显示1
       dayNum.type = 'number';
       dayNum.value = '1';
       dayNum.readOnly = false;
       dayNum.min = '1';
     }
-  });
+  }
+
+  // 1. 监听下拉框变化 → 触发状态更新
+  daySelect.addEventListener('change', updateDayInputState);
+  
+  // 2. 初始化时立即执行一次 → 确保初始状态正确
+  updateDayInputState();
 }
 
 // ====================== 数据加载逻辑 ======================
