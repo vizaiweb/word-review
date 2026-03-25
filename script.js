@@ -1,78 +1,81 @@
-// 全域狀態變數
-let allWords = [];          // 儲存目前檔案的所有單詞
-let filteredWords = [];     // 儲存篩選後的單詞（依 Day/All）
-let currentIdx = 0;         // 目前顯示的單詞索引
-let currentFileName = "";   // 目前選中的檔案名稱
-let currentLevel = "";      // 目前選中的級別 (P1/P2)
-const synth = window.speechSynthesis; // 語音合成 API
+// 全局状态变量
+let allWords = [];          // 存储当前文件的所有单词
+let filteredWords = [];     // 存储筛选后的单词（按Day/All）
+let currentIdx = 0;         // 当前显示的单词索引
+let currentFileName = "";   // 当前选中的文件名
+let currentLevel = "";      // 当前选中的级别(P1/P2)
+const synth = window.speechSynthesis; // 语音合成API
 
-// ====================== 分支自動切換邏輯 ======================
+// ====================== 新增：动态分支路径工具（核心修复） ======================
 /**
- * 取得當前使用的分支名稱
- * - 優先讀取 URL 參數 ?branch=xxx
- * - 若在 GitHub Pages 上，嘗試從路徑中提取（如 /repo/dev/ → dev）
- * - 預設返回 'main'
+ * 获取当前环境的 GitHub Raw 路径前缀（自动适配分支）
+ * @returns {string} 基础路径前缀
  */
-function getCurrentBranch() {
-  // 1. URL 參數
-  const urlParams = new URLSearchParams(window.location.search);
-  const branchParam = urlParams.get('branch');
-  if (branchParam) return branchParam;
+function getRawBaseUrl() {
+  // 本地打开文件 → 默认 main
+  if (window.location.protocol === 'file:') {
+    return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
+  }
+  
+  const host = window.location.hostname;
+  const path = window.location.pathname;
 
-  // 2. GitHub Pages 路徑解析
-  const hostname = window.location.hostname;
-  if (hostname.endsWith('github.io')) {
-    const pathParts = window.location.pathname.split('/').filter(p => p);
-    // 路徑結構通常為 /repo/branch/...，取第二段作為分支名
-    if (pathParts.length >= 2) {
-      const candidate = pathParts[1];
-      // 排除檔案名稱或無效字元
-      if (candidate !== 'index.html' && !candidate.includes('.')) {
-        return candidate;
-      }
-    }
+  // dev / gh-pages-dev 环境 → 自动用 dev 分支
+  if (host.includes('dev') || path.includes('dev')) {
+    return 'https://raw.githubusercontent.com/vizaiweb/word-review/dev';
   }
 
-  // 3. 預設
-  return 'main';
+  // 默认 main 分支
+  return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
 }
 
+// ====================== 工具函数 ======================
 /**
- * 移除檔案的 .xlsx 副檔名
+ * 移除文件名的.xlsx扩展名
+ * @param {string} filename - 带扩展名的文件名
+ * @returns {string} 纯文件名
  */
 function removeFileExtension(filename) {
   return filename.replace(/\.xlsx$/i, '');
 }
 
 /**
- * 取得對應級別的檔案列表 JSON 位址（支援指定分支）
+ * 获取对应级别的文件列表JSON地址
+ * @param {string} level - P1/P2
+ * @returns {string} JSON文件URL
  */
-function getFileListUrl(level, branch = null) {
-  const useBranch = branch || getCurrentBranch();
-  return `https://raw.githubusercontent.com/vizaiweb/word-review/${useBranch}/data/${level}/fileList.json`;
+function getFileListUrl(level) {
+  const base = getRawBaseUrl();
+  return `${base}/data/${level}/fileList.json`;
 }
 
 /**
- * 取得 Excel 檔案的完整 URL（支援指定分支）
+ * 获取Excel文件的完整URL
+ * @param {string} level - P1/P2
+ * @param {string} filename - Excel文件名
+ * @returns {string} Excel文件URL
  */
-function getXlsxFileUrl(level, filename, branch = null) {
-  const useBranch = branch || getCurrentBranch();
-  return `https://raw.githubusercontent.com/vizaiweb/word-review/${useBranch}/data/${level}/${filename}`;
+function getXlsxFileUrl(level, filename) {
+  const base = getRawBaseUrl();
+  return `${base}/data/${level}/${filename}`;
 }
 
 /**
- * 初始化 Day 下拉選單與數字輸入框的切換邏輯
+ * 终极修复：确保切回All Words必显--
  */
 function initDaySelectToggle() {
   const daySelect = document.getElementById('daySelect');
   const dayNum = document.getElementById('dayNum');
 
+  // 封装状态切换函数（复用逻辑）
   function updateDayInputState() {
     if (daySelect.value === 'all') {
+      // 强制设为文本类型 → 才能显示--
       dayNum.type = 'text';
+      // 强制赋值--（优先级最高）
       dayNum.value = '--';
       dayNum.readOnly = true;
-      dayNum.min = '';
+      dayNum.min = ''; // 清空数字限制
     } else {
       dayNum.type = 'number';
       dayNum.value = '1';
@@ -81,13 +84,136 @@ function initDaySelectToggle() {
     }
   }
 
+  // 1. 监听下拉框变化 → 触发状态更新
   daySelect.addEventListener('change', updateDayInputState);
-  updateDayInputState(); // 初始化
+  
+  // 2. 初始化时立即执行一次 → 确保初始状态正确
+  updateDayInputState();
 }
 
-// ====================== 語音朗讀功能（跨平台優化） ======================
+// ====================== 数据加载逻辑 ======================
 /**
- * 取得可用的語音清單（Promise 包裝，確保聲音載入完成）
+ * 根据级别加载文件列表
+ * @param {string} level - P1/P2
+ */
+async function loadFileListByLevel(level) {
+  const fileSelect = document.getElementById('fileSelect');
+  const fileRow = document.getElementById('fileRow');
+  
+  // 重置文件选择框并显示
+  fileSelect.innerHTML = '<option value="">Loading...</option>';
+  fileRow.style.display = 'flex';
+  
+  try {
+    const res = await fetch(getFileListUrl(level));
+    if (!res.ok) throw new Error(`HTTP ${res.status}: 无法加载文件列表`);
+    
+    const config = await res.json();
+    const files = config.files || [];
+    
+    // 填充文件选项
+    fileSelect.innerHTML = '';
+    if (files.length === 0) {
+      fileSelect.innerHTML = '<option value="">No files available</option>';
+      return;
+    }
+    
+    files.forEach(file => {
+      const option = document.createElement('option');
+      option.value = file;
+      option.textContent = removeFileExtension(file);
+      fileSelect.appendChild(option);
+    });
+  } catch (e) {
+    fileSelect.innerHTML = '<option value="">Load failed</option>';
+    console.error("文件列表加载失败:", e);
+    alert(`加载文件列表失败: ${e.message}`);
+  }
+}
+
+/**
+ * 加载并解析选中的Excel文件
+ * @param {string} filename - Excel文件名
+ */
+async function loadSelectedFile(filename) {
+  if (!filename || !currentLevel) return;
+  
+  currentFileName = filename;
+  const wordContent = document.getElementById("wordContent");
+  wordContent.innerHTML = '<p style="color:#3b82f6;">Loading words...</p>';
+  document.getElementById("dayRow").style.display = 'flex';
+  
+  try {
+    // 加载Excel文件
+    const url = getXlsxFileUrl(currentLevel, filename);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`文件不存在 (${res.status})`);
+    
+    // 解析Excel
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheetName = wb.SheetNames[0];
+    const rawData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+    
+    // 过滤并格式化数据（确保包含day/word/meaning）
+    allWords = rawData.filter(item => item.word && item.meaning && item.day).map(item => ({
+      word: String(item.word).trim(),
+      meaning: String(meaning).trim(),
+      day: Number(item.day)
+    }));
+    
+    // 初始化筛选列表（默认加载所有）
+    filteredWords = [...allWords];
+    currentIdx = 0;
+    showWord();
+    
+    // 显示"显示所有单词"按钮
+    document.getElementById('showAllBtn').style.display = 'inline-block';
+    
+  } catch (e) {
+    wordContent.innerHTML = '<p style="color:#ef4444;">Failed to load words</p>';
+    document.getElementById('showAllBtn').style.display = 'none';
+    console.error("单词文件加载失败:", e);
+    alert(`加载单词失败: ${e.message}`);
+  }
+}
+
+// ====================== 筛选逻辑（Day/All） ======================
+/**
+ * 按Day或All筛选单词
+ */
+function filterByDay() {
+  const daySelect = document.getElementById('daySelect');
+  const dayNum = document.getElementById('dayNum');
+  
+  // 选择All时强制加载所有单词
+  if (daySelect.value === 'all') {
+    // 深拷贝避免引用问题，确保加载完整数据
+    filteredWords = JSON.parse(JSON.stringify(allWords));
+    currentIdx = 0;
+    showWord();
+    // 可选：提示用户加载的单词数量
+    alert(`✅ Loaded all ${filteredWords.length} words!`);
+    return;
+  }
+  
+  // 按数字Day筛选（原有逻辑）
+  const day = Number(dayNum.value);
+  if (isNaN(day) || day < 1) {
+    alert('Please enter a valid day number (≥1)!');
+    dayNum.focus();
+    return;
+  }
+  
+  filteredWords = allWords.filter(item => item.day === day);
+  currentIdx = 0;
+  showWord();
+}
+
+// ====================== 语音朗读功能 ======================
+/**
+ * 获取可用的语音合成声音列表
+ * @returns {Promise<SpeechSynthesisVoice[]>} 声音列表
  */
 function getVoices() {
   return new Promise(resolve => {
@@ -95,96 +221,56 @@ function getVoices() {
     if (voices.length) {
       resolve(voices);
     } else {
-      synth.onvoiceschanged = () => {
+      // 等待声音加载完成
+      const onVoicesChanged = () => {
         resolve(synth.getVoices());
-        synth.onvoiceschanged = null;
+        synth.onvoiceschanged = null; // 移除监听避免重复触发
       };
+      synth.onvoiceschanged = onVoicesChanged;
     }
   });
 }
 
 /**
- * 智慧選擇英語語音
- * @param {SpeechSynthesisVoice[]} voices - 可用語音清單
- * @returns {SpeechSynthesisVoice|null} 選中的語音，若無則回傳 null
- */
-function selectEnglishVoice(voices) {
-  // 1. 優先尋找高品質女性英語語音（常見名稱）
-  const highQualityFemale = voices.find(voice =>
-    voice.lang.includes('en') &&
-    (voice.name.includes('Samantha') ||
-     voice.name.includes('Google UK') ||
-     voice.name.includes('Microsoft') ||
-     voice.name.includes('Female') ||
-     voice.name.includes('Zira') ||
-     voice.name.includes('Siri'))
-  );
-  if (highQualityFemale) return highQualityFemale;
-
-  // 2. 其次找任何高品質英語語音（不分性別）
-  const highQualityAny = voices.find(voice =>
-    voice.lang.includes('en') &&
-    (voice.name.includes('Google') ||
-     voice.name.includes('Microsoft') ||
-     voice.name.includes('Daniel') ||
-     voice.name.includes('Fred'))
-  );
-  if (highQualityAny) return highQualityAny;
-
-  // 3. 再找任何英語語音（只要語言是英文）
-  const anyEnglish = voices.find(voice => voice.lang.includes('en'));
-  if (anyEnglish) return anyEnglish;
-
-  // 4. 完全沒有英語語音，回傳 null
-  return null;
-}
-
-/**
- * 朗讀指定文字（支援所有平台，自動降級）
- * @param {string} text - 要朗讀的文字
+ * 朗读指定文本
+ * @param {string} text - 要朗读的文本
  */
 async function speak(text) {
   if (!text) return;
-
-  // 停止目前正在播放的任何語音
-  synth.cancel();
-
+  synth.cancel(); // 停止之前的朗读
+  
   const voices = await getVoices();
   const utterance = new SpeechSynthesisUtterance(text);
-
-  // 基本設定：語言設定為英文，語速放慢適合學習
+  
+  // 配置朗读参数
   utterance.lang = "en-US";
-  utterance.rate = 0.8;
-  utterance.volume = 1;
-  utterance.pitch = 1;
-
-  // 智慧選擇英語語音
-  const selectedVoice = selectEnglishVoice(voices);
-  if (selectedVoice) {
-    utterance.voice = selectedVoice;
-  } else {
-    // 極罕見情況：裝置完全沒有英語語音，使用系統預設（但發音可能不準）
-    console.warn('No English voice found on this device. Using system default, pronunciation may be poor.');
-    // 不指定 voice，讓瀏覽器用預設語音
-  }
-
-  // 開始朗讀
+  utterance.rate = 0.8;    // 语速（0.1-10）
+  utterance.volume = 1;    // 音量（0-1）
+  utterance.pitch = 1;     // 音调（0-2）
+  
+  // 优先选择英文女性声音
+  const femaleVoice = voices.find(voice => 
+    voice.lang.includes("en") && 
+    (voice.name.includes("Female") || voice.name.includes("Samantha") || voice.name.includes("Google") || voice.name.includes("Microsoft"))
+  );
+  if (femaleVoice) utterance.voice = femaleVoice;
+  
   synth.speak(utterance);
 }
 
 /**
- * 重複朗讀指定文字 3 次（間隔 2 秒）
- * @param {string} word - 要朗讀的單詞
+ * 重复朗读指定文本3次（间隔2秒）
+ * @param {string} word - 要朗读的单词
  */
 function read3Times(word) {
-  clearInterval(window.readTimer); // 清除之前的定時器
+  clearInterval(window.readTimer); // 清除之前的定时器
   let count = 0;
-
-  // 第一次朗讀
+  
+  // 第一次朗读
   speak(word);
   count++;
-
-  // 定時重複朗讀
+  
+  // 定时重复朗读
   window.readTimer = setInterval(() => {
     if (count < 3) {
       speak(word);
@@ -195,154 +281,48 @@ function read3Times(word) {
   }, 2000);
 }
 
-// ====================== 資料載入邏輯（含自動回退 main） ======================
+// ====================== 单词导航逻辑 ======================
 /**
- * 根據級別載入檔案列表（自動回退到 main）
+ * 上一个单词
  */
-async function loadFileListByLevel(level) {
-  const fileSelect = document.getElementById('fileSelect');
-  const fileRow = document.getElementById('fileRow');
-
-  fileSelect.innerHTML = '<option value="">Loading...</option>';
-  fileRow.style.display = 'flex';
-
-  let branch = getCurrentBranch();
-  let res = await fetch(getFileListUrl(level, branch));
-  if (!res.ok && branch !== 'main') {
-    console.warn(`Failed to load from branch ${branch}, trying main...`);
-    res = await fetch(getFileListUrl(level, 'main'));
-  }
-
-  try {
-    if (!res.ok) throw new Error(`HTTP ${res.status}: 無法載入檔案列表`);
-
-    const config = await res.json();
-    const files = config.files || [];
-
-    fileSelect.innerHTML = '';
-    if (files.length === 0) {
-      fileSelect.innerHTML = '<option value="">No files available</option>';
-      return;
-    }
-
-    files.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = removeFileExtension(file);
-      fileSelect.appendChild(option);
-    });
-  } catch (e) {
-    fileSelect.innerHTML = '<option value="">Load failed</option>';
-    console.error("檔案列表載入失敗:", e);
-    alert(`載入檔案列表失敗: ${e.message}`);
-  }
-}
-
-/**
- * 載入並解析選中的 Excel 檔案（自動回退到 main）
- */
-async function loadSelectedFile(filename) {
-  if (!filename || !currentLevel) return;
-
-  currentFileName = filename;
-  const wordContent = document.getElementById("wordContent");
-  wordContent.innerHTML = '<p style="color:#3b82f6;">Loading words...</p>';
-  document.getElementById("dayRow").style.display = 'flex';
-
-  let branch = getCurrentBranch();
-  let url = getXlsxFileUrl(currentLevel, filename, branch);
-  let res = await fetch(url);
-  if (!res.ok && branch !== 'main') {
-    console.warn(`Failed to load from branch ${branch}, trying main...`);
-    url = getXlsxFileUrl(currentLevel, filename, 'main');
-    res = await fetch(url);
-  }
-
-  try {
-    if (!res.ok) throw new Error(`檔案不存在 (${res.status})`);
-
-    const buf = await res.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    const sheetName = wb.SheetNames[0];
-    const rawData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
-
-    allWords = rawData.filter(item => item.word && item.meaning && item.day).map(item => ({
-      word: String(item.word).trim(),
-      meaning: String(item.meaning).trim(),
-      day: Number(item.day)
-    }));
-
-    filteredWords = [...allWords];
-    currentIdx = 0;
-    showWord();
-
-    document.getElementById('showAllBtn').style.display = 'inline-block';
-  } catch (e) {
-    wordContent.innerHTML = '<p style="color:#ef4444;">Failed to load words</p>';
-    document.getElementById('showAllBtn').style.display = 'none';
-    console.error("單詞檔案載入失敗:", e);
-    alert(`載入單詞失敗: ${e.message}`);
-  }
-}
-
-// ====================== 篩選邏輯（Day/All） ======================
-function filterByDay() {
-  const daySelect = document.getElementById('daySelect');
-  const dayNum = document.getElementById('dayNum');
-
-  if (daySelect.value === 'all') {
-    filteredWords = JSON.parse(JSON.stringify(allWords));
-    currentIdx = 0;
-    showWord();
-    alert(`✅ Loaded all ${filteredWords.length} words!`);
-    return;
-  }
-
-  const day = Number(dayNum.value);
-  if (isNaN(day) || day < 1) {
-    alert('Please enter a valid day number (≥1)!');
-    dayNum.focus();
-    return;
-  }
-
-  filteredWords = allWords.filter(item => item.day === day);
-  currentIdx = 0;
-  showWord();
-}
-
-// ====================== 單詞導航邏輯 ======================
 function prevWord() {
   if (currentIdx <= 0) return;
   currentIdx--;
   showWord();
 }
 
+/**
+ * 下一个单词
+ */
 function nextWord() {
   currentIdx++;
   showWord();
 }
 
 /**
- * 顯示目前單詞（核心渲染函式）
+ * 显示当前单词（核心渲染函数）
  */
 function showWord() {
-  clearInterval(window.readTimer); // 清除朗讀定時器
+  clearInterval(window.readTimer); // 清除朗读定时器
   const el = document.getElementById("wordContent");
-
+  
+  // 无筛选结果
   if (filteredWords.length === 0) {
     el.innerHTML = '<p style="color:#ef4444;">No words for this day</p>';
     return;
   }
-
+  
+  // 练习完成
   if (currentIdx >= filteredWords.length) {
     el.innerHTML = '<p style="color:#22c55e; font-size:24px;">🎉 Practice Complete!</p>';
     return;
   }
-
+  
+  // 渲染当前单词
   const wordData = filteredWords[currentIdx];
   const isFirstWord = currentIdx <= 0;
   const displayFileName = removeFileExtension(currentFileName);
-
+  
   el.innerHTML = `
     <div class="meaning">💡 ${wordData.meaning}</div>
     <div class="word" id="currentWord" style="display:none;">${wordData.word.toUpperCase()}</div>
@@ -354,18 +334,13 @@ function showWord() {
     </div>
     <div class="tip">Level: ${currentLevel} | File: ${displayFileName} | Day: ${wordData.day} | ${currentIdx + 1}/${filteredWords.length}</div>
   `;
-
-  // 超長單詞自動縮小字體
-  const wordEl = document.getElementById('currentWord');
-  if (wordData.word.length > 10) {
-    wordEl.style.fontSize = 'clamp(20px, 6vw, 40px)';
-  }
 }
 
-// ====================== 顯示所有單詞（新視窗） ======================
+// ====================== 显示所有单词（新窗口） ======================
 function showAllWords() {
   if (allWords.length === 0) return;
 
+  // 构建新窗口的HTML
   const allWordsHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -374,22 +349,72 @@ function showAllWords() {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>All Words - ${removeFileExtension(currentFileName)}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.8; background: #f0f4f8; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        h1 { color: #ff9a56; text-align: center; margin-bottom: 20px; font-size: 22px; }
-        .word-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        .word-table th, .word-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        .word-table th { background: #f8fafc; color: #333; }
-        .close-btn { display: block; margin: 20px auto 0; padding: 10px 20px; background: #ff9a56; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
-        .close-btn:hover { background: #ff6b35; }
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          line-height: 1.8;
+          background: #f0f4f8;
+        }
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+          background: white;
+          padding: 25px;
+          border-radius: 15px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        h1 {
+          color: #ff9a56;
+          text-align: center;
+          margin-bottom: 20px;
+          font-size: 22px;
+        }
+        .word-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+        }
+        .word-table th, .word-table td {
+          padding: 12px;
+          text-align: left;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .word-table th {
+          background: #f8fafc;
+          color: #333;
+        }
+        .close-btn {
+          display: block;
+          margin: 20px auto 0;
+          padding: 10px 20px;
+          background: #ff9a56;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+        }
+        .close-btn:hover {
+          background: #ff6b35;
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <h1>All Words - ${currentLevel} | ${removeFileExtension(currentFileName)}</h1>
         <table class="word-table">
-           <tr><th>Day</th><th>English Word</th><th>Chinese Meaning</th></tr>
-          ${allWords.map(word => `<tr><td>${word.day}</td><td><strong>${word.word.toUpperCase()}</strong></td><td>${word.meaning}</td></tr>`).join('')}
+          <tr>
+            <th>Day</th>
+            <th>English Word</th>
+            <th>Chinese Meaning</th>
+          </tr>
+          ${allWords.map(word => `
+            <tr>
+              <td>${word.day}</td>
+              <td><strong>${word.word.toUpperCase()}</strong></td>
+              <td>${word.meaning}</td>
+            </tr>
+          `).join('')}
         </table>
         <button class="close-btn" onclick="window.close()">❌ Close Window</button>
       </div>
@@ -397,23 +422,25 @@ function showAllWords() {
     </html>
   `;
 
+  // 打开新窗口并写入内容
   const newWindow = window.open('', '_blank', 'width=900,height=700');
   newWindow.document.write(allWordsHtml);
   newWindow.document.close();
 }
 
-// ====================== 初始化事件綁定 ======================
+// ====================== 初始化事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
   const showAllBtn = document.getElementById('showAllBtn');
-
-  // 初始化 Day 切換邏輯
+  
+  // 初始化Day选择框切换逻辑
   initDaySelectToggle();
 
-  // Level 確認按鈕
+  // Level确认按钮
   document.getElementById('levelConfirm').addEventListener('click', function() {
+    // 点击反馈
     this.style.opacity = '0.7';
     setTimeout(() => this.style.opacity = '1', 200);
-
+    
     const level = document.getElementById('levelSelect').value;
     if (!level) {
       alert('Please select P1 or P2 first!');
@@ -424,11 +451,12 @@ document.addEventListener('DOMContentLoaded', () => {
     showAllBtn.style.display = 'none';
   });
 
-  // File 確認按鈕
+  // File确认按钮
   document.getElementById('fileConfirm').addEventListener('click', function() {
+    // 点击反馈
     this.style.opacity = '0.7';
     setTimeout(() => this.style.opacity = '1', 200);
-
+    
     const file = document.getElementById('fileSelect').value;
     const invalidValues = ["", "Loading...", "No files available", "Load failed"];
     if (invalidValues.includes(file)) {
@@ -438,14 +466,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSelectedFile(file);
   });
 
-  // Filter 按鈕（Day/All）
+  // Filter按钮（Day/All）
   document.getElementById('filterBtn').addEventListener('click', function() {
+    // 点击反馈
     this.style.opacity = '0.7';
     setTimeout(() => this.style.opacity = '1', 200);
-
+    
     filterByDay();
   });
 
-  // 顯示所有單詞按鈕
+  // 显示所有单词按钮
   showAllBtn.addEventListener('click', showAllWords);
 });
