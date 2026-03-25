@@ -6,7 +6,37 @@ let currentFileName = "";   // 目前選中的檔案名稱
 let currentLevel = "";      // 目前選中的級別 (P1/P2)
 const synth = window.speechSynthesis; // 語音合成 API
 
-// ====================== 工具函式 ======================
+// ====================== 分支自動切換邏輯 ======================
+/**
+ * 取得當前使用的分支名稱
+ * - 優先讀取 URL 參數 ?branch=xxx
+ * - 若在 GitHub Pages 上，嘗試從路徑中提取（如 /repo/dev/ → dev）
+ * - 預設返回 'main'
+ */
+function getCurrentBranch() {
+  // 1. URL 參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const branchParam = urlParams.get('branch');
+  if (branchParam) return branchParam;
+
+  // 2. GitHub Pages 路徑解析
+  const hostname = window.location.hostname;
+  if (hostname.endsWith('github.io')) {
+    const pathParts = window.location.pathname.split('/').filter(p => p);
+    // 路徑結構通常為 /repo/branch/...，取第二段作為分支名
+    if (pathParts.length >= 2) {
+      const candidate = pathParts[1];
+      // 排除檔案名稱或無效字元
+      if (candidate !== 'index.html' && !candidate.includes('.')) {
+        return candidate;
+      }
+    }
+  }
+
+  // 3. 預設
+  return 'main';
+}
+
 /**
  * 移除檔案的 .xlsx 副檔名
  */
@@ -15,17 +45,19 @@ function removeFileExtension(filename) {
 }
 
 /**
- * 取得對應級別的檔案列表 JSON 位址
+ * 取得對應級別的檔案列表 JSON 位址（支援指定分支）
  */
-function getFileListUrl(level) {
-  return `https://raw.githubusercontent.com/vizaiweb/word-review/main/data/${level}/fileList.json`;
+function getFileListUrl(level, branch = null) {
+  const useBranch = branch || getCurrentBranch();
+  return `https://raw.githubusercontent.com/vizaiweb/word-review/${useBranch}/data/${level}/fileList.json`;
 }
 
 /**
- * 取得 Excel 檔案的完整 URL
+ * 取得 Excel 檔案的完整 URL（支援指定分支）
  */
-function getXlsxFileUrl(level, filename) {
-  return `https://raw.githubusercontent.com/vizaiweb/word-review/main/data/${level}/${filename}`;
+function getXlsxFileUrl(level, filename, branch = null) {
+  const useBranch = branch || getCurrentBranch();
+  return `https://raw.githubusercontent.com/vizaiweb/word-review/${useBranch}/data/${level}/${filename}`;
 }
 
 /**
@@ -163,9 +195,9 @@ function read3Times(word) {
   }, 2000);
 }
 
-// ====================== 資料載入邏輯 ======================
+// ====================== 資料載入邏輯（含自動回退 main） ======================
 /**
- * 根據級別載入檔案列表
+ * 根據級別載入檔案列表（自動回退到 main）
  */
 async function loadFileListByLevel(level) {
   const fileSelect = document.getElementById('fileSelect');
@@ -174,8 +206,14 @@ async function loadFileListByLevel(level) {
   fileSelect.innerHTML = '<option value="">Loading...</option>';
   fileRow.style.display = 'flex';
 
+  let branch = getCurrentBranch();
+  let res = await fetch(getFileListUrl(level, branch));
+  if (!res.ok && branch !== 'main') {
+    console.warn(`Failed to load from branch ${branch}, trying main...`);
+    res = await fetch(getFileListUrl(level, 'main'));
+  }
+
   try {
-    const res = await fetch(getFileListUrl(level));
     if (!res.ok) throw new Error(`HTTP ${res.status}: 無法載入檔案列表`);
 
     const config = await res.json();
@@ -201,7 +239,7 @@ async function loadFileListByLevel(level) {
 }
 
 /**
- * 載入並解析選中的 Excel 檔案
+ * 載入並解析選中的 Excel 檔案（自動回退到 main）
  */
 async function loadSelectedFile(filename) {
   if (!filename || !currentLevel) return;
@@ -211,9 +249,16 @@ async function loadSelectedFile(filename) {
   wordContent.innerHTML = '<p style="color:#3b82f6;">Loading words...</p>';
   document.getElementById("dayRow").style.display = 'flex';
 
+  let branch = getCurrentBranch();
+  let url = getXlsxFileUrl(currentLevel, filename, branch);
+  let res = await fetch(url);
+  if (!res.ok && branch !== 'main') {
+    console.warn(`Failed to load from branch ${branch}, trying main...`);
+    url = getXlsxFileUrl(currentLevel, filename, 'main');
+    res = await fetch(url);
+  }
+
   try {
-    const url = getXlsxFileUrl(currentLevel, filename);
-    const res = await fetch(url);
     if (!res.ok) throw new Error(`檔案不存在 (${res.status})`);
 
     const buf = await res.arrayBuffer();
@@ -343,7 +388,7 @@ function showAllWords() {
       <div class="container">
         <h1>All Words - ${currentLevel} | ${removeFileExtension(currentFileName)}</h1>
         <table class="word-table">
-          <tr><th>Day</th><th>English Word</th><th>Chinese Meaning</th></tr>
+           <tr><th>Day</th><th>English Word</th><th>Chinese Meaning</th></tr>
           ${allWords.map(word => `<tr><td>${word.day}</td><td><strong>${word.word.toUpperCase()}</strong></td><td>${word.meaning}</td></tr>`).join('')}
         </table>
         <button class="close-btn" onclick="window.close()">❌ Close Window</button>
