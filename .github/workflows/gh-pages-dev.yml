@@ -1,0 +1,29 @@
+name: Deploy dev branch to Pages
+# 触发条件：推送到dev分支时执行，也可以手动触发（方便测试）
+on:
+  push:
+    branches: [ dev ]
+  workflow_dispatch:  # 新增：允许手动触发，测试更灵活
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:  # 新增：添加必要的权限，避免部署失败
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      # 1. 拉取代码到服务器
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 拉取完整历史，避免静态站点构建出错
+
+      # 2. 部署到gh-pages-dev分支（专门存dev的部署文件）
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages-dev  # 存放dev部署文件的分支
+          publish_dir: ./  # 项目根目录（根据你的项目调整）
+          force_orphan: true  # 清空gh-pages-dev分支旧内容，避免冗余
