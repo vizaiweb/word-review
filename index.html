@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Word Practice</title>
+    <!-- 引入Excel解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 引入本地样式文件 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 标题区 -->
+        <div class="header">
+            <h1>🌟 Kids Word Practice 🌟</h1>
+        </div>
+
+        <!-- 选择区（Level/File/Day） -->
+        <div class="select-section">
+            <div class="select-row">
+                <label>Level:</label>
+                <select id="levelSelect">
+                    <option value="">Select P1/P2</option>
+                    <option value="P1">P1</option>
+                    <option value="P2">P2</option>
+                </select>
+                <button class="btn-level" id="levelConfirm">Confirm</button>
+            </div>
+
+            <div class="select-row" id="fileRow" style="display:none;">
+                <label>File:</label>
+                <select id="fileSelect">
+                    <option value="">Loading...</option>
+                </select>
+                <button class="btn-file" id="fileConfirm">Confirm</button>
+            </div>
+
+            <!-- Day选择区 -->
+            <div class="select-row" id="dayRow" style="display:none;">
+                <label>Day:</label>
+                <div style="display: flex; flex: 1; gap: 8px;">
+                    <select id="daySelect" style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
+                        <option value="all" selected>All Words</option>
+                        <option value="custom">Custom Day</option>
+                    </select>
+                    <input type="text" id="dayNum" value="--" readonly style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
+                </div>
+                <button class="btn-filter" id="filterBtn">Filter</button>
+            </div>
+        </div>
+
+        <!-- 练习区 -->
+        <div class="practice-section">
+            <div id="wordContent">
+                <p style="color:#64748b;">Please select Level first</p>
+            </div>
+            
+            <!-- 显示所有单词按钮（默认隐藏） -->
+            <button class="show-all-btn" id="showAllBtn">📋 Show All Words</button>
+        </div>
+    </div>
+
+    <!-- 底部链接区 -->
+    <div class="footer">
+        <a href="about.html">About</a> | 
+        <a href="privacy.html">Privacy Policy</a> | 
+        <a href="disclaimer.html">Disclaimer</a>
+    </div>
+
+    <!-- 引入本地JS文件 -->
+    <script src="script.js"></script>
+</body>
+</html>
