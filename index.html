@@ -2,73 +2,675 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kids Word Practice</title>
-    <!-- 引入Excel解析库 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Kids Word & Sentence Practice</title>
+    <!-- Excel 解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- 引入本地样式文件 -->
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ====================== 全局基础样式 ====================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f4f8;
+            padding: 15px;
+            line-height: 1.5;
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 标题 */
+        .header {
+            background: linear-gradient(135deg, #ff9a56, #ff6b35);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            letter-spacing: 1px;
+        }
+
+        /* 选择区 */
+        .select-section {
+            padding: 16px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .select-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .select-row label {
+            font-weight: 600;
+            color: #1e293b;
+            min-width: 60px;
+        }
+        .select-row select, .select-row input {
+            flex: 1;
+            padding: 8px 10px;
+            font-size: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            background: white;
+            height: 42px;
+        }
+        .select-row button {
+            padding: 8px 18px;
+            font-size: 15px;
+            border: none;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            background: #3b82f6;
+        }
+        .btn-level { background: #ff4500; }
+        .btn-file { background: #0f67b3; }
+        .btn-filter { background: #2b7e3a; }
+        .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
+
+        /* 单词练习区 */
+        .practice-section {
+            padding: 20px 18px;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .meaning {
+            font-size: 26px;
+            color: #0f172a;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .word {
+            font-size: clamp(28px, 8vw, 52px);
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 20px;
+            word-break: break-word;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .btn-group button {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-show { background: #8b5cf6; }
+        .btn-read { background: #3b82f6; }
+        .btn-prev { background: #64748b; }
+        .btn-next { background: #22c55e; }
+        .btn-prev:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .show-all-btn {
+            background: #6366f1;
+            border: none;
+            border-radius: 40px;
+            padding: 10px 18px;
+            color: white;
+            font-weight: bold;
+            margin: 8px 0 0;
+            cursor: pointer;
+            width: 100%;
+        }
+        .tip {
+            font-size: 13px;
+            color: #475569;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        /* ========= 句子专区 (新) ========= */
+        .sentence-section {
+            background: #fef9e8;
+            border-top: 3px solid #ffb347;
+            padding: 20px 18px;
+            border-radius: 0 0 20px 20px;
+        }
+        .sentence-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ffd966;
+            padding-bottom: 8px;
+        }
+        .sentence-header h3 {
+            font-size: 1.5rem;
+            color: #c2410c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sentence-stats {
+            font-size: 14px;
+            background: #fff1d6;
+            padding: 4px 12px;
+            border-radius: 40px;
+        }
+        .sentence-meaning {
+            font-size: 22px;
+            color: #2c3e2f;
+            background: #fff6e5;
+            padding: 12px;
+            border-radius: 20px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .sentence-en {
+            font-size: clamp(20px, 6vw, 32px);
+            font-weight: bold;
+            color: #b45309;
+            margin: 12px 0;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .sentence-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 15px 0 10px;
+        }
+        .sentence-buttons button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 40px;
+            font-weight: bold;
+            border: none;
+            color: white;
+            cursor: pointer;
+            background: #e67e22;
+            transition: 0.1s linear;
+        }
+        .btn-sentence-show { background: #d97706; }
+        .btn-sentence-read { background: #0284c7; }
+        .btn-sentence-prev { background: #6c757d; }
+        .btn-sentence-next { background: #2b9348; }
+        .btn-sentence-all { background: #5f4b8b; }
+        .sentence-tip {
+            font-size: 12px;
+            text-align: center;
+            color: #a16207;
+            margin-top: 12px;
+        }
+        button:active { transform: scale(0.96); }
+        .footer {
+            max-width: 700px;
+            margin: 20px auto 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #5b6e8c;
+        }
+        .footer a {
+            color: #ff6b35;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+        @media (max-width: 550px) {
+            .sentence-meaning { font-size: 18px; }
+            .btn-group button, .sentence-buttons button { font-size: 13px; padding: 8px; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 标题区 -->
-        <div class="header">
-            <h1>🌟 Kids Word Practice 🌟</h1>
+<div class="container">
+    <div class="header">
+        <h1>🌟 Kids Word & Sentence Practice 🌟</h1>
+    </div>
+
+    <div class="select-section">
+        <div class="select-row">
+            <label>Level:</label>
+            <select id="levelSelect">
+                <option value="">Select P1/P2</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+            </select>
+            <button class="btn-level" id="levelConfirm">Confirm</button>
         </div>
-
-        <!-- 选择区（Level/File/Day） -->
-        <div class="select-section">
-            <div class="select-row">
-                <label>Level:</label>
-                <select id="levelSelect">
-                    <option value="">Select P1/P2</option>
-                    <option value="P1">P1</option>
-                    <option value="P2">P2</option>
-                </select>
-                <button class="btn-level" id="levelConfirm">Confirm</button>
-            </div>
-
-            <div class="select-row" id="fileRow" style="display:none;">
-                <label>File:</label>
-                <select id="fileSelect">
-                    <option value="">Loading...</option>
-                </select>
-                <button class="btn-file" id="fileConfirm">Confirm</button>
-            </div>
-
-            <!-- Day选择区 -->
-            <div class="select-row" id="dayRow" style="display:none;">
-                <label>Day:</label>
-                <div style="display: flex; flex: 1; gap: 8px;">
-                    <select id="daySelect" style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
-                        <option value="all" selected>All Words</option>
-                        <option value="custom">Custom Day</option>
-                    </select>
-                    <input type="text" id="dayNum" value="--" readonly style="flex: 1; height: 40px; padding: 8px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 0; box-sizing: border-box;">
-                </div>
-                <button class="btn-filter" id="filterBtn">Filter</button>
-            </div>
+        <div class="select-row" id="fileRow" style="display:none;">
+            <label>File:</label>
+            <select id="fileSelect"><option>Loading...</option></select>
+            <button class="btn-file" id="fileConfirm">Confirm</button>
         </div>
+        <div class="select-row" id="dayRow" style="display:none;">
+            <label>Day:</label>
+            <select id="daySelect" style="flex:1">
+                <option value="all" selected>All Words</option>
+                <option value="custom">Custom Day</option>
+            </select>
+            <input type="text" id="dayNum" value="--" readonly>
+            <button class="btn-filter" id="filterBtn">Filter</button>
+        </div>
+    </div>
 
-        <!-- 练习区 -->
-        <div class="practice-section">
-            <div id="wordContent">
-                <p style="color:#64748b;">Please select Level first</p>
+    <!-- 单词卡片区 -->
+    <div class="practice-section" id="wordPracticeArea">
+        <div id="wordContent"><p style="color:#64748b;">✨ Select Level & File to start ✨</p></div>
+        <button class="show-all-btn" id="showAllBtn" style="display:none;">📋 Show All Words</button>
+    </div>
+
+    <!-- 句子专区 (独立于筛选, 仅与当前File绑定) -->
+    <div class="sentence-section" id="sentenceArea" style="display:none;">
+        <div class="sentence-header">
+            <h3>✏️ Sentence Practice</h3>
+            <span class="sentence-stats" id="sentenceStats">0 sentences</span>
+        </div>
+        <div id="sentenceContent">
+            <div class="sentence-meaning">💡 Chinese meaning will appear</div>
+            <div class="sentence-en" id="sentenceEnHidden" style="display:none;"></div>
+            <div class="sentence-buttons">
+                <button id="showSentenceBtn" class="btn-sentence-show">📖 Show Sentence</button>
+                <button id="readSentenceBtn" class="btn-sentence-read">🔊 Read 2x</button>
+                <button id="prevSentenceBtn" class="btn-sentence-prev">⬅️ Previous</button>
+                <button id="nextSentenceBtn" class="btn-sentence-next">➡️ Next</button>
             </div>
+            <button id="showAllSentencesBtn" class="btn-sentence-all" style="width:100%; margin-top:8px;">📜 Show All Sentences</button>
+            <div class="sentence-tip" id="sentenceTip">⭐ Practice everyday sentences!</div>
+        </div>
+    </div>
+</div>
+<div class="footer">
+    <a href="about.html">About</a> | <a href="privacy.html">Privacy Policy</a> | <a href="disclaimer.html">Disclaimer</a>
+</div>
+
+<script>
+    // ---------- 全局变量 ----------
+    let allWords = [];           // 原始单词 { word, meaning, day }
+    let filteredWords = [];      // 按Day筛选后的单词
+    let currentWordIdx = 0;
+
+    // 句子专用数据 (独立于单词filter)
+    let allSentences = [];       // 从Excel读取: { sentence_en, sentence_zh }
+    let currentSentenceIdx = 0;
+    let currentFileNameForSentences = "";   // 当前加载句子的文件
+    
+    let currentLevel = "";
+    let currentFileName = "";
+    const synth = window.speechSynthesis;
+
+    // ---------- 动态仓库分支 ----------
+    function getRawBaseUrl() {
+        if (window.location.protocol === 'file:') return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
+        const host = window.location.hostname;
+        const path = window.location.pathname;
+        if (host.includes('dev') || path.includes('dev')) return 'https://raw.githubusercontent.com/vizaiweb/word-review/dev';
+        return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
+    }
+
+    function getFileListUrl(level) { return `${getRawBaseUrl()}/data/${level}/fileList.json`; }
+    function getXlsxFileUrl(level, filename) { return `${getRawBaseUrl()}/data/${level}/${filename}`; }
+
+    // 辅助函数: 去除扩展名
+    function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
+
+    // 初始化Day下拉交互
+    function initDaySelectToggle() {
+        const daySelect = document.getElementById('daySelect');
+        const dayNum = document.getElementById('dayNum');
+        function update() {
+            if (daySelect.value === 'all') {
+                dayNum.type = 'text';
+                dayNum.value = '--';
+                dayNum.readOnly = true;
+            } else {
+                dayNum.type = 'number';
+                dayNum.value = '1';
+                dayNum.readOnly = false;
+                dayNum.min = '1';
+            }
+        }
+        daySelect.addEventListener('change', update);
+        update();
+    }
+
+    // 加载文件列表
+    async function loadFileListByLevel(level) {
+        const fileSelect = document.getElementById('fileSelect');
+        const fileRow = document.getElementById('fileRow');
+        fileSelect.innerHTML = '<option>Loading...</option>';
+        fileRow.style.display = 'flex';
+        try {
+            const res = await fetch(getFileListUrl(level));
+            if (!res.ok) throw new Error();
+            const config = await res.json();
+            const files = config.files || [];
+            fileSelect.innerHTML = '';
+            if (files.length === 0) { fileSelect.innerHTML = '<option>No files</option>'; return; }
+            files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = removeExtension(f);
+                fileSelect.appendChild(opt);
+            });
+        } catch(e) {
+            fileSelect.innerHTML = '<option>Load failed</option>';
+            console.error(e);
+        }
+    }
+
+    // 核心: 同时加载单词 + 句子 (从同一个excel读取两个sheet: 默认Sheet0为单词, Sheet1为句子; 若没有句子Sheet则显示空)
+    async function loadSelectedFile(filename) {
+        if (!filename || !currentLevel) return;
+        currentFileName = filename;
+        currentFileNameForSentences = filename;
+        const wordDiv = document.getElementById("wordContent");
+        wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
+        document.getElementById("dayRow").style.display = 'flex';
+        document.getElementById("sentenceArea").style.display = 'none';  // 先隐藏句子区
+        document.getElementById("showAllBtn").style.display = 'none';
+        
+        try {
+            const url = getXlsxFileUrl(currentLevel, filename);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buf = await res.arrayBuffer();
+            const wb = XLSX.read(buf, { type: "array" });
             
-            <!-- 显示所有单词按钮（默认隐藏） -->
-            <button class="show-all-btn" id="showAllBtn">📋 Show All Words</button>
-        </div>
-    </div>
+            // ----- 1. 加载单词 (Sheet0) -----
+            const sheetName0 = wb.SheetNames[0];
+            const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
+            allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
+                word: String(item.word).trim(),
+                meaning: String(item.meaning).trim(),
+                day: Number(item.day)
+            }));
+            // 初始无筛选，显示全部
+            filteredWords = [...allWords];
+            currentWordIdx = 0;
+            if (filteredWords.length) showWord();
+            else wordDiv.innerHTML = '<p>⚠️ No word data in this file.</p>';
+            document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
+            
+            // ----- 2. 加载句子 (尝试 Sheet1, 期望列: sentence / chinese 或 sentence_en / sentence_zh 兼容) -----
+            allSentences = [];
+            if (wb.SheetNames.length >= 2) {
+                const sheetName1 = wb.SheetNames[1];
+                const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
+                if (rawSentences && rawSentences.length) {
+                    allSentences = rawSentences.map(row => {
+                        // 智能匹配英文列 & 中文列
+                        let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
+                        let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
+                        if (!en && !zh) return null;
+                        return { 
+                            sentence_en: en ? String(en).trim() : "", 
+                            sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence" 
+                        };
+                    }).filter(s => s && s.sentence_en);
+                }
+            }
+            // 如果句子数据为空，显示无句子提示，但保留区域隐藏或显示禁用状态
+            if (allSentences.length === 0) {
+                document.getElementById("sentenceArea").style.display = 'none';
+            } else {
+                document.getElementById("sentenceArea").style.display = 'block';
+                currentSentenceIdx = 0;
+                updateSentenceUI();
+                updateSentenceStats();
+            }
+        } catch(err) {
+            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file. Check network.</p>';
+            document.getElementById("sentenceArea").style.display = 'none';
+            console.error(err);
+        }
+    }
 
-    <!-- 底部链接区 -->
-    <div class="footer">
-        <a href="about.html">About</a> | 
-        <a href="privacy.html">Privacy Policy</a> | 
-        <a href="disclaimer.html">Disclaimer</a>
-    </div>
+    // 单词展示
+    function showWord() {
+        clearSentenceTimer();  // 清理朗读计时器
+        const container = document.getElementById("wordContent");
+        if (!filteredWords.length) {
+            container.innerHTML = '<p>📭 No words match this day.</p>';
+            return;
+        }
+        if (currentWordIdx >= filteredWords.length) {
+            container.innerHTML = '<p style="color:#22c55e;">🎉 Great! All words practiced!</p>';
+            return;
+        }
+        const w = filteredWords[currentWordIdx];
+        const displayFile = removeExtension(currentFileName);
+        const isFirst = currentWordIdx === 0;
+        container.innerHTML = `
+            <div class="meaning">💡 ${w.meaning}</div>
+            <div class="word" id="currentWordSpan" style="display:none;">${w.word.toUpperCase()}</div>
+            <div class="btn-group">
+                <button class="btn-show" id="btnShowWord">👀 Show Word</button>
+                <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
+                <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
+                <button class="btn-next" id="btnNextWord">➡️ Next</button>
+            </div>
+            <div class="tip">${currentLevel} | ${displayFile} | Day ${w.day} | ${currentWordIdx+1}/${filteredWords.length}</div>
+        `;
+        // 绑定事件 (动态)
+        document.getElementById("btnShowWord")?.addEventListener("click", () => {
+            const wordSpan = document.getElementById("currentWordSpan");
+            if(wordSpan) wordSpan.style.display = "block";
+        });
+        document.getElementById("btnReadWord")?.addEventListener("click", () => read3Times(w.word));
+        document.getElementById("btnPrevWord")?.addEventListener("click", () => { if(currentWordIdx>0) { currentWordIdx--; showWord(); } });
+        document.getElementById("btnNextWord")?.addEventListener("click", () => { if(currentWordIdx+1 <= filteredWords.length) { currentWordIdx++; showWord(); } });
+    }
 
-    <!-- 引入本地JS文件 -->
-    <script src="script.js"></script>
+    // 朗读单词3次
+    let readTimer = null;
+    function clearSentenceTimer() { if(readTimer) { clearInterval(readTimer); readTimer = null; } }
+    async function speakText(text, rate=0.85) {
+        if(!text) return;
+        synth.cancel();
+        const getVoices = () => new Promise(resolve => { let v = synth.getVoices(); if(v.length) resolve(v); else synth.onvoiceschanged = () => resolve(synth.getVoices()); });
+        const voices = await getVoices();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "en-US";
+        utter.rate = rate;
+        const female = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female")));
+        if(female) utter.voice = female;
+        synth.speak(utter);
+    }
+    function read3Times(word) {
+        clearSentenceTimer();
+        let count = 0;
+        speakText(word);
+        count++;
+        readTimer = setInterval(() => {
+            if(count < 3) { speakText(word); count++; }
+            else { clearInterval(readTimer); readTimer = null; }
+        }, 1800);
+    }
+
+    // 筛选Day
+    function filterByDay() {
+        const daySelect = document.getElementById('daySelect');
+        const dayNum = document.getElementById('dayNum');
+        if(daySelect.value === 'all') {
+            filteredWords = JSON.parse(JSON.stringify(allWords));
+            currentWordIdx = 0;
+            showWord();
+            alert(`✨ All words: ${filteredWords.length} words.`);
+        } else {
+            let day = Number(dayNum.value);
+            if(isNaN(day) || day < 1) { alert("Enter valid day number >=1"); return; }
+            filteredWords = allWords.filter(item => item.day === day);
+            if(filteredWords.length === 0) alert(`No words for Day ${day}.`);
+            currentWordIdx = 0;
+            showWord();
+        }
+    }
+
+    // 展示所有单词 (弹窗)
+    function showAllWordsPopup() {
+        if(!allWords.length) return;
+        const fileNice = removeExtension(currentFileName);
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><title>All Words - ${fileNice}</title>
+        <style>body{font-family:sans-serif;padding:20px;background:#fef3e8;}table{border-collapse:collapse;width:100%;}th,td{padding:8px;border-bottom:1px solid #ffcd94;}th{background:#ff9a56;color:white;}</style>
+        </head><body><h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2><table><tr><th>Day</th><th>Word</th><th>Meaning</th></tr>
+        ${allWords.map(w => `<tr><td>${w.day}</td><td><strong>${w.word.toUpperCase()}</strong></td><td>${w.meaning}</td></tr>`).join('')}
+        </table><br><button onclick="window.close()">Close</button></body></html>`;
+        const win = window.open('', '_blank', 'width=800,height=600');
+        win.document.write(htmlContent);
+        win.document.close();
+    }
+
+    // ---------- 句子模块逻辑 ----------
+    function updateSentenceUI() {
+        if (!allSentences.length) return;
+        const sent = allSentences[currentSentenceIdx];
+        const sentenceDiv = document.getElementById("sentenceContent");
+        if(!sentenceDiv) return;
+        const meaningDiv = sentenceDiv.querySelector(".sentence-meaning");
+        const enSpan = document.getElementById("sentenceEnHidden");
+        if(!meaningDiv) return;
+        meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
+        if(enSpan) {
+            enSpan.innerText = sent.sentence_en;
+            enSpan.style.display = "none";
+        }
+        // 更新提示文本
+        const tipSpan = document.getElementById("sentenceTip");
+        if(tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx+1} / ${allSentences.length} sentences`;
+        updateSentenceStats();
+        // 重新绑定按钮事件 (避免重复绑定，用新的事件监听)
+        attachSentenceEvents();
+    }
+
+    function updateSentenceStats() {
+        const statsSpan = document.getElementById("sentenceStats");
+        if(statsSpan) statsSpan.innerText = `${allSentences.length} sentences`;
+    }
+
+    let sentenceReadInterval = null;
+    function clearSentenceReadInterval() { if(sentenceReadInterval) { clearInterval(sentenceReadInterval); sentenceReadInterval = null; } }
+    
+    function readSentence2x() {
+        if(!allSentences.length) return;
+        const sent = allSentences[currentSentenceIdx];
+        if(!sent.sentence_en) return;
+        clearSentenceReadInterval();
+        let times = 0;
+        speakText(sent.sentence_en, 0.8);
+        times++;
+        sentenceReadInterval = setInterval(() => {
+            if(times < 2) { speakText(sent.sentence_en, 0.8); times++; }
+            else { clearInterval(sentenceReadInterval); sentenceReadInterval = null; }
+        }, 2000);
+    }
+
+    function showCurrentSentence() {
+        const hiddenSpan = document.getElementById("sentenceEnHidden");
+        if(hiddenSpan) hiddenSpan.style.display = "block";
+    }
+
+    function prevSentence() {
+        if(allSentences.length === 0) return;
+        if(currentSentenceIdx > 0) {
+            currentSentenceIdx--;
+            updateSentenceUI();
+        } else { alert("This is the first sentence!"); }
+    }
+
+    function nextSentence() {
+        if(allSentences.length === 0) return;
+        if(currentSentenceIdx < allSentences.length - 1) {
+            currentSentenceIdx++;
+            updateSentenceUI();
+        } else { alert("🎉 You've completed all sentences!"); }
+    }
+
+    function showAllSentencesPopup() {
+        if(!allSentences.length) return;
+        const fileNice = removeExtension(currentFileNameForSentences);
+        const rows = allSentences.map((s, idx) => `<tr><td>${idx+1}</td><td><strong>${s.sentence_en}</strong></td><td>${s.sentence_zh}</td></tr>`).join('');
+        const winHtml = `
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><title>All Sentences - ${fileNice}</title>
+        <style>body{background:#fff4e6;font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:10px;border-bottom:1px solid #fbc490;} th{background:#ffaa66;}</style>
+        </head><body><h2>📝 All Sentences (${currentLevel} - ${fileNice})</h2><table><tr><th>#</th><th>English Sentence</th><th>Chinese</th></tr>${rows}</table><br><button onclick="window.close()">Close</button></body></html>`;
+        const win = window.open('', '_blank', 'width=850,height=650');
+        win.document.write(winHtml);
+        win.document.close();
+    }
+
+    function attachSentenceEvents() {
+        const showBtn = document.getElementById("showSentenceBtn");
+        const readBtn = document.getElementById("readSentenceBtn");
+        const prevBtn = document.getElementById("prevSentenceBtn");
+        const nextBtn = document.getElementById("nextSentenceBtn");
+        const allBtn = document.getElementById("showAllSentencesBtn");
+        if(showBtn) showBtn.onclick = () => showCurrentSentence();
+        if(readBtn) readBtn.onclick = () => readSentence2x();
+        if(prevBtn) prevBtn.onclick = () => prevSentence();
+        if(nextBtn) nextBtn.onclick = () => nextSentence();
+        if(allBtn) allBtn.onclick = () => showAllSentencesPopup();
+    }
+
+    // 重置句子区（换文件时重置索引）
+    function resetSentenceModule() {
+        if(allSentences.length) {
+            currentSentenceIdx = 0;
+            updateSentenceUI();
+        } else {
+            document.getElementById("sentenceArea").style.display = 'none';
+        }
+    }
+
+    // ---------- 初始化页面 ----------
+    document.addEventListener('DOMContentLoaded', () => {
+        initDaySelectToggle();
+        const levelConfirm = document.getElementById('levelConfirm');
+        const fileConfirm = document.getElementById('fileConfirm');
+        const filterBtn = document.getElementById('filterBtn');
+        const showAllWordsBtn = document.getElementById('showAllBtn');
+
+        levelConfirm.addEventListener('click', () => {
+            const level = document.getElementById('levelSelect').value;
+            if(!level) { alert("Please select P1 or P2"); return; }
+            currentLevel = level;
+            loadFileListByLevel(level);
+            document.getElementById("sentenceArea").style.display = 'none';
+            document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
+            document.getElementById("showAllBtn").style.display = 'none';
+            allWords = []; filteredWords = []; allSentences = [];
+        });
+
+        fileConfirm.addEventListener('click', async () => {
+            const fileSelect = document.getElementById('fileSelect');
+            const selected = fileSelect.value;
+            if(!selected || selected === "Loading..." || selected.includes("fail")) { alert("Please select a valid file"); return; }
+            await loadSelectedFile(selected);
+            resetSentenceModule();
+        });
+
+        filterBtn.addEventListener('click', () => filterByDay());
+        showAllWordsBtn.addEventListener('click', () => showAllWordsPopup());
+    });
+</script>
 </body>
 </html>
