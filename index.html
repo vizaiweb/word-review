@@ -145,7 +145,7 @@
             margin-top: 12px;
         }
 
-        /* ========= 句子专区 (新) ========= */
+        /* ========= 句子专区 ========= */
         .sentence-section {
             background: #fef9e8;
             border-top: 3px solid #ffb347;
@@ -236,6 +236,13 @@
             .sentence-meaning { font-size: 18px; }
             .btn-group button, .sentence-buttons button { font-size: 13px; padding: 8px; }
         }
+        
+        /* 朗读中禁用按钮样式 */
+        button.reading-disabled {
+            opacity: 0.6;
+            cursor: wait;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -287,7 +294,7 @@
             <div class="sentence-en" id="sentenceEnHidden" style="display:none;"></div>
             <div class="sentence-buttons">
                 <button id="showSentenceBtn" class="btn-sentence-show">📖 Show Sentence</button>
-                <button id="readSentenceBtn" class="btn-sentence-read">🔊 Read 2x</button>
+                <button id="readSentenceBtn" class="btn-sentence-read">🔊 Read 3x</button>
                 <button id="prevSentenceBtn" class="btn-sentence-prev">⬅️ Previous</button>
                 <button id="nextSentenceBtn" class="btn-sentence-next">➡️ Next</button>
             </div>
@@ -314,6 +321,23 @@
     let currentLevel = "";
     let currentFileName = "";
     const synth = window.speechSynthesis;
+
+    // ---------- 朗读状态管理 (确保完整读完才播放下一次) ----------
+    let currentSpeakingQueue = null;      // 当前正在进行的朗读队列
+    let isSpeaking = false;               // 是否正在朗读中
+    let pendingReadCallback = null;       // 等待执行的朗读回调
+    
+    // 单词朗读计时器
+    let wordReadTimer = null;
+    // 句子朗读队列相关
+    let sentenceReadQueue = [];
+    let isSentenceReading = false;
+    let currentSentenceReadCount = 0;
+    let targetSentenceReadCount = 3;      // 句子朗读3遍
+    let currentSentenceText = "";
+    
+    // 句子朗读按钮元素引用
+    let readSentenceBtnElement = null;
 
     // ---------- 动态仓库分支 ----------
     function getRawBaseUrl() {
@@ -375,15 +399,228 @@
         }
     }
 
-    // 核心: 同时加载单词 + 句子 (从同一个excel读取两个sheet: 默认Sheet0为单词, Sheet1为句子; 若没有句子Sheet则显示空)
+    // ========== 朗读核心函数：确保完整读完才播放下一个 ==========
+    function speakTextWithCallback(text, onEnd, rate = 0.85) {
+        if (!text) {
+            if (onEnd) onEnd();
+            return;
+        }
+        
+        // 取消任何正在进行的朗读，避免重叠
+        synth.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = rate;
+        utterance.volume = 1;
+        utterance.pitch = 1;
+        
+        // 获取合适的女性声音
+        const voices = synth.getVoices();
+        const femaleVoice = voices.find(v => 
+            v.lang.includes("en") && 
+            (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female") || v.name.includes("Microsoft"))
+        );
+        if (femaleVoice) utterance.voice = femaleVoice;
+        
+        utterance.onend = () => {
+            if (onEnd) onEnd();
+        };
+        
+        utterance.onerror = (err) => {
+            console.warn("Speech error:", err);
+            if (onEnd) onEnd();
+        };
+        
+        synth.speak(utterance);
+    }
+    
+    // 简单朗读（无回调，用于单词）
+    function speakTextSimple(text, rate = 0.85) {
+        if (!text) return;
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = rate;
+        const voices = synth.getVoices();
+        const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha")));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        synth.speak(utterance);
+    }
+    
+    // 单词朗读3次（顺序朗读，每次读完再读下一次）
+    function read3Times(word) {
+        // 清除之前的单词朗读计时器
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        
+        let count = 0;
+        const maxCount = 3;
+        
+        function speakNext() {
+            if (count < maxCount) {
+                speakTextSimple(word);
+                count++;
+                // 设置延时，等待朗读完成再播放下一次
+                // 使用 setTimeout 预估朗读时长，但为了精确，使用 onend 事件
+                // 但 speakTextSimple 没有回调，这里改用带回调的版本
+                // 重新实现单词朗读的递归回调
+            }
+        }
+        
+        // 使用递归回调方式确保顺序朗读
+        function speakRecursive(currentCount) {
+            if (currentCount >= maxCount) return;
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = "en-US";
+            utterance.rate = 0.8;
+            const voices = synth.getVoices();
+            const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha")));
+            if (femaleVoice) utterance.voice = femaleVoice;
+            utterance.onend = () => {
+                speakRecursive(currentCount + 1);
+            };
+            synth.speak(utterance);
+        }
+        
+        synth.cancel();
+        speakRecursive(0);
+    }
+    
+    // ========== 句子朗读3次（完整读完一次再播放下一次）==========
+    function readSentence3Times(sentenceText, buttonElement) {
+        if (!sentenceText) return;
+        
+        // 如果已经在朗读中，先取消当前朗读并重置状态
+        if (isSentenceReading) {
+            synth.cancel();
+            // 重置队列状态
+            isSentenceReading = false;
+            sentenceReadQueue = [];
+            currentSentenceReadCount = 0;
+            // 恢复按钮状态
+            if (readSentenceBtnElement) {
+                readSentenceBtnElement.classList.remove('reading-disabled');
+                readSentenceBtnElement.disabled = false;
+            }
+        }
+        
+        // 保存按钮引用用于状态管理
+        readSentenceBtnElement = buttonElement;
+        
+        // 禁用朗读按钮，防止重复点击
+        if (readSentenceBtnElement) {
+            readSentenceBtnElement.classList.add('reading-disabled');
+            readSentenceBtnElement.disabled = true;
+        }
+        
+        // 同时禁用其他句子按钮（避免在朗读时切换句子）
+        const showBtn = document.getElementById('showSentenceBtn');
+        const prevBtn = document.getElementById('prevSentenceBtn');
+        const nextBtn = document.getElementById('nextSentenceBtn');
+        const allBtn = document.getElementById('showAllSentencesBtn');
+        [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
+            if (btn) {
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.5';
+            }
+        });
+        
+        let readCount = 0;
+        const targetCount = 3;
+        
+        function speakNext() {
+            if (readCount >= targetCount) {
+                // 朗读完成，恢复所有按钮
+                if (readSentenceBtnElement) {
+                    readSentenceBtnElement.classList.remove('reading-disabled');
+                    readSentenceBtnElement.disabled = false;
+                }
+                [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
+                    if (btn) {
+                        btn.style.pointerEvents = '';
+                        btn.style.opacity = '';
+                    }
+                });
+                isSentenceReading = false;
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(sentenceText);
+            utterance.lang = "en-US";
+            utterance.rate = 0.8;
+            utterance.volume = 1;
+            
+            const voices = synth.getVoices();
+            const femaleVoice = voices.find(v => 
+                v.lang.includes("en") && 
+                (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female"))
+            );
+            if (femaleVoice) utterance.voice = femaleVoice;
+            
+            utterance.onend = () => {
+                readCount++;
+                // 完全读完一遍后，再播放下一次
+                speakNext();
+            };
+            
+            utterance.onerror = () => {
+                // 出错时继续尝试下一次
+                readCount++;
+                speakNext();
+            };
+            
+            synth.speak(utterance);
+        }
+        
+        isSentenceReading = true;
+        synth.cancel(); // 取消任何正在进行的朗读
+        speakNext();
+    }
+    
+    // 停止所有朗读并恢复按钮状态
+    function stopAllReading() {
+        synth.cancel();
+        
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        
+        if (isSentenceReading) {
+            isSentenceReading = false;
+            if (readSentenceBtnElement) {
+                readSentenceBtnElement.classList.remove('reading-disabled');
+                readSentenceBtnElement.disabled = false;
+            }
+            const showBtn = document.getElementById('showSentenceBtn');
+            const prevBtn = document.getElementById('prevSentenceBtn');
+            const nextBtn = document.getElementById('nextSentenceBtn');
+            const allBtn = document.getElementById('showAllSentencesBtn');
+            [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
+                if (btn) {
+                    btn.style.pointerEvents = '';
+                    btn.style.opacity = '';
+                }
+            });
+        }
+    }
+    
+    // 加载文件 (单词 + 句子)
     async function loadSelectedFile(filename) {
         if (!filename || !currentLevel) return;
+        
+        // 停止所有正在进行的朗读
+        stopAllReading();
+        
         currentFileName = filename;
         currentFileNameForSentences = filename;
         const wordDiv = document.getElementById("wordContent");
         wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
         document.getElementById("dayRow").style.display = 'flex';
-        document.getElementById("sentenceArea").style.display = 'none';  // 先隐藏句子区
+        document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         
         try {
@@ -401,21 +638,19 @@
                 meaning: String(item.meaning).trim(),
                 day: Number(item.day)
             }));
-            // 初始无筛选，显示全部
             filteredWords = [...allWords];
             currentWordIdx = 0;
             if (filteredWords.length) showWord();
             else wordDiv.innerHTML = '<p>⚠️ No word data in this file.</p>';
             document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
             
-            // ----- 2. 加载句子 (尝试 Sheet1, 期望列: sentence / chinese 或 sentence_en / sentence_zh 兼容) -----
+            // ----- 2. 加载句子 (Sheet1) -----
             allSentences = [];
             if (wb.SheetNames.length >= 2) {
                 const sheetName1 = wb.SheetNames[1];
                 const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
                 if (rawSentences && rawSentences.length) {
                     allSentences = rawSentences.map(row => {
-                        // 智能匹配英文列 & 中文列
                         let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
                         let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
                         if (!en && !zh) return null;
@@ -426,7 +661,7 @@
                     }).filter(s => s && s.sentence_en);
                 }
             }
-            // 如果句子数据为空，显示无句子提示，但保留区域隐藏或显示禁用状态
+            
             if (allSentences.length === 0) {
                 document.getElementById("sentenceArea").style.display = 'none';
             } else {
@@ -444,7 +679,7 @@
 
     // 单词展示
     function showWord() {
-        clearSentenceTimer();  // 清理朗读计时器
+        stopAllReading();
         const container = document.getElementById("wordContent");
         if (!filteredWords.length) {
             container.innerHTML = '<p>📭 No words match this day.</p>';
@@ -468,7 +703,7 @@
             </div>
             <div class="tip">${currentLevel} | ${displayFile} | Day ${w.day} | ${currentWordIdx+1}/${filteredWords.length}</div>
         `;
-        // 绑定事件 (动态)
+        
         document.getElementById("btnShowWord")?.addEventListener("click", () => {
             const wordSpan = document.getElementById("currentWordSpan");
             if(wordSpan) wordSpan.style.display = "block";
@@ -478,34 +713,9 @@
         document.getElementById("btnNextWord")?.addEventListener("click", () => { if(currentWordIdx+1 <= filteredWords.length) { currentWordIdx++; showWord(); } });
     }
 
-    // 朗读单词3次
-    let readTimer = null;
-    function clearSentenceTimer() { if(readTimer) { clearInterval(readTimer); readTimer = null; } }
-    async function speakText(text, rate=0.85) {
-        if(!text) return;
-        synth.cancel();
-        const getVoices = () => new Promise(resolve => { let v = synth.getVoices(); if(v.length) resolve(v); else synth.onvoiceschanged = () => resolve(synth.getVoices()); });
-        const voices = await getVoices();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = "en-US";
-        utter.rate = rate;
-        const female = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female")));
-        if(female) utter.voice = female;
-        synth.speak(utter);
-    }
-    function read3Times(word) {
-        clearSentenceTimer();
-        let count = 0;
-        speakText(word);
-        count++;
-        readTimer = setInterval(() => {
-            if(count < 3) { speakText(word); count++; }
-            else { clearInterval(readTimer); readTimer = null; }
-        }, 1800);
-    }
-
     // 筛选Day
     function filterByDay() {
+        stopAllReading();
         const daySelect = document.getElementById('daySelect');
         const dayNum = document.getElementById('dayNum');
         if(daySelect.value === 'all') {
@@ -523,7 +733,7 @@
         }
     }
 
-    // 展示所有单词 (弹窗)
+    // 展示所有单词
     function showAllWordsPopup() {
         if(!allWords.length) return;
         const fileNice = removeExtension(currentFileName);
@@ -539,48 +749,26 @@
         win.document.close();
     }
 
-    // ---------- 句子模块逻辑 ----------
+    // ---------- 句子模块UI更新 ----------
     function updateSentenceUI() {
         if (!allSentences.length) return;
         const sent = allSentences[currentSentenceIdx];
-        const sentenceDiv = document.getElementById("sentenceContent");
-        if(!sentenceDiv) return;
-        const meaningDiv = sentenceDiv.querySelector(".sentence-meaning");
+        const meaningDiv = document.querySelector("#sentenceContent .sentence-meaning");
         const enSpan = document.getElementById("sentenceEnHidden");
-        if(!meaningDiv) return;
-        meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
+        if(meaningDiv) meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
         if(enSpan) {
             enSpan.innerText = sent.sentence_en;
             enSpan.style.display = "none";
         }
-        // 更新提示文本
         const tipSpan = document.getElementById("sentenceTip");
         if(tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx+1} / ${allSentences.length} sentences`;
         updateSentenceStats();
-        // 重新绑定按钮事件 (避免重复绑定，用新的事件监听)
         attachSentenceEvents();
     }
 
     function updateSentenceStats() {
         const statsSpan = document.getElementById("sentenceStats");
         if(statsSpan) statsSpan.innerText = `${allSentences.length} sentences`;
-    }
-
-    let sentenceReadInterval = null;
-    function clearSentenceReadInterval() { if(sentenceReadInterval) { clearInterval(sentenceReadInterval); sentenceReadInterval = null; } }
-    
-    function readSentence2x() {
-        if(!allSentences.length) return;
-        const sent = allSentences[currentSentenceIdx];
-        if(!sent.sentence_en) return;
-        clearSentenceReadInterval();
-        let times = 0;
-        speakText(sent.sentence_en, 0.8);
-        times++;
-        sentenceReadInterval = setInterval(() => {
-            if(times < 2) { speakText(sent.sentence_en, 0.8); times++; }
-            else { clearInterval(sentenceReadInterval); sentenceReadInterval = null; }
-        }, 2000);
     }
 
     function showCurrentSentence() {
@@ -590,6 +778,7 @@
 
     function prevSentence() {
         if(allSentences.length === 0) return;
+        stopAllReading();
         if(currentSentenceIdx > 0) {
             currentSentenceIdx--;
             updateSentenceUI();
@@ -598,6 +787,7 @@
 
     function nextSentence() {
         if(allSentences.length === 0) return;
+        stopAllReading();
         if(currentSentenceIdx < allSentences.length - 1) {
             currentSentenceIdx++;
             updateSentenceUI();
@@ -624,32 +814,35 @@
         const prevBtn = document.getElementById("prevSentenceBtn");
         const nextBtn = document.getElementById("nextSentenceBtn");
         const allBtn = document.getElementById("showAllSentencesBtn");
+        
         if(showBtn) showBtn.onclick = () => showCurrentSentence();
-        if(readBtn) readBtn.onclick = () => readSentence2x();
+        if(readBtn) readBtn.onclick = () => {
+            const currentSent = allSentences[currentSentenceIdx];
+            if(currentSent && currentSent.sentence_en) {
+                readSentence3Times(currentSent.sentence_en, readBtn);
+            }
+        };
         if(prevBtn) prevBtn.onclick = () => prevSentence();
         if(nextBtn) nextBtn.onclick = () => nextSentence();
         if(allBtn) allBtn.onclick = () => showAllSentencesPopup();
     }
 
-    // 重置句子区（换文件时重置索引）
-    function resetSentenceModule() {
-        if(allSentences.length) {
-            currentSentenceIdx = 0;
-            updateSentenceUI();
-        } else {
-            document.getElementById("sentenceArea").style.display = 'none';
-        }
-    }
-
     // ---------- 初始化页面 ----------
     document.addEventListener('DOMContentLoaded', () => {
         initDaySelectToggle();
+        
+        // 获取 voices 列表，确保语音引擎就绪
+        if (synth.getVoices().length === 0) {
+            synth.onvoiceschanged = () => {};
+        }
+        
         const levelConfirm = document.getElementById('levelConfirm');
         const fileConfirm = document.getElementById('fileConfirm');
         const filterBtn = document.getElementById('filterBtn');
         const showAllWordsBtn = document.getElementById('showAllBtn');
 
         levelConfirm.addEventListener('click', () => {
+            stopAllReading();
             const level = document.getElementById('levelSelect').value;
             if(!level) { alert("Please select P1 or P2"); return; }
             currentLevel = level;
@@ -661,11 +854,11 @@
         });
 
         fileConfirm.addEventListener('click', async () => {
+            stopAllReading();
             const fileSelect = document.getElementById('fileSelect');
             const selected = fileSelect.value;
             if(!selected || selected === "Loading..." || selected.includes("fail")) { alert("Please select a valid file"); return; }
             await loadSelectedFile(selected);
-            resetSentenceModule();
         });
 
         filterBtn.addEventListener('click', () => filterByDay());
