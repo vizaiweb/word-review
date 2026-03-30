@@ -85,71 +85,12 @@
         .btn-file { background: #0f67b3; }
         .btn-filter { background: #2b7e3a; }
         .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
-        
-        /* Day行特殊处理：All Words和Filter在同一行 */
-        #dayRow {
-            display: flex;
-            flex-wrap: nowrap;
-            align-items: center;
-            gap: 8px;
-        }
-        #dayRow label {
-            flex-shrink: 0;
-            min-width: 50px;
-        }
-        #daySelect {
-            flex: 2;
-            min-width: 0;
-        }
-        #dayNum {
-            flex: 1;
-            min-width: 60px;
-        }
-        #filterBtn {
-            flex-shrink: 0;
-            min-width: 70px;
-        }
-        
-        @media (max-width: 550px) {
-            #dayRow {
-                gap: 6px;
-            }
-            #dayRow label {
-                min-width: 45px;
-                font-size: 14px;
-            }
-            #daySelect {
-                flex: 2;
-            }
-            #dayNum {
-                flex: 1;
-                min-width: 55px;
-                font-size: 14px;
-            }
-            #filterBtn {
-                min-width: 65px;
-                padding: 8px 12px;
-                font-size: 14px;
-            }
-        }
 
         /* 单词练习区 */
         .practice-section {
             padding: 20px 18px;
             border-bottom: 1px dashed #e2e8f0;
         }
-        
-        /* 单词区域标题 */
-        .vocab-title {
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: #ff6b35;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
-            border-bottom: 3px solid #ff9a56;
-            display: inline-block;
-        }
-        
         .meaning {
             font-size: 26px;
             color: #0f172a;
@@ -177,43 +118,31 @@
             font-weight: bold;
             color: white;
             cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s;
         }
-        .btn-group button:active {
-            transform: scale(0.96);
-        }
-        .btn-show { background: #f97316; }
-        .btn-read { background: #f97316; }
-        .btn-prev { background: #f97316; }
-        .btn-next { background: #f97316; }
+        .btn-show { background: #8b5cf6; }
+        .btn-read { background: #3b82f6; }
+        .btn-prev { background: #64748b; }
+        .btn-next { background: #22c55e; }
         .btn-prev:disabled {
             background: #cbd5e1;
             cursor: not-allowed;
-            opacity: 0.6;
         }
         .show-all-btn {
-            background: #f97316;
+            background: #6366f1;
             border: none;
             border-radius: 40px;
-            padding: 12px;
+            padding: 10px 18px;
             color: white;
             font-weight: bold;
             margin: 8px 0 0;
             cursor: pointer;
             width: 100%;
-            font-size: 16px;
-            transition: transform 0.1s;
         }
-        .show-all-btn:active {
-            transform: scale(0.97);
-        }
-        .info-tip {
+        .tip {
             font-size: 13px;
-            color: #64748b;
+            color: #475569;
             text-align: center;
             margin-top: 12px;
-            padding-top: 8px;
-            border-top: 1px solid #e2e8f0;
         }
 
         /* ========= 句子专区 ========= */
@@ -233,7 +162,7 @@
             padding-bottom: 8px;
         }
         .sentence-header h3 {
-            font-size: 1.3rem;
+            font-size: 1.5rem;
             color: #c2410c;
             display: flex;
             align-items: center;
@@ -262,58 +191,35 @@
             line-height: 1.4;
             word-break: break-word;
         }
-        /* 句子按钮组 - 与单词按钮组样式一致 */
         .sentence-buttons {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            display: flex;
+            flex-wrap: wrap;
             gap: 12px;
-            margin: 15px 0;
+            margin: 15px 0 10px;
         }
         .sentence-buttons button {
-            padding: 12px;
-            font-size: 16px;
-            border: none;
+            flex: 1;
+            padding: 10px;
             border-radius: 40px;
             font-weight: bold;
-            color: white;
-            cursor: pointer;
-            background: #f97316;
-            transition: transform 0.1s;
-        }
-        .sentence-buttons button:active {
-            transform: scale(0.96);
-        }
-        /* 大按钮样式与Show All Words一致 */
-        .btn-sentence-all {
-            background: #f97316;
             border: none;
-            border-radius: 40px;
-            padding: 12px;
             color: white;
-            font-weight: bold;
-            margin-top: 8px;
             cursor: pointer;
-            width: 100%;
-            font-size: 16px;
-            transition: transform 0.1s;
+            background: #e67e22;
+            transition: 0.1s linear;
         }
-        .btn-sentence-all:active {
-            transform: scale(0.97);
-        }
+        .btn-sentence-show { background: #d97706; }
+        .btn-sentence-read { background: #0284c7; }
+        .btn-sentence-prev { background: #6c757d; }
+        .btn-sentence-next { background: #2b9348; }
+        .btn-sentence-all { background: #5f4b8b; }
         .sentence-tip {
             font-size: 12px;
             text-align: center;
             color: #a16207;
             margin-top: 12px;
         }
-        
-        /* 朗读中禁用按钮样式 */
-        button.reading-disabled {
-            opacity: 0.6;
-            cursor: wait;
-            pointer-events: none;
-        }
-        
+        button:active { transform: scale(0.96); }
         .footer {
             max-width: 700px;
             margin: 20px auto 20px;
@@ -326,15 +232,16 @@
             text-decoration: none;
             margin: 0 6px;
         }
-        
         @media (max-width: 550px) {
-            .meaning { font-size: 22px; }
             .sentence-meaning { font-size: 18px; }
-            .btn-group button, .sentence-buttons button, .show-all-btn, .btn-sentence-all {
-                font-size: 14px;
-                padding: 10px;
-            }
-            .vocab-title { font-size: 1.2rem; }
+            .btn-group button, .sentence-buttons button { font-size: 13px; padding: 8px; }
+        }
+        
+        /* 朗读中禁用按钮样式 */
+        button.reading-disabled {
+            opacity: 0.6;
+            cursor: wait;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -359,10 +266,9 @@
             <select id="fileSelect"><option>Loading...</option></select>
             <button class="btn-file" id="fileConfirm">Confirm</button>
         </div>
-        <!-- Day行：All Words 和 Filter 在同一行 -->
         <div class="select-row" id="dayRow" style="display:none;">
             <label>Day:</label>
-            <select id="daySelect">
+            <select id="daySelect" style="flex:1">
                 <option value="all" selected>All Words</option>
                 <option value="custom">Custom Day</option>
             </select>
@@ -373,16 +279,14 @@
 
     <!-- 单词卡片区 -->
     <div class="practice-section" id="wordPracticeArea">
-        <div class="vocab-title">✏️ Vocabulary Practice</div>
-        <div id="wordContent"><p style="color:#64748b; margin-top: 15px;">✨ Select Level & File to start ✨</p></div>
+        <div id="wordContent"><p style="color:#64748b;">✨ Select Level & File to start ✨</p></div>
         <button class="show-all-btn" id="showAllBtn" style="display:none;">📋 Show All Words</button>
-        <div id="infoTipContainer" class="info-tip"></div>
     </div>
 
     <!-- 句子专区 (独立于筛选, 仅与当前File绑定) -->
     <div class="sentence-section" id="sentenceArea" style="display:none;">
         <div class="sentence-header">
-            <h3>📝 Sentence Practice</h3>
+            <h3>✏️ Sentence Practice</h3>
             <span class="sentence-stats" id="sentenceStats">0 sentences</span>
         </div>
         <div id="sentenceContent">
@@ -394,7 +298,7 @@
                 <button id="prevSentenceBtn" class="btn-sentence-prev">⬅️ Previous</button>
                 <button id="nextSentenceBtn" class="btn-sentence-next">➡️ Next</button>
             </div>
-            <button id="showAllSentencesBtn" class="btn-sentence-all">📜 Show All Sentences</button>
+            <button id="showAllSentencesBtn" class="btn-sentence-all" style="width:100%; margin-top:8px;">📜 Show All Sentences</button>
             <div class="sentence-tip" id="sentenceTip">⭐ Practice everyday sentences!</div>
         </div>
     </div>
@@ -405,20 +309,34 @@
 
 <script>
     // ---------- 全局变量 ----------
-    let allWords = [];
-    let filteredWords = [];
+    let allWords = [];           // 原始单词 { word, meaning, day }
+    let filteredWords = [];      // 按Day筛选后的单词
     let currentWordIdx = 0;
 
-    let allSentences = [];
+    // 句子专用数据 (独立于单词filter)
+    let allSentences = [];       // 从Excel读取: { sentence_en, sentence_zh }
     let currentSentenceIdx = 0;
-    let currentFileNameForSentences = "";
+    let currentFileNameForSentences = "";   // 当前加载句子的文件
     
     let currentLevel = "";
     let currentFileName = "";
     const synth = window.speechSynthesis;
 
+    // ---------- 朗读状态管理 (确保完整读完才播放下一次) ----------
+    let currentSpeakingQueue = null;      // 当前正在进行的朗读队列
+    let isSpeaking = false;               // 是否正在朗读中
+    let pendingReadCallback = null;       // 等待执行的朗读回调
+    
+    // 单词朗读计时器
     let wordReadTimer = null;
+    // 句子朗读队列相关
+    let sentenceReadQueue = [];
     let isSentenceReading = false;
+    let currentSentenceReadCount = 0;
+    let targetSentenceReadCount = 3;      // 句子朗读3遍
+    let currentSentenceText = "";
+    
+    // 句子朗读按钮元素引用
     let readSentenceBtnElement = null;
 
     // ---------- 动态仓库分支 ----------
@@ -433,8 +351,10 @@
     function getFileListUrl(level) { return `${getRawBaseUrl()}/data/${level}/fileList.json`; }
     function getXlsxFileUrl(level, filename) { return `${getRawBaseUrl()}/data/${level}/${filename}`; }
 
+    // 辅助函数: 去除扩展名
     function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
 
+    // 初始化Day下拉交互
     function initDaySelectToggle() {
         const daySelect = document.getElementById('daySelect');
         const dayNum = document.getElementById('dayNum');
@@ -454,6 +374,7 @@
         update();
     }
 
+    // 加载文件列表
     async function loadFileListByLevel(level) {
         const fileSelect = document.getElementById('fileSelect');
         const fileRow = document.getElementById('fileRow');
@@ -478,132 +399,222 @@
         }
     }
 
-    // 朗读核心：带回调，确保完整读完
-    function speakTextWithCallback(text, onEnd, rate = 0.8) {
-        if (!text) { if (onEnd) onEnd(); return; }
+    // ========== 朗读核心函数：确保完整读完才播放下一个 ==========
+    function speakTextWithCallback(text, onEnd, rate = 0.85) {
+        if (!text) {
+            if (onEnd) onEnd();
+            return;
+        }
+        
+        // 取消任何正在进行的朗读，避免重叠
         synth.cancel();
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
         utterance.rate = rate;
         utterance.volume = 1;
+        utterance.pitch = 1;
+        
+        // 获取合适的女性声音
         const voices = synth.getVoices();
-        const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female")));
+        const femaleVoice = voices.find(v => 
+            v.lang.includes("en") && 
+            (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female") || v.name.includes("Microsoft"))
+        );
         if (femaleVoice) utterance.voice = femaleVoice;
-        utterance.onend = () => { if (onEnd) onEnd(); };
-        utterance.onerror = () => { if (onEnd) onEnd(); };
+        
+        utterance.onend = () => {
+            if (onEnd) onEnd();
+        };
+        
+        utterance.onerror = (err) => {
+            console.warn("Speech error:", err);
+            if (onEnd) onEnd();
+        };
+        
         synth.speak(utterance);
     }
-
-    // 单词朗读3次（递归回调，完整读完一次再读下一次）
-    function read3Times(word) {
-        if (wordReadTimer) clearInterval(wordReadTimer);
-        let count = 0;
-        function speakNext() {
-            if (count >= 3) return;
-            speakTextWithCallback(word, () => {
-                count++;
-                if (count < 3) speakNext();
-            }, 0.8);
-        }
+    
+    // 简单朗读（无回调，用于单词）
+    function speakTextSimple(text, rate = 0.85) {
+        if (!text) return;
         synth.cancel();
-        speakNext();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = rate;
+        const voices = synth.getVoices();
+        const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha")));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        synth.speak(utterance);
     }
     
-    // 句子朗读3次（完整读完一次再播放下一次）
+    // 单词朗读3次（顺序朗读，每次读完再读下一次）
+    function read3Times(word) {
+        // 清除之前的单词朗读计时器
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        
+        let count = 0;
+        const maxCount = 3;
+        
+        function speakNext() {
+            if (count < maxCount) {
+                speakTextSimple(word);
+                count++;
+                // 设置延时，等待朗读完成再播放下一次
+                // 使用 setTimeout 预估朗读时长，但为了精确，使用 onend 事件
+                // 但 speakTextSimple 没有回调，这里改用带回调的版本
+                // 重新实现单词朗读的递归回调
+            }
+        }
+        
+        // 使用递归回调方式确保顺序朗读
+        function speakRecursive(currentCount) {
+            if (currentCount >= maxCount) return;
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = "en-US";
+            utterance.rate = 0.8;
+            const voices = synth.getVoices();
+            const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha")));
+            if (femaleVoice) utterance.voice = femaleVoice;
+            utterance.onend = () => {
+                speakRecursive(currentCount + 1);
+            };
+            synth.speak(utterance);
+        }
+        
+        synth.cancel();
+        speakRecursive(0);
+    }
+    
+    // ========== 句子朗读3次（完整读完一次再播放下一次）==========
     function readSentence3Times(sentenceText, buttonElement) {
         if (!sentenceText) return;
+        
+        // 如果已经在朗读中，先取消当前朗读并重置状态
         if (isSentenceReading) {
             synth.cancel();
+            // 重置队列状态
             isSentenceReading = false;
+            sentenceReadQueue = [];
+            currentSentenceReadCount = 0;
+            // 恢复按钮状态
             if (readSentenceBtnElement) {
                 readSentenceBtnElement.classList.remove('reading-disabled');
                 readSentenceBtnElement.disabled = false;
             }
-            restoreSentenceButtons(false);
         }
         
+        // 保存按钮引用用于状态管理
         readSentenceBtnElement = buttonElement;
+        
+        // 禁用朗读按钮，防止重复点击
         if (readSentenceBtnElement) {
             readSentenceBtnElement.classList.add('reading-disabled');
             readSentenceBtnElement.disabled = true;
         }
-        restoreSentenceButtons(true); // 禁用其他按钮
         
-        let readCount = 0;
-        function speakNext() {
-            if (readCount >= 3) {
-                isSentenceReading = false;
-                if (readSentenceBtnElement) {
-                    readSentenceBtnElement.classList.remove('reading-disabled');
-                    readSentenceBtnElement.disabled = false;
-                }
-                restoreSentenceButtons(false);
-                return;
-            }
-            speakTextWithCallback(sentenceText, () => {
-                readCount++;
-                speakNext();
-            }, 0.8);
-        }
-        
-        isSentenceReading = true;
-        synth.cancel();
-        speakNext();
-    }
-    
-    function restoreSentenceButtons(disable) {
+        // 同时禁用其他句子按钮（避免在朗读时切换句子）
         const showBtn = document.getElementById('showSentenceBtn');
         const prevBtn = document.getElementById('prevSentenceBtn');
         const nextBtn = document.getElementById('nextSentenceBtn');
         const allBtn = document.getElementById('showAllSentencesBtn');
-        const btns = [showBtn, prevBtn, nextBtn, allBtn];
-        btns.forEach(btn => {
+        [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
             if (btn) {
-                if (disable) {
-                    btn.style.pointerEvents = 'none';
-                    btn.style.opacity = '0.5';
-                } else {
-                    btn.style.pointerEvents = '';
-                    btn.style.opacity = '';
-                }
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.5';
             }
         });
+        
+        let readCount = 0;
+        const targetCount = 3;
+        
+        function speakNext() {
+            if (readCount >= targetCount) {
+                // 朗读完成，恢复所有按钮
+                if (readSentenceBtnElement) {
+                    readSentenceBtnElement.classList.remove('reading-disabled');
+                    readSentenceBtnElement.disabled = false;
+                }
+                [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
+                    if (btn) {
+                        btn.style.pointerEvents = '';
+                        btn.style.opacity = '';
+                    }
+                });
+                isSentenceReading = false;
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(sentenceText);
+            utterance.lang = "en-US";
+            utterance.rate = 0.8;
+            utterance.volume = 1;
+            
+            const voices = synth.getVoices();
+            const femaleVoice = voices.find(v => 
+                v.lang.includes("en") && 
+                (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female"))
+            );
+            if (femaleVoice) utterance.voice = femaleVoice;
+            
+            utterance.onend = () => {
+                readCount++;
+                // 完全读完一遍后，再播放下一次
+                speakNext();
+            };
+            
+            utterance.onerror = () => {
+                // 出错时继续尝试下一次
+                readCount++;
+                speakNext();
+            };
+            
+            synth.speak(utterance);
+        }
+        
+        isSentenceReading = true;
+        synth.cancel(); // 取消任何正在进行的朗读
+        speakNext();
     }
     
+    // 停止所有朗读并恢复按钮状态
     function stopAllReading() {
         synth.cancel();
-        if (wordReadTimer) clearInterval(wordReadTimer);
+        
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        
         if (isSentenceReading) {
             isSentenceReading = false;
             if (readSentenceBtnElement) {
                 readSentenceBtnElement.classList.remove('reading-disabled');
                 readSentenceBtnElement.disabled = false;
             }
-            restoreSentenceButtons(false);
+            const showBtn = document.getElementById('showSentenceBtn');
+            const prevBtn = document.getElementById('prevSentenceBtn');
+            const nextBtn = document.getElementById('nextSentenceBtn');
+            const allBtn = document.getElementById('showAllSentencesBtn');
+            [showBtn, prevBtn, nextBtn, allBtn].forEach(btn => {
+                if (btn) {
+                    btn.style.pointerEvents = '';
+                    btn.style.opacity = '';
+                }
+            });
         }
     }
     
-    // 更新底部信息（不显示Level，只显示 File | Day X | 进度）
-    function updateInfoTip() {
-        const container = document.getElementById('infoTipContainer');
-        if (!container) return;
-        if (!currentFileName || filteredWords.length === 0) {
-            container.innerHTML = '';
-            return;
-        }
-        const displayFile = removeExtension(currentFileName);
-        const currentWord = filteredWords[currentWordIdx];
-        if (currentWord) {
-            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length}`;
-        } else {
-            container.innerHTML = `${displayFile} | 0/0`;
-        }
-    }
-    
-    // 加载文件
+    // 加载文件 (单词 + 句子)
     async function loadSelectedFile(filename) {
         if (!filename || !currentLevel) return;
+        
+        // 停止所有正在进行的朗读
         stopAllReading();
+        
         currentFileName = filename;
         currentFileNameForSentences = filename;
         const wordDiv = document.getElementById("wordContent");
@@ -611,7 +622,6 @@
         document.getElementById("dayRow").style.display = 'flex';
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
-        document.getElementById("infoTipContainer").innerHTML = '';
         
         try {
             const url = getXlsxFileUrl(currentLevel, filename);
@@ -620,7 +630,7 @@
             const buf = await res.arrayBuffer();
             const wb = XLSX.read(buf, { type: "array" });
             
-            // 单词 Sheet0
+            // ----- 1. 加载单词 (Sheet0) -----
             const sheetName0 = wb.SheetNames[0];
             const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
             allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
@@ -630,15 +640,11 @@
             }));
             filteredWords = [...allWords];
             currentWordIdx = 0;
-            if (filteredWords.length) {
-                showWord();
-                updateInfoTip();
-            } else {
-                wordDiv.innerHTML = '<p>⚠️ No word data in this file.</p>';
-            }
+            if (filteredWords.length) showWord();
+            else wordDiv.innerHTML = '<p>⚠️ No word data in this file.</p>';
             document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
             
-            // 句子 Sheet1
+            // ----- 2. 加载句子 (Sheet1) -----
             allSentences = [];
             if (wb.SheetNames.length >= 2) {
                 const sheetName1 = wb.SheetNames[1];
@@ -647,9 +653,9 @@
                     allSentences = rawSentences.map(row => {
                         let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
                         let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
-                        if (!en) return null;
+                        if (!en && !zh) return null;
                         return { 
-                            sentence_en: String(en).trim(), 
+                            sentence_en: en ? String(en).trim() : "", 
                             sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence" 
                         };
                     }).filter(s => s && s.sentence_en);
@@ -671,20 +677,20 @@
         }
     }
 
+    // 单词展示
     function showWord() {
         stopAllReading();
         const container = document.getElementById("wordContent");
         if (!filteredWords.length) {
             container.innerHTML = '<p>📭 No words match this day.</p>';
-            updateInfoTip();
             return;
         }
         if (currentWordIdx >= filteredWords.length) {
             container.innerHTML = '<p style="color:#22c55e;">🎉 Great! All words practiced!</p>';
-            updateInfoTip();
             return;
         }
         const w = filteredWords[currentWordIdx];
+        const displayFile = removeExtension(currentFileName);
         const isFirst = currentWordIdx === 0;
         container.innerHTML = `
             <div class="meaning">💡 ${w.meaning}</div>
@@ -695,22 +701,19 @@
                 <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
                 <button class="btn-next" id="btnNextWord">➡️ Next</button>
             </div>
+            <div class="tip">${currentLevel} | ${displayFile} | Day ${w.day} | ${currentWordIdx+1}/${filteredWords.length}</div>
         `;
-        updateInfoTip();
         
         document.getElementById("btnShowWord")?.addEventListener("click", () => {
             const wordSpan = document.getElementById("currentWordSpan");
             if(wordSpan) wordSpan.style.display = "block";
         });
         document.getElementById("btnReadWord")?.addEventListener("click", () => read3Times(w.word));
-        document.getElementById("btnPrevWord")?.addEventListener("click", () => { 
-            if(currentWordIdx > 0) { currentWordIdx--; showWord(); } 
-        });
-        document.getElementById("btnNextWord")?.addEventListener("click", () => { 
-            if(currentWordIdx + 1 <= filteredWords.length) { currentWordIdx++; showWord(); } 
-        });
+        document.getElementById("btnPrevWord")?.addEventListener("click", () => { if(currentWordIdx>0) { currentWordIdx--; showWord(); } });
+        document.getElementById("btnNextWord")?.addEventListener("click", () => { if(currentWordIdx+1 <= filteredWords.length) { currentWordIdx++; showWord(); } });
     }
 
+    // 筛选Day
     function filterByDay() {
         stopAllReading();
         const daySelect = document.getElementById('daySelect');
@@ -722,15 +725,15 @@
             alert(`✨ All words: ${filteredWords.length} words.`);
         } else {
             let day = Number(dayNum.value);
-            if(isNaN(day) || day < 1) { alert("Enter valid day number ≥1"); return; }
+            if(isNaN(day) || day < 1) { alert("Enter valid day number >=1"); return; }
             filteredWords = allWords.filter(item => item.day === day);
             if(filteredWords.length === 0) alert(`No words for Day ${day}.`);
             currentWordIdx = 0;
             showWord();
         }
-        updateInfoTip();
     }
 
+    // 展示所有单词
     function showAllWordsPopup() {
         if(!allWords.length) return;
         const fileNice = removeExtension(currentFileName);
@@ -746,6 +749,7 @@
         win.document.close();
     }
 
+    // ---------- 句子模块UI更新 ----------
     function updateSentenceUI() {
         if (!allSentences.length) return;
         const sent = allSentences[currentSentenceIdx];
@@ -810,6 +814,7 @@
         const prevBtn = document.getElementById("prevSentenceBtn");
         const nextBtn = document.getElementById("nextSentenceBtn");
         const allBtn = document.getElementById("showAllSentencesBtn");
+        
         if(showBtn) showBtn.onclick = () => showCurrentSentence();
         if(readBtn) readBtn.onclick = () => {
             const currentSent = allSentences[currentSentenceIdx];
@@ -822,9 +827,11 @@
         if(allBtn) allBtn.onclick = () => showAllSentencesPopup();
     }
 
-    // 初始化
+    // ---------- 初始化页面 ----------
     document.addEventListener('DOMContentLoaded', () => {
         initDaySelectToggle();
+        
+        // 获取 voices 列表，确保语音引擎就绪
         if (synth.getVoices().length === 0) {
             synth.onvoiceschanged = () => {};
         }
@@ -843,7 +850,6 @@
             document.getElementById("sentenceArea").style.display = 'none';
             document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
             document.getElementById("showAllBtn").style.display = 'none';
-            document.getElementById("infoTipContainer").innerHTML = '';
             allWords = []; filteredWords = []; allSentences = [];
         });
 
