@@ -1,3 +1,5 @@
+以下是修改后的完整HTML代码，确保“Show All Words”和“Show All Sentences”的弹出页面使用表格形式显示内容。
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -485,7 +487,6 @@
 
     // 单词朗读3次（不屏蔽其他按钮）
     function read3Times(word) {
-        // 停止之前的朗读
         if (wordReadTimer) {
             clearInterval(wordReadTimer);
             wordReadTimer = null;
@@ -507,13 +508,11 @@
     function readSentence3Times(sentenceText, buttonElement) {
         if (!sentenceText) return;
         
-        // 停止任何正在进行的朗读
         if (sentenceReadTimer) {
             clearInterval(sentenceReadTimer);
             sentenceReadTimer = null;
         }
         
-        // 如果正在朗读，先取消
         if (isSentenceReading) {
             synth.cancel();
             isSentenceReading = false;
@@ -523,10 +522,8 @@
             }
         }
         
-        // 保存当前按钮引用
         currentReadButton = buttonElement;
         
-        // 仅禁用朗读按钮本身，不禁用其他按钮
         if (currentReadButton) {
             currentReadButton.classList.add('reading-disabled');
             currentReadButton.disabled = true;
@@ -537,7 +534,6 @@
         
         function speakNext() {
             if (readCount >= 3) {
-                // 朗读完成，恢复朗读按钮
                 if (currentReadButton) {
                     currentReadButton.classList.remove('reading-disabled');
                     currentReadButton.disabled = false;
@@ -579,7 +575,7 @@
         }
     }
     
-    // 更新底部信息（不显示Level，只显示 File | Day X | 进度 + "vocabs"）
+    // 更新底部信息
     function updateInfoTip() {
         const container = document.getElementById('infoTipContainer');
         if (!container) return;
@@ -727,17 +723,116 @@
         updateInfoTip();
     }
 
+    // 展示所有单词 - 表格形式
     function showAllWordsPopup() {
         if(!allWords.length) return;
         const fileNice = removeExtension(currentFileName);
+        const tableRows = allWords.map(w => `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ffcd94;"><strong>${w.word.toUpperCase()}</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #ffcd94;">${w.meaning}</td>
+            </tr>
+        `).join('');
+        
         const htmlContent = `
         <!DOCTYPE html>
-        <html><head><meta charset="UTF-8"><title>All Words - ${fileNice}</title>
-        <style>body{font-family:sans-serif;padding:20px;background:#fef3e8;}table{border-collapse:collapse;width:100%;}th,td{padding:8px;border-bottom:1px solid #ffcd94;}th{background:#ff9a56;color:white;}</style>
-        </head><body><h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2> 表格<thead> tr<th>Day</th><th>Word</th><th>Meaning</th> </thead><tbody>
-        ${allWords.map(w => `<tr><td>${w.day}</td><td><strong>${w.word.toUpperCase()}</strong></td><td>${w.meaning}</td></tr>`).join('')}
-        </tbody> </table><br><button onclick="window.close()">Close</button></body></html>`;
-        const win = window.open('', '_blank', 'width=800,height=600');
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>All Words - ${fileNice}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    padding: 30px 20px;
+                    background: linear-gradient(135deg, #fef3e8 0%, #fff5eb 100%);
+                    min-height: 100vh;
+                }
+                .container {
+                    max-width: 900px;
+                    margin: 0 auto;
+                    background: white;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+                h2 {
+                    background: linear-gradient(135deg, #ff9a56, #ff6b35);
+                    color: white;
+                    padding: 20px;
+                    margin: 0;
+                    text-align: center;
+                    font-size: 24px;
+                }
+                .word-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .word-table th {
+                    background: #ff9a56;
+                    color: white;
+                    padding: 14px 12px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    text-align: left;
+                }
+                .word-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #ffe0b5;
+                }
+                .word-table tr:hover {
+                    background: #fff7ed;
+                }
+                .close-btn {
+                    display: block;
+                    width: 120px;
+                    margin: 20px auto;
+                    padding: 10px 20px;
+                    background: #ff6b35;
+                    color: white;
+                    border: none;
+                    border-radius: 30px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: transform 0.1s;
+                }
+                .close-btn:hover {
+                    transform: scale(1.02);
+                    background: #ff8c5a;
+                }
+                .stats {
+                    text-align: center;
+                    padding: 12px;
+                    background: #fff1e0;
+                    color: #b45f2b;
+                    font-size: 14px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2>
+                <div class="stats">✨ Total: ${allWords.length} words ✨</div>
+                <table class="word-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Day</th>
+                            <th>Word</th>
+                            <th>Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                <button class="close-btn" onclick="window.close()">Close</button>
+            </div>
+        </body>
+        </html>`;
+        
+        const win = window.open('', '_blank', 'width=850,height=650,scrollbars=yes');
         win.document.write(htmlContent);
         win.document.close();
     }
@@ -756,7 +851,6 @@
         if(tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx+1} / ${allSentences.length} sentences`;
         updateSentenceStats();
         
-        // 更新 Previous 按钮的禁用状态（与单词section逻辑一致）
         const prevBtn = document.getElementById("prevSentenceBtn");
         if (prevBtn) {
             if (currentSentenceIdx === 0) {
@@ -799,16 +893,117 @@
         }
     }
 
+    // 展示所有句子 - 表格形式
     function showAllSentencesPopup() {
         if(!allSentences.length) return;
         const fileNice = removeExtension(currentFileNameForSentences);
-        const rows = allSentences.map((s, idx) => `<tr><td>${idx+1}</td><td><strong>${s.sentence_en}</strong></td><td>${s.sentence_zh}</td></tr>`).join('');
+        const tableRows = allSentences.map((s, idx) => `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #fbc490; text-align: center; width: 60px;">${idx + 1}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #fbc490;"><strong>${s.sentence_en}</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #fbc490;">${s.sentence_zh}</td>
+            </tr>
+        `).join('');
+        
         const winHtml = `
         <!DOCTYPE html>
-        <html><head><meta charset="UTF-8"><title>All Sentences - ${fileNice}</title>
-        <style>body{background:#fff4e6;font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:10px;border-bottom:1px solid #fbc490;} th{background:#ffaa66;}</style>
-        </head><body><h2>📝 All Sentences (${currentLevel} - ${fileNice})</h2> 表格<thead> tr<th>#</th><th>English Sentence</th><th>Chinese</th> </thead><tbody>${rows}</tbody> </table><br><button onclick="window.close()">Close</button></body></html>`;
-        const win = window.open('', '_blank', 'width=850,height=650');
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>All Sentences - ${fileNice}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    padding: 30px 20px;
+                    background: linear-gradient(135deg, #fff4e6 0%, #fff9f0 100%);
+                    min-height: 100vh;
+                }
+                .container {
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    background: white;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+                h2 {
+                    background: linear-gradient(135deg, #ffb347, #ff8c42);
+                    color: white;
+                    padding: 20px;
+                    margin: 0;
+                    text-align: center;
+                    font-size: 24px;
+                }
+                .sentence-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .sentence-table th {
+                    background: #ffaa66;
+                    color: white;
+                    padding: 14px 12px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    text-align: left;
+                }
+                .sentence-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #ffe0b5;
+                    vertical-align: top;
+                }
+                .sentence-table tr:hover {
+                    background: #fff7ed;
+                }
+                .close-btn {
+                    display: block;
+                    width: 120px;
+                    margin: 20px auto;
+                    padding: 10px 20px;
+                    background: #ff8c42;
+                    color: white;
+                    border: none;
+                    border-radius: 30px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: transform 0.1s;
+                }
+                .close-btn:hover {
+                    transform: scale(1.02);
+                    background: #ffa559;
+                }
+                .stats {
+                    text-align: center;
+                    padding: 12px;
+                    background: #fff1e0;
+                    color: #b45f2b;
+                    font-size: 14px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2>📝 ${currentLevel} - ${fileNice} (All Sentences)</h2>
+                <div class="stats">✨ Total: ${allSentences.length} sentences ✨</div>
+                <table class="sentence-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">#</th>
+                            <th>English Sentence</th>
+                            <th>Chinese</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                <button class="close-btn" onclick="window.close()">Close</button>
+            </div>
+        </body>
+        </html>`;
+        
+        const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
         win.document.write(winHtml);
         win.document.close();
     }
@@ -871,3 +1066,4 @@
 </script>
 </body>
 </html>
+```
