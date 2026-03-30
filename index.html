@@ -166,18 +166,19 @@
             font-weight: bold;
             color: white;
             cursor: pointer;
-            background: #f97316;
+            background: #22c55e;
+            transition: transform 0.1s;
         }
         .btn-group button:active {
             transform: scale(0.96);
         }
         .btn-prev:disabled {
-            background: #cbd5e1;
+            background: #94a3b8;
             cursor: not-allowed;
             opacity: 0.6;
         }
         .show-all-btn {
-            background: #f97316;
+            background: #3b82f6;
             border: none;
             border-radius: 40px;
             padding: 12px;
@@ -262,13 +263,18 @@
             font-weight: bold;
             color: white;
             cursor: pointer;
-            background: #f97316;
+            background: #22c55e;
             transition: transform 0.1s;
         }
         .sentence-buttons button:active {
             transform: scale(0.96);
         }
-        /* 大按钮样式与Show All Words一致，但颜色为蓝底白字 */
+        .sentence-prev:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        /* 大按钮样式与Show All Words一致，颜色为蓝底白字 */
         .btn-sentence-all {
             background: #3b82f6;
             border: none;
@@ -373,7 +379,7 @@
             <div class="sentence-buttons">
                 <button id="showSentenceBtn">📖 Show Sentence</button>
                 <button id="readSentenceBtn">🔊 Read 3x</button>
-                <button id="prevSentenceBtn">⬅️ Previous</button>
+                <button id="prevSentenceBtn" class="sentence-prev">⬅️ Previous</button>
                 <button id="nextSentenceBtn">➡️ Next</button>
             </div>
             <button id="showAllSentencesBtn" class="btn-sentence-all">📜 Show All Sentences</button>
@@ -741,6 +747,19 @@
         const tipSpan = document.getElementById("sentenceTip");
         if(tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx+1} / ${allSentences.length} sentences`;
         updateSentenceStats();
+        
+        // 更新 Previous 按钮的禁用状态（与单词section逻辑一致）
+        const prevBtn = document.getElementById("prevSentenceBtn");
+        if (prevBtn) {
+            if (currentSentenceIdx === 0) {
+                prevBtn.disabled = true;
+                prevBtn.classList.add('sentence-prev');
+            } else {
+                prevBtn.disabled = false;
+                prevBtn.classList.remove('sentence-prev');
+            }
+        }
+        
         attachSentenceEvents();
     }
 
@@ -760,7 +779,7 @@
         if(currentSentenceIdx > 0) {
             currentSentenceIdx--;
             updateSentenceUI();
-        } else { alert("This is the first sentence!"); }
+        }
     }
 
     function nextSentence() {
@@ -769,7 +788,9 @@
         if(currentSentenceIdx < allSentences.length - 1) {
             currentSentenceIdx++;
             updateSentenceUI();
-        } else { alert("🎉 You've completed all sentences!"); }
+        } else { 
+            alert("🎉 You've completed all sentences!"); 
+        }
     }
 
     function showAllSentencesPopup() {
