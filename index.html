@@ -403,6 +403,7 @@
     
     let currentLevel = "";
     let currentFileName = "";
+    let currentFileExtension = ""; // 記錄副檔名
     const synth = window.speechSynthesis;
 
     let wordReadTimer = null;
@@ -420,9 +421,9 @@
     }
 
     function getFileListUrl(level) { return `${getRawBaseUrl()}/data/${level}/fileList.json`; }
-    function getXlsxFileUrl(level, filename) { return `${getRawBaseUrl()}/data/${level}/${filename}`; }
+    function getDataFileUrl(level, filename) { return `${getRawBaseUrl()}/data/${level}/${filename}`; }
 
-    function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
+    function removeExtension(fname) { return fname.replace(/\.(xlsx|json)$/i, ''); }
 
     function initDaySelectToggle() {
         const daySelect = document.getElementById('daySelect');
@@ -467,135 +468,139 @@
         }
     }
 
-    // 朗读核心：带回调，确保完整读完
-    function speakTextWithCallback(text, onEnd, rate = 0.8) {
-        if (!text) { if (onEnd) onEnd(); return; }
+    // 解析 JSON 檔案 (支援兩種格式)
+    function parseJsonData(jsonData) {
+        let words = [];
+        let sentences = [];
         
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "en-US";
-        utterance.rate = rate;
-        utterance.volume = 1;
-        const voices = synth.getVoices();
-        const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female")));
-        if (femaleVoice) utterance.voice = femaleVoice;
-        utterance.onend = () => { if (onEnd) onEnd(); };
-        utterance.onerror = () => { if (onEnd) onEnd(); };
-        synth.speak(utterance);
+        // 格式1: 直接是 { vocabulary: [...], sentences: [...] }
+        if (jsonData.vocabulary && Array.isArray(jsonData.vocabulary)) {
+            // 檢查 vocabulary 格式
+            if (jsonData.vocabulary.length > 0) {
+                const firstItem = jsonData.vocabulary[0];
+                if (Array.isArray(firstItem)) {
+                    // 陣列格式: [word, meaning, day]
+                    words = jsonData.vocabulary.map(item => ({
+                        word: String(item[0]).trim(),
+                        meaning: String(item[1]).trim(),
+                        day: Number(item[2])
+                    }));
+                } else if (firstItem.word && firstItem.meaning) {
+                    // 物件格式: { word, meaning, day }
+                    words = jsonData.vocabulary.map(item => ({
+                        word: String(item.word).trim(),
+                        meaning: String(item.meaning).trim(),
+                        day: Number(item.day)
+                    }));
+                }
+            }
+            
+            // 解析句子
+            if (jsonData.sentences && Array.isArray(jsonData.sentences)) {
+                const firstSentence = jsonData.sentences[0];
+                if (Array.isArray(firstSentence)) {
+                    // 陣列格式: [sentence, chinese]
+                    sentences = jsonData.sentences.map(item => ({
+                        sentence_en: String(item[0]).trim(),
+                        sentence_zh: item[1] ? String(item[1]).trim() : "✨ Practice sentence"
+                    }));
+                } else if (firstSentence.sentence && firstSentence.chinese) {
+                    // 物件格式: { sentence, chinese }
+                    sentences = jsonData.sentences.map(item => ({
+                        sentence_en: String(item.sentence).trim(),
+                        sentence_zh: String(item.chinese).trim()
+                    }));
+                }
+            }
+        }
+        // 格式2: Excel 風格的工作表結構
+        else if (jsonData["工作表1"] && Array.isArray(jsonData["工作表1"])) {
+            const sheet1 = jsonData["工作表1"];
+            // 跳過標題列
+            for (let i = 1; i < sheet1.length; i++) {
+                const row = sheet1[i];
+                if (row && row.length >= 3) {
+                    words.push({
+                        word: String(row[0]).trim(),
+                        meaning: String(row[1]).trim(),
+                        day: Number(row[2])
+                    });
+                }
+            }
+            
+            if (jsonData["工作表2"] && Array.isArray(jsonData["工作表2"])) {
+                const sheet2 = jsonData["工作表2"];
+                for (let i = 1; i < sheet2.length; i++) {
+                    const row = sheet2[i];
+                    if (row && row.length >= 2) {
+                        sentences.push({
+                            sentence_en: String(row[0]).trim(),
+                            sentence_zh: String(row[1]).trim()
+                        });
+                    }
+                }
+            }
+        }
+        
+        return { words, sentences };
     }
 
-    // 单词朗读3次（不屏蔽其他按钮）
-    function read3Times(word) {
-        if (wordReadTimer) {
-            clearInterval(wordReadTimer);
-            wordReadTimer = null;
-        }
-        synth.cancel();
-        
-        let count = 0;
-        function speakNext() {
-            if (count >= 3) return;
-            speakTextWithCallback(word, () => {
-                count++;
-                if (count < 3) speakNext();
-            }, 0.8);
-        }
-        speakNext();
+    // 讀取 JSON 檔案
+    async function loadJsonFile(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const jsonData = await response.json();
+        return parseJsonData(jsonData);
     }
-    
-    // 句子朗读3次（与单词朗读逻辑完全一致，不屏蔽其他按钮）
-    function readSentence3Times(sentenceText, buttonElement) {
-        if (!sentenceText) return;
+
+    // 讀取 Excel 檔案
+    async function loadExcelFile(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const buf = await response.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
         
-        if (sentenceReadTimer) {
-            clearInterval(sentenceReadTimer);
-            sentenceReadTimer = null;
-        }
+        // 單字 Sheet0
+        const sheetName0 = wb.SheetNames[0];
+        const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
+        const words = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
+            word: String(item.word).trim(),
+            meaning: String(item.meaning).trim(),
+            day: Number(item.day)
+        }));
         
-        if (isSentenceReading) {
-            synth.cancel();
-            isSentenceReading = false;
-            if (currentReadButton) {
-                currentReadButton.classList.remove('reading-disabled');
-                currentReadButton.disabled = false;
+        // 句子 Sheet1
+        let sentences = [];
+        if (wb.SheetNames.length >= 2) {
+            const sheetName1 = wb.SheetNames[1];
+            const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
+            if (rawSentences && rawSentences.length) {
+                sentences = rawSentences.map(row => {
+                    let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
+                    let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
+                    if (!en) return null;
+                    return { 
+                        sentence_en: String(en).trim(), 
+                        sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence" 
+                    };
+                }).filter(s => s && s.sentence_en);
             }
         }
         
-        currentReadButton = buttonElement;
-        
-        if (currentReadButton) {
-            currentReadButton.classList.add('reading-disabled');
-            currentReadButton.disabled = true;
-        }
-        
-        let readCount = 0;
-        isSentenceReading = true;
-        
-        function speakNext() {
-            if (readCount >= 3) {
-                if (currentReadButton) {
-                    currentReadButton.classList.remove('reading-disabled');
-                    currentReadButton.disabled = false;
-                }
-                isSentenceReading = false;
-                currentReadButton = null;
-                return;
-            }
-            speakTextWithCallback(sentenceText, () => {
-                readCount++;
-                speakNext();
-            }, 0.8);
-        }
-        
-        synth.cancel();
-        speakNext();
+        return { words, sentences };
     }
-    
-    function stopAllReading() {
-        synth.cancel();
-        
-        if (wordReadTimer) {
-            clearInterval(wordReadTimer);
-            wordReadTimer = null;
-        }
-        
-        if (sentenceReadTimer) {
-            clearInterval(sentenceReadTimer);
-            sentenceReadTimer = null;
-        }
-        
-        if (isSentenceReading) {
-            isSentenceReading = false;
-            if (currentReadButton) {
-                currentReadButton.classList.remove('reading-disabled');
-                currentReadButton.disabled = false;
-                currentReadButton = null;
-            }
-        }
-    }
-    
-    // 更新底部信息
-    function updateInfoTip() {
-        const container = document.getElementById('infoTipContainer');
-        if (!container) return;
-        if (!currentFileName || filteredWords.length === 0 || !filteredWords[currentWordIdx]) {
-            container.innerHTML = '';
-            return;
-        }
-        const displayFile = removeExtension(currentFileName);
-        const currentWord = filteredWords[currentWordIdx];
-        if (currentWord) {
-            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs`;
-        } else {
-            container.innerHTML = `${displayFile} | 0/0 vocabs`;
-        }
-    }
-    
-    // 加载文件
+
+    // 加載檔案 (自動判斷格式)
     async function loadSelectedFile(filename) {
         if (!filename || !currentLevel) return;
         stopAllReading();
         currentFileName = filename;
         currentFileNameForSentences = filename;
+        
+        // 判斷副檔名
+        const isJson = filename.toLowerCase().endsWith('.json');
+        currentFileExtension = isJson ? 'json' : 'xlsx';
+        
         const wordDiv = document.getElementById("wordContent");
         wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
         document.getElementById("dayRow").style.display = 'flex';
@@ -604,22 +609,23 @@
         document.getElementById("infoTipContainer").innerHTML = '';
         
         try {
-            const url = getXlsxFileUrl(currentLevel, filename);
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const buf = await res.arrayBuffer();
-            const wb = XLSX.read(buf, { type: "array" });
+            const url = getDataFileUrl(currentLevel, filename);
             
-            // 单词 Sheet0
-            const sheetName0 = wb.SheetNames[0];
-            const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
-            allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
-                word: String(item.word).trim(),
-                meaning: String(item.meaning).trim(),
-                day: Number(item.day)
-            }));
+            let words, sentences;
+            if (isJson) {
+                const result = await loadJsonFile(url);
+                words = result.words;
+                sentences = result.sentences;
+            } else {
+                const result = await loadExcelFile(url);
+                words = result.words;
+                sentences = result.sentences;
+            }
+            
+            allWords = words;
             filteredWords = [...allWords];
             currentWordIdx = 0;
+            
             if (filteredWords.length) {
                 showWord();
                 updateInfoTip();
@@ -628,23 +634,8 @@
             }
             document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
             
-            // 句子 Sheet1
-            allSentences = [];
-            if (wb.SheetNames.length >= 2) {
-                const sheetName1 = wb.SheetNames[1];
-                const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
-                if (rawSentences && rawSentences.length) {
-                    allSentences = rawSentences.map(row => {
-                        let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
-                        let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
-                        if (!en) return null;
-                        return { 
-                            sentence_en: String(en).trim(), 
-                            sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence" 
-                        };
-                    }).filter(s => s && s.sentence_en);
-                }
-            }
+            // 句子處理
+            allSentences = sentences;
             
             if (allSentences.length === 0) {
                 document.getElementById("sentenceArea").style.display = 'none';
@@ -655,7 +646,7 @@
                 updateSentenceStats();
             }
         } catch(err) {
-            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file. Check network.</p>';
+            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file. Check network or file format.</p>';
             document.getElementById("sentenceArea").style.display = 'none';
             console.error(err);
         }
@@ -699,6 +690,22 @@
         document.getElementById("btnNextWord")?.addEventListener("click", () => { 
             if(currentWordIdx + 1 <= filteredWords.length) { currentWordIdx++; showWord(); } 
         });
+    }
+
+    function updateInfoTip() {
+        const container = document.getElementById('infoTipContainer');
+        if (!container) return;
+        if (!currentFileName || filteredWords.length === 0 || !filteredWords[currentWordIdx]) {
+            container.innerHTML = '';
+            return;
+        }
+        const displayFile = removeExtension(currentFileName);
+        const currentWord = filteredWords[currentWordIdx];
+        if (currentWord) {
+            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs`;
+        } else {
+            container.innerHTML = `${displayFile} | 0/0 vocabs`;
+        }
     }
 
     function filterByDay() {
@@ -833,6 +840,112 @@
         const win = window.open('', '_blank', 'width=850,height=650,scrollbars=yes');
         win.document.write(htmlContent);
         win.document.close();
+    }
+
+    // 朗读核心：带回调，确保完整读完
+    function speakTextWithCallback(text, onEnd, rate = 0.8) {
+        if (!text) { if (onEnd) onEnd(); return; }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = rate;
+        utterance.volume = 1;
+        const voices = synth.getVoices();
+        const femaleVoice = voices.find(v => v.lang.includes("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Female")));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        utterance.onend = () => { if (onEnd) onEnd(); };
+        utterance.onerror = () => { if (onEnd) onEnd(); };
+        synth.speak(utterance);
+    }
+
+    // 单词朗读3次
+    function read3Times(word) {
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        synth.cancel();
+        
+        let count = 0;
+        function speakNext() {
+            if (count >= 3) return;
+            speakTextWithCallback(word, () => {
+                count++;
+                if (count < 3) speakNext();
+            }, 0.8);
+        }
+        speakNext();
+    }
+    
+    // 句子朗读3次
+    function readSentence3Times(sentenceText, buttonElement) {
+        if (!sentenceText) return;
+        
+        if (sentenceReadTimer) {
+            clearInterval(sentenceReadTimer);
+            sentenceReadTimer = null;
+        }
+        
+        if (isSentenceReading) {
+            synth.cancel();
+            isSentenceReading = false;
+            if (currentReadButton) {
+                currentReadButton.classList.remove('reading-disabled');
+                currentReadButton.disabled = false;
+            }
+        }
+        
+        currentReadButton = buttonElement;
+        
+        if (currentReadButton) {
+            currentReadButton.classList.add('reading-disabled');
+            currentReadButton.disabled = true;
+        }
+        
+        let readCount = 0;
+        isSentenceReading = true;
+        
+        function speakNext() {
+            if (readCount >= 3) {
+                if (currentReadButton) {
+                    currentReadButton.classList.remove('reading-disabled');
+                    currentReadButton.disabled = false;
+                }
+                isSentenceReading = false;
+                currentReadButton = null;
+                return;
+            }
+            speakTextWithCallback(sentenceText, () => {
+                readCount++;
+                speakNext();
+            }, 0.8);
+        }
+        
+        synth.cancel();
+        speakNext();
+    }
+    
+    function stopAllReading() {
+        synth.cancel();
+        
+        if (wordReadTimer) {
+            clearInterval(wordReadTimer);
+            wordReadTimer = null;
+        }
+        
+        if (sentenceReadTimer) {
+            clearInterval(sentenceReadTimer);
+            sentenceReadTimer = null;
+        }
+        
+        if (isSentenceReading) {
+            isSentenceReading = false;
+            if (currentReadButton) {
+                currentReadButton.classList.remove('reading-disabled');
+                currentReadButton.disabled = false;
+                currentReadButton = null;
+            }
+        }
     }
 
     function updateSentenceUI() {
