@@ -1,0 +1,30 @@
+{
+  "vocabulary": [
+    ["family", "家庭", 1],
+    ["grandparents", "祖父母、外祖父母", 1],
+    ["grandfather", "祖父、外祖父、爺爺、外公", 1],
+    ["grandmother", "祖母、外祖母、奶奶、外婆", 1],
+    ["parents", "父母", 1],
+    ["father", "父親、爸爸", 2],
+    ["mother", "母親、媽媽", 2],
+    ["siblings", "兄弟姐妹", 2],
+    ["brother", "兄弟、哥哥、弟弟", 2],
+    ["sister", "姐妹、姊姊、妹妹", 2],
+    ["uncle", "叔叔、伯伯、舅舅、姑丈、姨丈", 3],
+    ["aunt", "阿姨、姑姑、伯母、嬸嬸、舅媽、姨媽", 3],
+    ["cousin", "堂兄弟姊妹、表兄弟姊妹", 3],
+    ["son", "兒子", 3],
+    ["daughter", "女兒", 3],
+    ["grandson", "孫子、外孫", 4],
+    ["granddaughter", "孫女、外孫女", 4],
+    ["friends", "朋友", 4],
+    ["classmates", "同班同學", 4],
+    ["schoolmates", "同校同學", 4]
+  ],
+  "sentences": [
+    ["We live in families.", "我們生活在家庭裡。"],
+    ["Some families are big. Some families are small.", "有些家庭很大，有些家庭很小。"],
+    ["Families help each other.", "家人會互相幫助。"],
+    ["Friends share things and play together.", "朋友會分享東西，並且一起玩。"]
+  ]
+}
