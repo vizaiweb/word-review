@@ -201,6 +201,16 @@
             padding-top: 8px;
             border-top: 1px solid #e2e8f0;
         }
+        .external-link-badge {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #1890ff;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
 
         /* ========= 句子专区 ========= */
         .sentence-section {
@@ -404,6 +414,9 @@
     let currentLevel = "";
     let currentFileName = "";
     let currentFileExtension = ""; // 記錄副檔名
+    let isExternalFile = false; // 是否為外部連結載入
+    let externalFileUrl = ""; // 外部連結網址
+    
     const synth = window.speechSynthesis;
 
     let wordReadTimer = null;
@@ -590,34 +603,32 @@
         return { words, sentences };
     }
 
-    // 加載檔案 (自動判斷格式)
-    async function loadSelectedFile(filename) {
-        if (!filename || !currentLevel) return;
+    // 通用載入資料函數
+    async function loadDataFromUrl(url, isExternal = false) {
         stopAllReading();
-        currentFileName = filename;
-        currentFileNameForSentences = filename;
-        
-        // 判斷副檔名
-        const isJson = filename.toLowerCase().endsWith('.json');
-        currentFileExtension = isJson ? 'json' : 'xlsx';
         
         const wordDiv = document.getElementById("wordContent");
-        wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
+        wordDiv.innerHTML = '<p>📖 載入資料中...</p>';
         document.getElementById("dayRow").style.display = 'flex';
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         document.getElementById("infoTipContainer").innerHTML = '';
         
         try {
-            const url = getDataFileUrl(currentLevel, filename);
-            
             let words, sentences;
-            if (isJson) {
+            
+            // 根據副檔名判斷格式
+            if (url.toLowerCase().endsWith('.json')) {
                 const result = await loadJsonFile(url);
                 words = result.words;
                 sentences = result.sentences;
-            } else {
+            } else if (url.toLowerCase().endsWith('.xlsx')) {
                 const result = await loadExcelFile(url);
+                words = result.words;
+                sentences = result.sentences;
+            } else {
+                // 嘗試當作 JSON 處理
+                const result = await loadJsonFile(url);
                 words = result.words;
                 sentences = result.sentences;
             }
@@ -630,7 +641,7 @@
                 showWord();
                 updateInfoTip();
             } else {
-                wordDiv.innerHTML = '<p>⚠️ No word data in this file.</p>';
+                wordDiv.innerHTML = '<p>⚠️ 此檔案沒有單字資料。</p>';
             }
             document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
             
@@ -645,11 +656,54 @@
                 updateSentenceUI();
                 updateSentenceStats();
             }
+            
+            // 顯示外部連結提示
+            if (isExternal) {
+                const tipContainer = document.getElementById("infoTipContainer");
+                if (tipContainer) {
+                    tipContainer.innerHTML = `<div class="external-link-badge">🔗 外部連結：<a href="${url}" target="_blank" style="color:#1890ff;">${url.length > 50 ? url.substring(0, 50) + '...' : url}</a></div>`;
+                }
+            }
+            
         } catch(err) {
-            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file. Check network or file format.</p>';
+            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ 無法載入檔案，請檢查網址是否正確或檔案格式是否支援。<br>錯誤：' + err.message + '</p>';
             document.getElementById("sentenceArea").style.display = 'none';
             console.error(err);
         }
+    }
+
+    // 加載檔案 (自動判斷格式) - 保留原有功能
+    async function loadSelectedFile(filename) {
+        if (!filename || !currentLevel) return;
+        isExternalFile = false;
+        currentFileName = filename;
+        currentFileNameForSentences = filename;
+        
+        // 判斷副檔名
+        const isJson = filename.toLowerCase().endsWith('.json');
+        currentFileExtension = isJson ? 'json' : 'xlsx';
+        
+        const url = getDataFileUrl(currentLevel, filename);
+        await loadDataFromUrl(url, false);
+    }
+
+    // 從 URL 參數載入外部檔案
+    async function loadFromUrlParameter(fileUrl) {
+        // 隱藏選擇區域，顯示外部載入模式
+        const fileRow = document.getElementById('fileRow');
+        const levelSelect = document.getElementById('levelSelect');
+        const levelConfirm = document.getElementById('levelConfirm');
+        
+        fileRow.style.display = 'none';
+        levelSelect.disabled = true;
+        levelConfirm.disabled = true;
+        
+        isExternalFile = true;
+        externalFileUrl = fileUrl;
+        currentFileName = fileUrl.split('/').pop();
+        currentFileNameForSentences = currentFileName;
+        
+        await loadDataFromUrl(fileUrl, true);
     }
 
     function showWord() {
@@ -695,8 +749,13 @@
     function updateInfoTip() {
         const container = document.getElementById('infoTipContainer');
         if (!container) return;
+        
+        // 如果已有外部連結提示，不再覆蓋
+        if (isExternalFile && container.innerHTML.includes('external-link-badge')) {
+            return;
+        }
+        
         if (!currentFileName || filteredWords.length === 0 || !filteredWords[currentWordIdx]) {
-            container.innerHTML = '';
             return;
         }
         const displayFile = removeExtension(currentFileName);
@@ -818,7 +877,7 @@
         </head>
         <body>
             <div class="container">
-                <h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2>
+                <h2>📖 ${isExternalFile ? '外部連結' : currentLevel} - ${fileNice} (All Words)</h2>
                 <div class="stats">✨ Total: ${allWords.length} words ✨</div>
                 <table class="word-table">
                     <thead>
@@ -1095,7 +1154,7 @@
         </head>
         <body>
             <div class="container">
-                <h2>📝 ${currentLevel} - ${fileNice} (All Sentences)</h2>
+                <h2>📝 ${isExternalFile ? '外部連結' : currentLevel} - ${fileNice} (All Sentences)</h2>
                 <div class="stats">✨ Total: ${allSentences.length} sentences ✨</div>
                 <table class="sentence-table">
                     <thead>
@@ -1145,34 +1204,45 @@
             synth.onvoiceschanged = () => {};
         }
         
-        const levelConfirm = document.getElementById('levelConfirm');
-        const fileConfirm = document.getElementById('fileConfirm');
-        const filterBtn = document.getElementById('filterBtn');
-        const showAllWordsBtn = document.getElementById('showAllBtn');
+        // 檢查 URL 參數
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileParam = urlParams.get('file');
+        
+        if (fileParam && fileParam.trim() !== '') {
+            // 有 file 參數，直接載入外部檔案
+            loadFromUrlParameter(fileParam.trim());
+        } else {
+            // 無參數，正常初始化選擇介面
+            const levelConfirm = document.getElementById('levelConfirm');
+            const fileConfirm = document.getElementById('fileConfirm');
+            const filterBtn = document.getElementById('filterBtn');
+            const showAllWordsBtn = document.getElementById('showAllBtn');
 
-        levelConfirm.addEventListener('click', () => {
-            stopAllReading();
-            const level = document.getElementById('levelSelect').value;
-            if(!level) { alert("Please select P1 or P2"); return; }
-            currentLevel = level;
-            loadFileListByLevel(level);
-            document.getElementById("sentenceArea").style.display = 'none';
-            document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
-            document.getElementById("showAllBtn").style.display = 'none';
-            document.getElementById("infoTipContainer").innerHTML = '';
-            allWords = []; filteredWords = []; allSentences = [];
-        });
+            levelConfirm.addEventListener('click', () => {
+                stopAllReading();
+                const level = document.getElementById('levelSelect').value;
+                if(!level) { alert("Please select P1 or P2"); return; }
+                currentLevel = level;
+                loadFileListByLevel(level);
+                document.getElementById("sentenceArea").style.display = 'none';
+                document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
+                document.getElementById("showAllBtn").style.display = 'none';
+                document.getElementById("infoTipContainer").innerHTML = '';
+                allWords = []; filteredWords = []; allSentences = [];
+                isExternalFile = false;
+            });
 
-        fileConfirm.addEventListener('click', async () => {
-            stopAllReading();
-            const fileSelect = document.getElementById('fileSelect');
-            const selected = fileSelect.value;
-            if(!selected || selected === "Loading..." || selected.includes("fail")) { alert("Please select a valid file"); return; }
-            await loadSelectedFile(selected);
-        });
+            fileConfirm.addEventListener('click', async () => {
+                stopAllReading();
+                const fileSelect = document.getElementById('fileSelect');
+                const selected = fileSelect.value;
+                if(!selected || selected === "Loading..." || selected.includes("fail")) { alert("Please select a valid file"); return; }
+                await loadSelectedFile(selected);
+            });
 
-        filterBtn.addEventListener('click', () => filterByDay());
-        showAllWordsBtn.addEventListener('click', () => showAllWordsPopup());
+            filterBtn.addEventListener('click', () => filterByDay());
+            showAllWordsBtn.addEventListener('click', () => showAllWordsPopup());
+        }
     });
 </script>
 </body>
