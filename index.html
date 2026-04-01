@@ -211,6 +211,15 @@
             display: inline-block;
             margin-bottom: 10px;
         }
+        .success-message {
+            margin-top: 10px;
+            padding: 8px;
+            background: #e8f5e9;
+            border-radius: 12px;
+            color: #2e7d32;
+            text-align: center;
+            font-size: 14px;
+        }
 
         /* ========= 句子专区 ========= */
         .sentence-section {
@@ -413,9 +422,9 @@
     
     let currentLevel = "";
     let currentFileName = "";
-    let currentFileExtension = ""; // 記錄副檔名
-    let isExternalFile = false; // 是否為外部連結載入
-    let externalFileUrl = ""; // 外部連結網址
+    let currentFileExtension = "";
+    let isExternalFile = false;
+    let externalFileUrl = "";
     
     const synth = window.speechSynthesis;
 
@@ -488,18 +497,15 @@
         
         // 格式1: 直接是 { vocabulary: [...], sentences: [...] }
         if (jsonData.vocabulary && Array.isArray(jsonData.vocabulary)) {
-            // 檢查 vocabulary 格式
             if (jsonData.vocabulary.length > 0) {
                 const firstItem = jsonData.vocabulary[0];
                 if (Array.isArray(firstItem)) {
-                    // 陣列格式: [word, meaning, day]
                     words = jsonData.vocabulary.map(item => ({
                         word: String(item[0]).trim(),
                         meaning: String(item[1]).trim(),
                         day: Number(item[2])
                     }));
                 } else if (firstItem.word && firstItem.meaning) {
-                    // 物件格式: { word, meaning, day }
                     words = jsonData.vocabulary.map(item => ({
                         word: String(item.word).trim(),
                         meaning: String(item.meaning).trim(),
@@ -508,17 +514,14 @@
                 }
             }
             
-            // 解析句子
             if (jsonData.sentences && Array.isArray(jsonData.sentences)) {
                 const firstSentence = jsonData.sentences[0];
                 if (Array.isArray(firstSentence)) {
-                    // 陣列格式: [sentence, chinese]
                     sentences = jsonData.sentences.map(item => ({
                         sentence_en: String(item[0]).trim(),
                         sentence_zh: item[1] ? String(item[1]).trim() : "✨ Practice sentence"
                     }));
                 } else if (firstSentence.sentence && firstSentence.chinese) {
-                    // 物件格式: { sentence, chinese }
                     sentences = jsonData.sentences.map(item => ({
                         sentence_en: String(item.sentence).trim(),
                         sentence_zh: String(item.chinese).trim()
@@ -529,7 +532,6 @@
         // 格式2: Excel 風格的工作表結構
         else if (jsonData["工作表1"] && Array.isArray(jsonData["工作表1"])) {
             const sheet1 = jsonData["工作表1"];
-            // 跳過標題列
             for (let i = 1; i < sheet1.length; i++) {
                 const row = sheet1[i];
                 if (row && row.length >= 3) {
@@ -558,22 +560,8 @@
         return { words, sentences };
     }
 
-    // 讀取 JSON 檔案
-    async function loadJsonFile(url) {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const jsonData = await response.json();
-        return parseJsonData(jsonData);
-    }
-
-    // 讀取 Excel 檔案
-    async function loadExcelFile(url) {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const buf = await response.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
-        
-        // 單字 Sheet0
+    // 讀取 Excel 資料
+    async function loadExcelData(wb) {
         const sheetName0 = wb.SheetNames[0];
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         const words = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
@@ -582,7 +570,6 @@
             day: Number(item.day)
         }));
         
-        // 句子 Sheet1
         let sentences = [];
         if (wb.SheetNames.length >= 2) {
             const sheetName1 = wb.SheetNames[1];
@@ -615,23 +602,37 @@
         document.getElementById("infoTipContainer").innerHTML = '';
         
         try {
-            let words, sentences;
+            console.log("開始載入:", url);
+            const response = await fetch(url);
+            console.log("回應狀態:", response.status);
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            let words = [];
+            let sentences = [];
             
             // 根據副檔名判斷格式
             if (url.toLowerCase().endsWith('.json')) {
-                const result = await loadJsonFile(url);
+                const jsonData = await response.json();
+                console.log("JSON 資料接收完成");
+                const result = parseJsonData(jsonData);
                 words = result.words;
                 sentences = result.sentences;
             } else if (url.toLowerCase().endsWith('.xlsx')) {
-                const result = await loadExcelFile(url);
+                const buf = await response.arrayBuffer();
+                const wb = XLSX.read(buf, { type: "array" });
+                const result = await loadExcelData(wb);
                 words = result.words;
                 sentences = result.sentences;
             } else {
                 // 嘗試當作 JSON 處理
-                const result = await loadJsonFile(url);
+                const jsonData = await response.json();
+                const result = parseJsonData(jsonData);
                 words = result.words;
                 sentences = result.sentences;
             }
+            
+            console.log(`解析完成: ${words.length} 個單字, ${sentences.length} 個句子`);
             
             allWords = words;
             filteredWords = [...allWords];
@@ -661,34 +662,29 @@
             if (isExternal) {
                 const tipContainer = document.getElementById("infoTipContainer");
                 if (tipContainer) {
-                    tipContainer.innerHTML = `<div class="external-link-badge">🔗 外部連結：<a href="${url}" target="_blank" style="color:#1890ff;">${url.length > 50 ? url.substring(0, 50) + '...' : url}</a></div>`;
+                    tipContainer.innerHTML = `<div class="external-link-badge">🔗 外部連結：<a href="${url}" target="_blank" style="color:#1890ff;">${url.length > 60 ? url.substring(0, 60) + '...' : url}</a></div>`;
                 }
             }
             
+            // 顯示成功訊息
+            const successMsg = document.createElement('div');
+            successMsg.className = 'success-message';
+            successMsg.innerHTML = `✅ 成功載入 ${allWords.length} 個單字，${allSentences.length} 個句子`;
+            wordDiv.appendChild(successMsg);
+            
         } catch(err) {
-            wordDiv.innerHTML = '<p style="color:#ef4444;">❌ 無法載入檔案，請檢查網址是否正確或檔案格式是否支援。<br>錯誤：' + err.message + '</p>';
+            console.error("載入錯誤:", err);
+            wordDiv.innerHTML = `<p style="color:#ef4444;">❌ 無法載入檔案，請檢查網址是否正確。<br>
+            網址: ${url}<br>
+            錯誤: ${err.message}</p>`;
             document.getElementById("sentenceArea").style.display = 'none';
-            console.error(err);
         }
-    }
-
-    // 加載檔案 (自動判斷格式) - 保留原有功能
-    async function loadSelectedFile(filename) {
-        if (!filename || !currentLevel) return;
-        isExternalFile = false;
-        currentFileName = filename;
-        currentFileNameForSentences = filename;
-        
-        // 判斷副檔名
-        const isJson = filename.toLowerCase().endsWith('.json');
-        currentFileExtension = isJson ? 'json' : 'xlsx';
-        
-        const url = getDataFileUrl(currentLevel, filename);
-        await loadDataFromUrl(url, false);
     }
 
     // 從 URL 參數載入外部檔案
     async function loadFromUrlParameter(fileUrl) {
+        console.log("載入外部檔案:", fileUrl);
+        
         // 隱藏選擇區域，顯示外部載入模式
         const fileRow = document.getElementById('fileRow');
         const levelSelect = document.getElementById('levelSelect');
@@ -698,12 +694,41 @@
         levelSelect.disabled = true;
         levelConfirm.disabled = true;
         
+        // 處理 GitHub blob 連結轉換為 raw 連結
+        let actualUrl = fileUrl;
+        if (fileUrl.includes('github.com') && fileUrl.includes('/blob/')) {
+            actualUrl = fileUrl
+                .replace('github.com', 'raw.githubusercontent.com')
+                .replace('/blob/', '/');
+            console.log("轉換為 Raw 連結:", actualUrl);
+        }
+        
         isExternalFile = true;
-        externalFileUrl = fileUrl;
-        currentFileName = fileUrl.split('/').pop();
+        externalFileUrl = actualUrl;
+        currentFileName = actualUrl.split('/').pop();
         currentFileNameForSentences = currentFileName;
         
-        await loadDataFromUrl(fileUrl, true);
+        // 顯示載入狀態
+        const wordDiv = document.getElementById("wordContent");
+        wordDiv.innerHTML = '<p>📖 正在從外部連結載入資料...</p>';
+        document.getElementById("sentenceArea").style.display = 'none';
+        document.getElementById("showAllBtn").style.display = 'none';
+        
+        await loadDataFromUrl(actualUrl, true);
+    }
+
+    // 加載檔案 (自動判斷格式) - 保留原有功能
+    async function loadSelectedFile(filename) {
+        if (!filename || !currentLevel) return;
+        isExternalFile = false;
+        currentFileName = filename;
+        currentFileNameForSentences = filename;
+        
+        const isJson = filename.toLowerCase().endsWith('.json');
+        currentFileExtension = isJson ? 'json' : 'xlsx';
+        
+        const url = getDataFileUrl(currentLevel, filename);
+        await loadDataFromUrl(url, false);
     }
 
     function showWord() {
@@ -750,7 +775,6 @@
         const container = document.getElementById('infoTipContainer');
         if (!container) return;
         
-        // 如果已有外部連結提示，不再覆蓋
         if (isExternalFile && container.innerHTML.includes('external-link-badge')) {
             return;
         }
@@ -1208,10 +1232,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         const fileParam = urlParams.get('file');
         
+        console.log("URL 參數 file:", fileParam);
+        
         if (fileParam && fileParam.trim() !== '') {
             // 有 file 參數，直接載入外部檔案
+            console.log("偵測到 file 參數，開始載入外部檔案:", fileParam);
             loadFromUrlParameter(fileParam.trim());
         } else {
+            console.log("無 file 參數，使用正常模式");
             // 無參數，正常初始化選擇介面
             const levelConfirm = document.getElementById('levelConfirm');
             const fileConfirm = document.getElementById('fileConfirm');
