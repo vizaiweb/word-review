@@ -1,3 +1,5 @@
+明白了！原来 P2 的 Excel 文件里没有放句子数据，所以不需要特殊的解析逻辑。让我把代码简化，让 P2 和 P1 使用完全相同的句子读取逻辑（都是读取第二个工作表 Sheet1）。
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -335,17 +337,6 @@
         .level-row.hidden-level {
             display: none !important;
         }
-        
-        /* 调试信息样式 */
-        .debug-info {
-            font-size: 11px;
-            color: #888;
-            text-align: center;
-            margin-top: 8px;
-            padding: 4px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
     </style>
 </head>
 <body>
@@ -459,109 +450,14 @@
 
     function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
 
-    // 增强的句子解析函数 - 智能识别各种列名
-    function extractSentence(row, rowIndex) {
-        // 所有可能的英文句子列名（不区分大小写）
-        const enKeywords = ['sentence', 'english', 'en', 'eng', 'text', 'sentence_en', 'en_sentence', 'english sentence'];
-        // 所有可能的中文列名
-        const zhKeywords = ['chinese', 'meaning', 'zh', 'translation', 'sentence_zh', 'zh_sentence', 'cn', 'chinese meaning'];
-        
-        let enText = null;
-        let zhText = null;
-        
-        // 遍历所有列，查找英文句子
-        for (let key in row) {
-            const keyLower = key.toLowerCase().trim();
-            const value = row[key];
-            if (!value) continue;
-            
-            const valueStr = String(value).trim();
-            if (!valueStr) continue;
-            
-            // 检查是否是英文句子列
-            let isEnColumn = false;
-            for (let keyword of enKeywords) {
-                if (keyLower === keyword || keyLower.includes(keyword)) {
-                    isEnColumn = true;
-                    break;
-                }
-            }
-            
-            // 如果列名包含英文相关关键词，或者值较长且包含英文字母
-            if (isEnColumn || (valueStr.length > 5 && /[a-zA-Z]{3,}/.test(valueStr) && !/[\u4e00-\u9fa5]/.test(valueStr))) {
-                if (!enText) {
-                    enText = valueStr;
-                    continue;
-                }
-            }
-            
-            // 检查是否是中文列
-            let isZhColumn = false;
-            for (let keyword of zhKeywords) {
-                if (keyLower === keyword || keyLower.includes(keyword)) {
-                    isZhColumn = true;
-                    break;
-                }
-            }
-            
-            // 如果列名包含中文相关关键词，或者值包含中文字符
-            if (isZhColumn || /[\u4e00-\u9fa5]/.test(valueStr)) {
-                if (!zhText) {
-                    zhText = valueStr;
-                }
-            }
-        }
-        
-        // 如果还没找到英文句子，尝试获取第一个非数字且长度合适的字段
-        if (!enText) {
-            for (let key in row) {
-                const value = row[key];
-                if (!value) continue;
-                const valueStr = String(value).trim();
-                if (valueStr.length > 8 && /[a-zA-Z]{3,}/.test(valueStr) && !/[\u4e00-\u9fa5]/.test(valueStr)) {
-                    enText = valueStr;
-                    break;
-                }
-            }
-        }
-        
-        // 如果还没找到中文，尝试获取第一个包含中文的字段
-        if (!zhText && enText) {
-            for (let key in row) {
-                const value = row[key];
-                if (!value) continue;
-                const valueStr = String(value).trim();
-                if (/[\u4e00-\u9fa5]/.test(valueStr) && valueStr !== enText) {
-                    zhText = valueStr;
-                    break;
-                }
-            }
-        }
-        
-        if (enText) {
-            return {
-                sentence_en: enText,
-                sentence_zh: zhText || "✨ Practice sentence"
-            };
-        }
-        return null;
-    }
-
-    // 通用数据加载核心
+    // 统一的数据加载逻辑 - P1 和 P2 完全相同
     async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         try {
             const wb = XLSX.read(buf, { type: "array" });
             
-            console.log("Excel 工作表数量:", wb.SheetNames.length);
-            console.log("工作表名称:", wb.SheetNames);
-            
-            // ========== 单词 Sheet0 ==========
+            // ========== 单词 Sheet0 (第一个工作表) ==========
             const sheetName0 = wb.SheetNames[0];
             const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
-            
-            if (wordData.length > 0) {
-                console.log("单词表列名:", Object.keys(wordData[0]));
-            }
             
             allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
                 word: String(item.word).trim(),
@@ -569,81 +465,41 @@
                 day: Number(item.day)
             }));
             
-            console.log(`✅ 成功加载 ${allWords.length} 个单词`);
+            console.log(`✅ 成功加载 ${allWords.length} 个单词 (来自 ${sourceLabel})`);
             
             filteredWords = [...allWords];
             currentWordIdx = 0;
             
-            // ========== 句子提取（增强版） ==========
+            // ========== 句子 Sheet1 (第二个工作表) - P1 和 P2 使用完全相同逻辑 ==========
             allSentences = [];
             
-            // 方法1: 从第二个工作表提取
+            // 检查是否有第二个工作表
             if (wb.SheetNames.length >= 2) {
                 const sheetName1 = wb.SheetNames[1];
-                console.log(`📄 尝试从第二个工作表 "${sheetName1}" 提取句子...`);
+                console.log(`📄 检测到第二个工作表: "${sheetName1}"，尝试加载句子...`);
                 const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
                 
-                console.log(`句子表行数: ${rawSentences.length}`);
-                if (rawSentences.length > 0) {
-                    console.log("句子表列名:", Object.keys(rawSentences[0]));
-                }
-                
-                for (let i = 0; i < rawSentences.length; i++) {
-                    const sentence = extractSentence(rawSentences[i], i);
-                    if (sentence && sentence.sentence_en) {
-                        allSentences.push(sentence);
-                    }
-                }
-                
-                console.log(`从第二个工作表提取到 ${allSentences.length} 个句子`);
-            }
-            
-            // 方法2: 如果第二个工作表没有句子，尝试从第一个工作表的其他列提取
-            if (allSentences.length === 0 && wb.SheetNames.length >= 1) {
-                console.log("📄 尝试从第一个工作表提取句子...");
-                const sheet0 = wb.Sheets[wb.SheetNames[0]];
-                const data0 = XLSX.utils.sheet_to_json(sheet0);
-                
-                for (let i = 0; i < data0.length; i++) {
-                    // 查找可能包含句子的字段
-                    for (let key in data0[i]) {
-                        const keyLower = key.toLowerCase();
-                        if ((keyLower.includes('sentence') || keyLower.includes('english') || keyLower.includes('en')) && 
-                            data0[i][key] && String(data0[i][key]).trim().length > 10) {
-                            const sentence = extractSentence(data0[i], i);
-                            if (sentence && sentence.sentence_en) {
-                                allSentences.push(sentence);
-                            }
-                            break;
+                if (rawSentences && rawSentences.length > 0) {
+                    // 与 P1 完全相同的解析逻辑
+                    for (let row of rawSentences) {
+                        // 支持多种可能的列名（与 P1 一致）
+                        let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
+                        let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
+                        
+                        if (en && String(en).trim()) {
+                            allSentences.push({ 
+                                sentence_en: String(en).trim(), 
+                                sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence" 
+                            });
                         }
                     }
+                    console.log(`✅ 成功加载 ${allSentences.length} 个句子 (来自第二个工作表)`);
+                } else {
+                    console.log(`📄 第二个工作表 "${sheetName1}" 为空或无有效数据`);
                 }
-                console.log(`从第一个工作表提取到 ${allSentences.length} 个句子`);
+            } else {
+                console.log(`📄 文件只有 ${wb.SheetNames.length} 个工作表，没有句子数据`);
             }
-            
-            // 方法3: 如果还没有，尝试从任何工作表中查找（遍历所有工作表）
-            if (allSentences.length === 0) {
-                console.log("📄 尝试遍历所有工作表查找句子...");
-                for (let sheetIdx = 0; sheetIdx < wb.SheetNames.length; sheetIdx++) {
-                    const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[sheetIdx]]);
-                    for (let row of sheetData) {
-                        for (let key in row) {
-                            const value = String(row[key] || "").trim();
-                            if (value.length > 15 && /[a-zA-Z]{4,}/.test(value) && !/[\u4e00-\u9fa5]/.test(value)) {
-                                const sentence = extractSentence(row);
-                                if (sentence && sentence.sentence_en && !allSentences.some(s => s.sentence_en === sentence.sentence_en)) {
-                                    allSentences.push(sentence);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (allSentences.length > 0) break;
-                }
-                console.log(`遍历所有工作表后提取到 ${allSentences.length} 个句子`);
-            }
-            
-            console.log(`📊 最终结果: ${allWords.length} 个单词, ${allSentences.length} 个句子`);
             
             // 更新UI
             const wordDiv = document.getElementById("wordContent");
@@ -658,20 +514,13 @@
             
             if (allSentences.length === 0) {
                 document.getElementById("sentenceArea").style.display = 'none';
-                // 添加调试提示
-                const debugDiv = document.createElement('div');
-                debugDiv.className = 'debug-info';
-                debugDiv.innerHTML = '💡 提示: 此文件未检测到句子数据。请确保Excel有第二个工作表，且包含英文句子列。';
-                if (!document.querySelector('.debug-info')) {
-                    wordDiv.parentNode.appendChild(debugDiv);
-                    setTimeout(() => debugDiv.remove(), 8000);
-                }
+                console.log("⚠️ 没有句子数据，句子区域隐藏");
             } else {
                 document.getElementById("sentenceArea").style.display = 'block';
                 currentSentenceIdx = 0;
                 updateSentenceUI();
                 updateSentenceStats();
-                console.log(`✅ 句子区域已显示，共 ${allSentences.length} 个句子`);
+                console.log(`🎉 句子区域已显示，共 ${allSentences.length} 个句子`);
             }
             return true;
         } catch (parseErr) {
@@ -737,13 +586,9 @@
         document.getElementById("showAllBtn").style.display = 'none';
         document.getElementById("infoTipContainer").innerHTML = '';
         
-        // 移除旧的调试信息
-        const oldDebug = document.querySelector('.debug-info');
-        if (oldDebug) oldDebug.remove();
-        
         try {
             const url = getXlsxFileUrl(currentLevel, filename);
-            console.log("加载文件:", url);
+            console.log(`加载文件: ${currentLevel}/${filename}`);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const buf = await res.arrayBuffer();
@@ -779,6 +624,7 @@
                 opt.textContent = removeExtension(f);
                 fileSelect.appendChild(opt);
             });
+            console.log(`✅ 加载 ${level} 文件列表: ${files.length} 个文件`);
         } catch(e) {
             fileSelect.innerHTML = '<option>Load failed</option>';
             console.error(e);
@@ -992,7 +838,7 @@
         if(!allSentences.length) return;
         const fileNice = currentMode === "local" ? removeExtension(currentFileNameForSentences) : "External Link";
         const tableRows = allSentences.map((s, idx) => `<tr><td style="padding:10px;">${idx+1}</td><td style="padding:10px;"><strong>${s.sentence_en}</strong></td><td style="padding:10px;">${s.sentence_zh}</td>`).join('');
-        const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>body{font-family:Segoe UI;padding:20px;background:#fff4e6;} .container{max-width:1000px;margin:0 auto;background:white;border-radius:20px;padding:20px;} th,td{padding:12px;border-bottom:1px solid #fbc490;} .close-btn{background:#ff8c42;color:white;border-radius:30px;padding:10px 20px;cursor:pointer;}</style></head><body><div class='container'><h2>📝 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice}</h2><p>📝 共 ${allSentences.length} 个句子</p><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
+        const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>body{font-family:Segoe UI;padding:20px;background:#fff4e6;} .container{max-width:1000px;margin:0 auto;background:white;border-radius:20px;padding:20px;} th,td{padding:12px;border-bottom:1px solid #fbc490;} .close-btn{background:#ff8c42;color:white;border-radius:30px;padding:10px 20px;cursor:pointer;}</style></head><body><div class='container'><h2>📝 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice}</h2><p>📝 共 ${allSentences.length} 个句子</p><tr><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody>}</table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
         const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
         win.document.write(winHtml);
         win.document.close();
@@ -1075,3 +921,4 @@
 </script>
 </body>
 </html>
+```
