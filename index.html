@@ -345,6 +345,11 @@
             margin-top: 4px;
             text-align: right;
         }
+        
+        /* Level区域隐藏样式 */
+        .level-row.hidden-level {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -361,8 +366,8 @@
             <span style="font-size:12px; color:#475569;">切换可读取外部链接</span>
         </div>
         
-        <!-- Level 行始终存在 -->
-        <div class="select-row">
+        <!-- Level 行（内置模式显示，外部模式自动隐藏） -->
+        <div class="select-row level-row" id="levelRow">
             <label>Level:</label>
             <select id="levelSelect">
                 <option value="">Select P1/P2</option>
@@ -382,7 +387,7 @@
         <!-- 外部链接模式: URL输入框行 (默认隐藏) -->
         <div class="select-row external-url-row" id="externalUrlRow" style="display:none;">
             <label>🔗 URL:</label>
-            <input type="text" id="externalUrlInput" placeholder="https://raw.githubusercontent.com/.../xxx.xlsx" value="https://raw.githubusercontent.com/vizaiweb/word-review/main/data/P1/P1T1_BQ2(test).xlsx">
+            <input type="text" id="externalUrlInput" placeholder="https://raw.githubusercontent.com/.../xxx.xlsx" value="">
             <button class="btn-file" id="externalUrlConfirmBtn">Load</button>
         </div>
         
@@ -526,15 +531,17 @@
     }
     
     // 外部模式加载：直接通过fetch获取原始链接 (raw GitHub 或任意直链)
+    // 外部模式不需要Level，直接使用URL加载
     async function loadFromExternalUrl(url) {
-        if (!url || !currentLevel) {
-            alert("请先选择Level，再填写有效的Excel直链（.xlsx）");
+        if (!url) {
+            alert("请输入有效的Excel直链（.xlsx）");
             return false;
         }
         stopAllReading();
         currentFileName = "";  // 内置文件名置空
         currentFileNameForSentences = url;
         currentExternalUrl = url;
+        currentLevel = "";     // 外部模式不需要Level
         
         const wordDiv = document.getElementById("wordContent");
         wordDiv.innerHTML = '<p>🌐 Loading external Excel file ...</p>';
@@ -630,48 +637,58 @@
         currentMode = mode;
         const fileRow = document.getElementById('fileRow');
         const externalRow = document.getElementById('externalUrlRow');
+        const levelRow = document.getElementById('levelRow');
         const toggleBtn = document.getElementById('modeToggleBtn');
+        const dayRow = document.getElementById('dayRow');
         
         if (mode === "local") {
             fileRow.style.display = 'flex';
             externalRow.style.display = 'none';
+            levelRow.classList.remove('hidden-level');  // 显示Level选择
             toggleBtn.textContent = "📁 内置数据库";
             toggleBtn.classList.add('active');
-            // 清除外部数据视觉残留
-            if (!currentFileName && allWords.length === 0) {
-                // 保持等待选择
-            } else if (currentFileName === "" && currentExternalUrl) {
+            // 清空外部模式残留数据
+            if (currentExternalUrl && allWords.length === 0) {
+                // 保持空白状态
+            } else if (currentExternalUrl) {
                 // 之前是外部模式，切回内置时清空数据提示重新选文件
                 allWords = [];
                 filteredWords = [];
                 allSentences = [];
-                document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ 已切换至内置模式，请重新选择文件 ✨</p>';
+                document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ 已切换至内置模式，请重新选择Level和文件 ✨</p>';
                 document.getElementById("sentenceArea").style.display = 'none';
                 document.getElementById("showAllBtn").style.display = 'none';
-                document.getElementById("dayRow").style.display = 'none';
+                dayRow.style.display = 'none';
                 document.getElementById("infoTipContainer").innerHTML = '';
+                currentLevel = "";
             }
         } else {
             fileRow.style.display = 'none';
             externalRow.style.display = 'flex';
+            levelRow.classList.add('hidden-level');  // 隐藏Level选择
             toggleBtn.textContent = "🌐 外部链接模式";
             toggleBtn.classList.remove('active');
-            // 如果之前是内置模式且有数据，建议用户重新加载外部链接时覆盖
+            // 清空内置数据，因为外部模式不需要Level
             if (currentFileName && allWords.length > 0) {
-                // 保留但提示可以加载外部链接
-                document.getElementById("wordContent").innerHTML = '<p>🔗 外部链接模式已激活，粘贴Excel直链并点击Load</p>';
-                document.getElementById("sentenceArea").style.display = 'none';
-                document.getElementById("showAllBtn").style.display = 'none';
-                document.getElementById("dayRow").style.display = 'none';
-                document.getElementById("infoTipContainer").innerHTML = '';
                 allWords = [];
                 filteredWords = [];
                 allSentences = [];
+                document.getElementById("wordContent").innerHTML = '<p>🔗 外部链接模式已激活，粘贴Excel直链并点击Load</p>';
+                document.getElementById("sentenceArea").style.display = 'none';
+                document.getElementById("showAllBtn").style.display = 'none';
+                dayRow.style.display = 'none';
+                document.getElementById("infoTipContainer").innerHTML = '';
+                currentLevel = "";
+            }
+            // 清空URL输入框默认值，不预设任何网址
+            const urlInput = document.getElementById('externalUrlInput');
+            if (urlInput && !urlInput.value) {
+                // 保持为空
             }
         }
     }
     
-    // ---------- 朗读与展示逻辑 (保持不变，与之前相同) ----------
+    // ---------- 朗读与展示逻辑 (完整保留原有功能) ----------
     function speakTextWithCallback(text, onEnd, rate = 0.8) {
         if (!text) { if (onEnd) onEnd(); return; }
         const utterance = new SpeechSynthesisUtterance(text);
@@ -802,9 +819,9 @@
     
     function showAllWordsPopup() {
         if(!allWords.length) return;
-        const fileNice = currentMode === "local" ? removeExtension(currentFileName) : "External";
+        const fileNice = currentMode === "local" ? removeExtension(currentFileName) : "External Link";
         const tableRows = allWords.map(w => `<tr><td style="padding:10px;">${w.day}</td><td><strong>${w.word.toUpperCase()}</strong></td><td>${w.meaning}</td></tr>`).join('');
-        const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;background:#f0f4f8;} .container{max-width:900px;margin:0 auto;background:white;border-radius:20px;padding:20px;} h2{color:#ff9a56;} table{width:100%;border-collapse:collapse;} th,td{padding:12px;border-bottom:1px solid #ffe0b5;} .close-btn{background:#ff6b35;color:white;border:none;border-radius:30px;padding:10px 20px;margin-top:20px;cursor:pointer;}</style></head><body><div class='container'><h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
+        const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;background:#f0f4f8;} .container{max-width:900px;margin:0 auto;background:white;border-radius:20px;padding:20px;} h2{color:#ff9a56;} table{width:100%;border-collapse:collapse;} th,td{padding:12px;border-bottom:1px solid #ffe0b5;} .close-btn{background:#ff6b35;color:white;border:none;border-radius:30px;padding:10px 20px;margin-top:20px;cursor:pointer;}</style></head><body><div class='container'><h2>📖 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice} (All Words)</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
         const win = window.open('', '_blank', 'width=850,height=650,scrollbars=yes');
         win.document.write(htmlContent);
         win.document.close();
@@ -832,8 +849,8 @@
     function showAllSentencesPopup() {
         if(!allSentences.length) return;
         const fileNice = currentMode === "local" ? removeExtension(currentFileNameForSentences) : "External Link";
-        const tableRows = allSentences.map((s, idx) => `<tr><td>${idx+1}</td><td><strong>${s.sentence_en}</strong></td><td>${s.sentence_zh}</td></tr>`).join('');
-        const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>body{font-family:Segoe UI;padding:20px;background:#fff4e6;} .container{max-width:1000px;margin:0 auto;background:white;border-radius:20px;padding:20px;} th,td{padding:12px;border-bottom:1px solid #fbc490;} .close-btn{background:#ff8c42;color:white;border-radius:30px;padding:10px 20px;cursor:pointer;}</style></head><body><div class='container'><h2>📝 ${currentLevel} - ${fileNice}</h2><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
+        const tableRows = allSentences.map((s, idx) => `<tr><td style="padding:10px;">${idx+1}</td><td><strong>${s.sentence_en}</strong></td><td>${s.sentence_zh}</td>`).join('');
+        const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>body{font-family:Segoe UI;padding:20px;background:#fff4e6;} .container{max-width:1000px;margin:0 auto;background:white;border-radius:20px;padding:20px;} th,td{padding:12px;border-bottom:1px solid #fbc490;} .close-btn{background:#ff8c42;color:white;border-radius:30px;padding:10px 20px;cursor:pointer;}</style></head><body><div class='container'><h2>📝 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice}</h2> <table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
         const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
         win.document.write(winHtml);
         win.document.close();
@@ -877,17 +894,14 @@
         });
         
         levelConfirm.addEventListener('click', () => {
+            if (currentMode !== "local") return;
             stopAllReading();
             const level = document.getElementById('levelSelect').value;
             if(!level) { alert("Please select P1 or P2"); return; }
             currentLevel = level;
-            if (currentMode === "local") {
-                loadFileListByLevel(level);
-                document.getElementById("sentenceArea").style.display = 'none';
-                document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
-            } else {
-                document.getElementById("wordContent").innerHTML = '<p>✅ Level set. 现在可以粘贴外部链接并点击Load。</p>';
-            }
+            loadFileListByLevel(level);
+            document.getElementById("sentenceArea").style.display = 'none';
+            document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
             document.getElementById("showAllBtn").style.display = 'none';
             document.getElementById("infoTipContainer").innerHTML = '';
             allWords = []; filteredWords = []; allSentences = [];
@@ -905,7 +919,7 @@
             if (currentMode !== "external") return;
             let url = document.getElementById('externalUrlInput').value.trim();
             if (!url) { alert("请输入有效的Excel直链（.xlsx）"); return; }
-            // 如果用户输入的是github blob链接，提示并尝试转换为raw链接
+            // 如果用户输入的是github blob链接，提示并自动转换为raw链接
             if (url.includes("github.com") && url.includes("/blob/")) {
                 url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
                 document.getElementById('externalUrlInput').value = url;
