@@ -21,7 +21,6 @@
             line-height: 1.5;
         }
 
-        /* 主容器 */
         .container {
             max-width: 700px;
             margin: 0 auto;
@@ -31,7 +30,6 @@
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
         }
 
-        /* 标题 */
         .header {
             background: linear-gradient(135deg, #ff9a56, #ff6b35);
             color: white;
@@ -43,7 +41,6 @@
             letter-spacing: 1px;
         }
 
-        /* 选择区 */
         .select-section {
             padding: 16px 18px;
             background: #f8fafc;
@@ -86,7 +83,6 @@
         .btn-filter { background: #2b7e3a; }
         .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
         
-        /* 切换按钮样式 */
         .mode-toggle {
             background: #ffb347;
             margin-bottom: 5px;
@@ -96,7 +92,6 @@
             box-shadow: 0 0 0 2px #f0f4f8, 0 0 0 4px #2b7e3a;
         }
 
-        /* Day行：All Words和Filter在同一行 */
         #dayRow {
             display: flex;
             flex-wrap: nowrap;
@@ -143,7 +138,6 @@
             }
         }
 
-        /* 单词练习区 */
         .practice-section {
             padding: 20px 18px;
             border-bottom: 1px dashed #e2e8f0;
@@ -212,7 +206,6 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        /* ========= 句子专区 ========= */
         .sentence-section {
             background: #fef9e8;
             border-top: 3px solid #ffb347;
@@ -334,21 +327,24 @@
             }
         }
         
-        /* 外部链接行特殊样式 */
         .external-url-row input {
             background: #fffaf0;
             font-family: monospace;
         }
-        .small-hint {
-            font-size: 11px;
-            color: #6c757d;
-            margin-top: 4px;
-            text-align: right;
-        }
         
-        /* Level区域隐藏样式 */
         .level-row.hidden-level {
             display: none !important;
+        }
+        
+        /* 调试信息样式 */
+        .debug-info {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            margin-top: 8px;
+            padding: 4px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -359,14 +355,12 @@
     </div>
 
     <div class="select-section">
-        <!-- 切换模式行 -->
         <div class="select-row">
             <label>📀 Mode:</label>
             <button id="modeToggleBtn" class="mode-toggle active">📁 内置数据库</button>
             <span style="font-size:12px; color:#475569;">切换可读取外部链接</span>
         </div>
         
-        <!-- Level 行（内置模式显示，外部模式自动隐藏） -->
         <div class="select-row level-row" id="levelRow">
             <label>Level:</label>
             <select id="levelSelect">
@@ -377,21 +371,18 @@
             <button class="btn-level" id="levelConfirm">Confirm</button>
         </div>
         
-        <!-- 内置数据库模式: file下拉框行 (默认显示) -->
         <div class="select-row" id="fileRow">
             <label>File:</label>
             <select id="fileSelect"><option>Loading...</option></select>
             <button class="btn-file" id="fileConfirm">Confirm</button>
         </div>
         
-        <!-- 外部链接模式: URL输入框行 (默认隐藏) -->
         <div class="select-row external-url-row" id="externalUrlRow" style="display:none;">
             <label>🔗 URL:</label>
             <input type="text" id="externalUrlInput" placeholder="https://raw.githubusercontent.com/.../xxx.xlsx" value="">
             <button class="btn-file" id="externalUrlConfirmBtn">Load</button>
         </div>
         
-        <!-- Day筛选行，初始隐藏 -->
         <div class="select-row" id="dayRow" style="display:none;">
             <label>Day:</label>
             <select id="daySelect">
@@ -403,14 +394,12 @@
         </div>
     </div>
 
-    <!-- 单词卡片区 -->
     <div class="practice-section" id="wordPracticeArea">
         <div id="wordContent"><p style="color:#64748b;">✨ Select Level & File to start ✨</p></div>
         <button class="show-all-btn" id="showAllBtn" style="display:none;">📋 Show All Words</button>
         <div id="infoTipContainer" class="info-tip"></div>
     </div>
 
-    <!-- 句子专区 -->
     <div class="sentence-section" id="sentenceArea" style="display:none;">
         <div class="sentence-header">
             <h3>✏️ Sentence Practice</h3>
@@ -456,7 +445,7 @@
     let isSentenceReading = false;
     let currentReadButton = null;
 
-    // ---------- 动态仓库分支 (仅用于内置模式) ----------
+    // ---------- 动态仓库分支 ----------
     function getRawBaseUrl() {
         if (window.location.protocol === 'file:') return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
         const host = window.location.hostname;
@@ -470,50 +459,80 @@
 
     function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
 
-    // 增强的句子解析函数 - 支持更多列名变体
-    function extractSentence(row) {
-        // 尝试所有可能的英文句子列名
-        const enCandidates = ['sentence', 'sentence_en', 'english', 'en', 'Sentence', 'English', 'EN', 'eng', 'Eng'];
-        // 尝试所有可能的中文释义列名
-        const zhCandidates = ['chinese', 'meaning', 'zh', 'sentence_zh', 'Chinese', 'Meaning', 'ZH', 'zh_CN', 'translation'];
+    // 增强的句子解析函数 - 智能识别各种列名
+    function extractSentence(row, rowIndex) {
+        // 所有可能的英文句子列名（不区分大小写）
+        const enKeywords = ['sentence', 'english', 'en', 'eng', 'text', 'sentence_en', 'en_sentence', 'english sentence'];
+        // 所有可能的中文列名
+        const zhKeywords = ['chinese', 'meaning', 'zh', 'translation', 'sentence_zh', 'zh_sentence', 'cn', 'chinese meaning'];
         
         let enText = null;
         let zhText = null;
         
-        // 查找英文句子
-        for (let key of enCandidates) {
-            if (row[key] && String(row[key]).trim()) {
-                enText = String(row[key]).trim();
-                break;
+        // 遍历所有列，查找英文句子
+        for (let key in row) {
+            const keyLower = key.toLowerCase().trim();
+            const value = row[key];
+            if (!value) continue;
+            
+            const valueStr = String(value).trim();
+            if (!valueStr) continue;
+            
+            // 检查是否是英文句子列
+            let isEnColumn = false;
+            for (let keyword of enKeywords) {
+                if (keyLower === keyword || keyLower.includes(keyword)) {
+                    isEnColumn = true;
+                    break;
+                }
             }
-        }
-        
-        // 如果没找到，尝试获取第一个非空字符串字段（兼容没有标准列名的情况）
-        if (!enText) {
-            for (let key in row) {
-                if (row[key] && typeof row[key] === 'string' && row[key].trim().length > 5) {
-                    // 避免把数字、日期或过短的字段当作句子
-                    if (isNaN(row[key]) && row[key].trim().length > 3) {
-                        enText = row[key].trim();
-                        break;
-                    }
+            
+            // 如果列名包含英文相关关键词，或者值较长且包含英文字母
+            if (isEnColumn || (valueStr.length > 5 && /[a-zA-Z]{3,}/.test(valueStr) && !/[\u4e00-\u9fa5]/.test(valueStr))) {
+                if (!enText) {
+                    enText = valueStr;
+                    continue;
+                }
+            }
+            
+            // 检查是否是中文列
+            let isZhColumn = false;
+            for (let keyword of zhKeywords) {
+                if (keyLower === keyword || keyLower.includes(keyword)) {
+                    isZhColumn = true;
+                    break;
+                }
+            }
+            
+            // 如果列名包含中文相关关键词，或者值包含中文字符
+            if (isZhColumn || /[\u4e00-\u9fa5]/.test(valueStr)) {
+                if (!zhText) {
+                    zhText = valueStr;
                 }
             }
         }
         
-        // 查找中文释义
-        for (let key of zhCandidates) {
-            if (row[key] && String(row[key]).trim()) {
-                zhText = String(row[key]).trim();
-                break;
+        // 如果还没找到英文句子，尝试获取第一个非数字且长度合适的字段
+        if (!enText) {
+            for (let key in row) {
+                const value = row[key];
+                if (!value) continue;
+                const valueStr = String(value).trim();
+                if (valueStr.length > 8 && /[a-zA-Z]{3,}/.test(valueStr) && !/[\u4e00-\u9fa5]/.test(valueStr)) {
+                    enText = valueStr;
+                    break;
+                }
             }
         }
         
-        // 如果没有专门的中文列，但可能有第二列有值
+        // 如果还没找到中文，尝试获取第一个包含中文的字段
         if (!zhText && enText) {
             for (let key in row) {
-                if (row[key] && typeof row[key] === 'string' && row[key].trim() && row[key].trim() !== enText) {
-                    zhText = row[key].trim();
+                const value = row[key];
+                if (!value) continue;
+                const valueStr = String(value).trim();
+                if (/[\u4e00-\u9fa5]/.test(valueStr) && valueStr !== enText) {
+                    zhText = valueStr;
                     break;
                 }
             }
@@ -528,19 +547,20 @@
         return null;
     }
 
-    // 通用数据加载核心：解析arrayBuffer并提取单词和句子（增强版）
+    // 通用数据加载核心
     async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         try {
             const wb = XLSX.read(buf, { type: "array" });
+            
+            console.log("Excel 工作表数量:", wb.SheetNames.length);
+            console.log("工作表名称:", wb.SheetNames);
             
             // ========== 单词 Sheet0 ==========
             const sheetName0 = wb.SheetNames[0];
             const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
             
-            // 调试：打印第一个单词数据以便检查
             if (wordData.length > 0) {
-                console.log("单词表第一行数据:", wordData[0]);
-                console.log("可用的列名:", Object.keys(wordData[0]));
+                console.log("单词表列名:", Object.keys(wordData[0]));
             }
             
             allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
@@ -549,48 +569,48 @@
                 day: Number(item.day)
             }));
             
-            console.log(`成功加载 ${allWords.length} 个单词`);
+            console.log(`✅ 成功加载 ${allWords.length} 个单词`);
             
             filteredWords = [...allWords];
             currentWordIdx = 0;
             
-            // ========== 句子 Sheet1 (增强版) ==========
+            // ========== 句子提取（增强版） ==========
             allSentences = [];
+            
+            // 方法1: 从第二个工作表提取
             if (wb.SheetNames.length >= 2) {
                 const sheetName1 = wb.SheetNames[1];
-                console.log("句子工作表名称:", sheetName1);
+                console.log(`📄 尝试从第二个工作表 "${sheetName1}" 提取句子...`);
                 const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
                 
-                console.log(`句子表原始行数: ${rawSentences.length}`);
+                console.log(`句子表行数: ${rawSentences.length}`);
                 if (rawSentences.length > 0) {
-                    console.log("句子表第一行数据:", rawSentences[0]);
-                    console.log("句子表可用列名:", Object.keys(rawSentences[0]));
+                    console.log("句子表列名:", Object.keys(rawSentences[0]));
                 }
                 
-                if (rawSentences && rawSentences.length) {
-                    for (let row of rawSentences) {
-                        const sentence = extractSentence(row);
-                        if (sentence && sentence.sentence_en) {
-                            allSentences.push(sentence);
-                        }
+                for (let i = 0; i < rawSentences.length; i++) {
+                    const sentence = extractSentence(rawSentences[i], i);
+                    if (sentence && sentence.sentence_en) {
+                        allSentences.push(sentence);
                     }
                 }
+                
+                console.log(`从第二个工作表提取到 ${allSentences.length} 个句子`);
             }
             
-            console.log(`成功加载 ${allSentences.length} 个句子`);
-            
-            // 如果没有找到句子，尝试检查是否句子在第一个工作表的其他列
+            // 方法2: 如果第二个工作表没有句子，尝试从第一个工作表的其他列提取
             if (allSentences.length === 0 && wb.SheetNames.length >= 1) {
-                console.log("尝试从单词表中提取句子...");
+                console.log("📄 尝试从第一个工作表提取句子...");
                 const sheet0 = wb.Sheets[wb.SheetNames[0]];
                 const data0 = XLSX.utils.sheet_to_json(sheet0);
-                for (let row of data0) {
+                
+                for (let i = 0; i < data0.length; i++) {
                     // 查找可能包含句子的字段
-                    for (let key in row) {
+                    for (let key in data0[i]) {
                         const keyLower = key.toLowerCase();
                         if ((keyLower.includes('sentence') || keyLower.includes('english') || keyLower.includes('en')) && 
-                            row[key] && String(row[key]).trim().length > 10) {
-                            const sentence = extractSentence(row);
+                            data0[i][key] && String(data0[i][key]).trim().length > 10) {
+                            const sentence = extractSentence(data0[i], i);
                             if (sentence && sentence.sentence_en) {
                                 allSentences.push(sentence);
                             }
@@ -598,8 +618,32 @@
                         }
                     }
                 }
-                console.log(`从单词表中提取到 ${allSentences.length} 个句子`);
+                console.log(`从第一个工作表提取到 ${allSentences.length} 个句子`);
             }
+            
+            // 方法3: 如果还没有，尝试从任何工作表中查找（遍历所有工作表）
+            if (allSentences.length === 0) {
+                console.log("📄 尝试遍历所有工作表查找句子...");
+                for (let sheetIdx = 0; sheetIdx < wb.SheetNames.length; sheetIdx++) {
+                    const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[sheetIdx]]);
+                    for (let row of sheetData) {
+                        for (let key in row) {
+                            const value = String(row[key] || "").trim();
+                            if (value.length > 15 && /[a-zA-Z]{4,}/.test(value) && !/[\u4e00-\u9fa5]/.test(value)) {
+                                const sentence = extractSentence(row);
+                                if (sentence && sentence.sentence_en && !allSentences.some(s => s.sentence_en === sentence.sentence_en)) {
+                                    allSentences.push(sentence);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (allSentences.length > 0) break;
+                }
+                console.log(`遍历所有工作表后提取到 ${allSentences.length} 个句子`);
+            }
+            
+            console.log(`📊 最终结果: ${allWords.length} 个单词, ${allSentences.length} 个句子`);
             
             // 更新UI
             const wordDiv = document.getElementById("wordContent");
@@ -614,13 +658,20 @@
             
             if (allSentences.length === 0) {
                 document.getElementById("sentenceArea").style.display = 'none';
-                console.log("没有句子数据，句子区域隐藏");
+                // 添加调试提示
+                const debugDiv = document.createElement('div');
+                debugDiv.className = 'debug-info';
+                debugDiv.innerHTML = '💡 提示: 此文件未检测到句子数据。请确保Excel有第二个工作表，且包含英文句子列。';
+                if (!document.querySelector('.debug-info')) {
+                    wordDiv.parentNode.appendChild(debugDiv);
+                    setTimeout(() => debugDiv.remove(), 8000);
+                }
             } else {
                 document.getElementById("sentenceArea").style.display = 'block';
                 currentSentenceIdx = 0;
                 updateSentenceUI();
                 updateSentenceStats();
-                console.log(`句子区域已显示，共 ${allSentences.length} 个句子`);
+                console.log(`✅ 句子区域已显示，共 ${allSentences.length} 个句子`);
             }
             return true;
         } catch (parseErr) {
@@ -685,6 +736,10 @@
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         document.getElementById("infoTipContainer").innerHTML = '';
+        
+        // 移除旧的调试信息
+        const oldDebug = document.querySelector('.debug-info');
+        if (oldDebug) oldDebug.remove();
         
         try {
             const url = getXlsxFileUrl(currentLevel, filename);
@@ -773,10 +828,6 @@
                 document.getElementById("infoTipContainer").innerHTML = '';
                 currentLevel = "";
             }
-            const urlInput = document.getElementById('externalUrlInput');
-            if (urlInput && !urlInput.value) {
-                // 保持为空
-            }
         }
     }
     
@@ -845,12 +896,14 @@
         if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
             const displayFile = removeExtension(currentFileName);
             const currentWord = filteredWords[currentWordIdx];
-            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | 句子: ${allSentences.length}`;
+            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | ✏️ 句子: ${allSentences.length}`;
         } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
             const currentWord = filteredWords[currentWordIdx];
-            container.innerHTML = `🔗 外部链接 | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | 句子: ${allSentences.length}`;
+            container.innerHTML = `🔗 外部链接 | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | ✏️ 句子: ${allSentences.length}`;
+        } else if (allSentences.length > 0) {
+            container.innerHTML = `✨ 共 ${allSentences.length} 个句子可用 ✨`;
         } else {
-            container.innerHTML = allSentences.length ? `✨ 共 ${allSentences.length} 个句子可用 ✨` : '';
+            container.innerHTML = '';
         }
     }
     
@@ -909,7 +962,7 @@
     function showAllWordsPopup() {
         if(!allWords.length) return;
         const fileNice = currentMode === "local" ? removeExtension(currentFileName) : "External Link";
-        const tableRows = allWords.map(w => `<tr><td style="padding:10px;">${w.day}</td><td><strong>${w.word.toUpperCase()}</strong></td><td>${w.meaning}</td>`).join('');
+        const tableRows = allWords.map(w => `<tr><td style="padding:10px;">${w.day}</td><td style="padding:10px;"><strong>${w.word.toUpperCase()}</strong></td><td style="padding:10px;">${w.meaning}</td>`).join('');
         const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;background:#f0f4f8;} .container{max-width:900px;margin:0 auto;background:white;border-radius:20px;padding:20px;} h2{color:#ff9a56;} table{width:100%;border-collapse:collapse;} th,td{padding:12px;border-bottom:1px solid #ffe0b5;} .close-btn{background:#ff6b35;color:white;border:none;border-radius:30px;padding:10px 20px;margin-top:20px;cursor:pointer;}</style></head><body><div class='container'><h2>📖 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice} (All Words)</h2> <p>📝 共 ${allWords.length} 个单词 | ✏️ 句子: ${allSentences.length}</p><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
         const win = window.open('', '_blank', 'width=850,height=650,scrollbars=yes');
         win.document.write(htmlContent);
@@ -938,7 +991,7 @@
     function showAllSentencesPopup() {
         if(!allSentences.length) return;
         const fileNice = currentMode === "local" ? removeExtension(currentFileNameForSentences) : "External Link";
-        const tableRows = allSentences.map((s, idx) => `<tr><td style="padding:10px;">${idx+1}</td><td><strong>${s.sentence_en}</strong></td><td>${s.sentence_zh}</td>`).join('');
+        const tableRows = allSentences.map((s, idx) => `<tr><td style="padding:10px;">${idx+1}</td><td style="padding:10px;"><strong>${s.sentence_en}</strong></td><td style="padding:10px;">${s.sentence_zh}</td>`).join('');
         const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>body{font-family:Segoe UI;padding:20px;background:#fff4e6;} .container{max-width:1000px;margin:0 auto;background:white;border-radius:20px;padding:20px;} th,td{padding:12px;border-bottom:1px solid #fbc490;} .close-btn{background:#ff8c42;color:white;border-radius:30px;padding:10px 20px;cursor:pointer;}</style></head><body><div class='container'><h2>📝 ${currentMode === "local" ? currentLevel + " - " : ""}${fileNice}</h2><p>📝 共 ${allSentences.length} 个句子</p><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class='close-btn' onclick='window.close()'>Close</button></div></body></html>`;
         const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
         win.document.write(winHtml);
