@@ -346,8 +346,8 @@
     <div class="select-section">
         <div class="select-row">
             <label>📀 Mode:</label>
-            <button id="modeToggleBtn" class="mode-toggle active">📁 内置数据库</button>
-            <span style="font-size:12px; color:#475569;">切换可读取外部链接</span>
+            <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+            <span style="font-size:12px; color:#475569;">Switch to external link mode</span>
         </div>
         
         <div class="select-row level-row" id="levelRow">
@@ -413,7 +413,7 @@
 </div>
 
 <script>
-    // ---------- 全局变量 ----------
+    // ---------- Global Variables ----------
     let allWords = [];
     let filteredWords = [];
     let currentWordIdx = 0;
@@ -434,7 +434,7 @@
     let isSentenceReading = false;
     let currentReadButton = null;
 
-    // ---------- 动态仓库分支 ----------
+    // ---------- Dynamic Branch Path (for built-in mode) ----------
     function getRawBaseUrl() {
         if (window.location.protocol === 'file:') return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
         const host = window.location.hostname;
@@ -448,12 +448,12 @@
 
     function removeExtension(fname) { return fname.replace(/\.xlsx$/i, ''); }
 
-    // 统一的数据加载逻辑
+    // Unified data loading logic
     async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         try {
             const wb = XLSX.read(buf, { type: "array" });
             
-            // ========== 单词 Sheet0 ==========
+            // ========== Words from Sheet0 ==========
             const sheetName0 = wb.SheetNames[0];
             const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
             
@@ -463,12 +463,12 @@
                 day: Number(item.day)
             }));
             
-            console.log(`✅ 成功加载 ${allWords.length} 个单词`);
+            console.log(`✅ Successfully loaded ${allWords.length} words`);
             
             filteredWords = [...allWords];
             currentWordIdx = 0;
             
-            // ========== 句子 Sheet1 ==========
+            // ========== Sentences from Sheet1 ==========
             allSentences = [];
             
             if (wb.SheetNames.length >= 2) {
@@ -487,11 +487,11 @@
                             });
                         }
                     }
-                    console.log(`✅ 成功加载 ${allSentences.length} 个句子`);
+                    console.log(`✅ Successfully loaded ${allSentences.length} sentences`);
                 }
             }
             
-            // 更新UI
+            // Update UI
             const wordDiv = document.getElementById("wordContent");
             if (filteredWords.length) {
                 showWord();
@@ -512,15 +512,15 @@
             }
             return true;
         } catch (parseErr) {
-            console.error("解析Excel失败", parseErr);
+            console.error("Excel parsing failed", parseErr);
             return false;
         }
     }
     
-    // 外部模式加载
+    // External mode loading
     async function loadFromExternalUrl(url) {
         if (!url) {
-            alert("请输入有效的Excel直链（.xlsx）");
+            alert("Please enter a valid Excel direct link (.xlsx)");
             return false;
         }
         stopAllReading();
@@ -545,14 +545,14 @@
                 const tipDiv = document.getElementById("infoTipContainer");
                 if (tipDiv && filteredWords.length) {
                     const shortUrl = url.length > 60 ? url.substring(0,57)+"..." : url;
-                    tipDiv.innerHTML = `🔗 外部链接: ${shortUrl} | ${filteredWords.length} 单词 | 句子: ${allSentences.length}`;
+                    tipDiv.innerHTML = `🔗 External: ${shortUrl} | ${filteredWords.length} words | Sentences: ${allSentences.length}`;
                 }
                 return true;
             } else {
-                throw new Error("解析失败，请检查文件格式");
+                throw new Error("Parse failed, please check file format");
             }
         } catch (err) {
-            wordDiv.innerHTML = `<p style="color:#ef4444;">❌ 加载失败: ${err.message}<br>请确保提供的是原始Excel下载链接</p>`;
+            wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}<br>Please ensure you provide a raw Excel download link</p>`;
             document.getElementById("sentenceArea").style.display = 'none';
             document.getElementById("showAllBtn").style.display = 'none';
             console.error(err);
@@ -560,7 +560,7 @@
         }
     }
     
-    // 内置模式加载
+    // Built-in mode loading
     async function loadSelectedFile(filename) {
         if (!filename || !currentLevel) return;
         stopAllReading();
@@ -583,7 +583,7 @@
             if (success) {
                 updateInfoTip();
             } else {
-                wordDiv.innerHTML = '<p>❌ 文件格式错误</p>';
+                wordDiv.innerHTML = '<p>❌ Invalid file format</p>';
             }
         } catch(err) {
             wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file.</p>';
@@ -592,7 +592,7 @@
         }
     }
     
-    // 内置模式下加载文件列表
+    // Load file list for built-in mode
     async function loadFileListByLevel(level) {
         const fileSelect = document.getElementById('fileSelect');
         const fileRow = document.getElementById('fileRow');
@@ -617,7 +617,7 @@
         }
     }
     
-    // 模式切换
+    // Mode switching
     function toggleMode(mode) {
         currentMode = mode;
         const fileRow = document.getElementById('fileRow');
@@ -630,13 +630,13 @@
             fileRow.style.display = 'flex';
             externalRow.style.display = 'none';
             levelRow.classList.remove('hidden-level');
-            toggleBtn.textContent = "📁 内置数据库";
+            toggleBtn.textContent = "📁 Built-in DB";
             toggleBtn.classList.add('active');
             if (currentExternalUrl) {
                 allWords = [];
                 filteredWords = [];
                 allSentences = [];
-                document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ 已切换至内置模式，请重新选择Level和文件 ✨</p>';
+                document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Switched to built-in mode, please select Level and file ✨</p>';
                 document.getElementById("sentenceArea").style.display = 'none';
                 document.getElementById("showAllBtn").style.display = 'none';
                 dayRow.style.display = 'none';
@@ -647,13 +647,13 @@
             fileRow.style.display = 'none';
             externalRow.style.display = 'flex';
             levelRow.classList.add('hidden-level');
-            toggleBtn.textContent = "🌐 外部链接模式";
+            toggleBtn.textContent = "🌐 External Link";
             toggleBtn.classList.remove('active');
             if (currentFileName && allWords.length > 0) {
                 allWords = [];
                 filteredWords = [];
                 allSentences = [];
-                document.getElementById("wordContent").innerHTML = '<p>🔗 外部链接模式已激活，粘贴Excel直链并点击Load</p>';
+                document.getElementById("wordContent").innerHTML = '<p>🔗 External mode activated, paste Excel direct link and click Load</p>';
                 document.getElementById("sentenceArea").style.display = 'none';
                 document.getElementById("showAllBtn").style.display = 'none';
                 dayRow.style.display = 'none';
@@ -663,7 +663,7 @@
         }
     }
     
-    // ---------- 朗读与展示逻辑 ----------
+    // ---------- Speech and Display Logic ----------
     function speakTextWithCallback(text, onEnd, rate = 0.8) {
         if (!text) { if (onEnd) onEnd(); return; }
         const utterance = new SpeechSynthesisUtterance(text);
@@ -728,12 +728,12 @@
         if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
             const displayFile = removeExtension(currentFileName);
             const currentWord = filteredWords[currentWordIdx];
-            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | ✏️ 句子: ${allSentences.length}`;
+            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
         } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
             const currentWord = filteredWords[currentWordIdx];
-            container.innerHTML = `🔗 外部链接 | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} vocabs | ✏️ 句子: ${allSentences.length}`;
+            container.innerHTML = `🔗 External | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
         } else if (allSentences.length > 0) {
-            container.innerHTML = `✨ 共 ${allSentences.length} 个句子可用 ✨`;
+            container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
         } else {
             container.innerHTML = '';
         }
@@ -782,7 +782,7 @@
             alert(`✨ All words: ${filteredWords.length} words.`);
         } else {
             let day = Number(dayNum.value);
-            if(isNaN(day) || day < 1) { alert("Enter valid day number ≥1"); return; }
+            if(isNaN(day) || day < 1) { alert("Enter valid day number (≥1)"); return; }
             filteredWords = allWords.filter(item => item.day === day);
             if(filteredWords.length === 0) alert(`No words for Day ${day}.`);
             currentWordIdx = 0;
@@ -947,7 +947,6 @@
         } 
     }
     
-    // Show All Sentences - 与 Show All Words 样式完全一致
     function showAllSentencesPopup() {
         if(!allSentences.length) return;
         const fileNice = currentMode === "local" ? removeExtension(currentFileNameForSentences) : "External Link";
@@ -1099,7 +1098,7 @@
         update();
     }
     
-    // DOM 挂载事件
+    // DOM Event Listeners
     document.addEventListener('DOMContentLoaded', () => {
         initDaySelectToggle();
         if (synth.getVoices().length === 0) synth.onvoiceschanged = () => {};
@@ -1144,7 +1143,7 @@
             if (currentMode !== "external") return;
             let url = document.getElementById('externalUrlInput').value.trim();
             if (!url) { 
-                alert("请输入有效的Excel直链（.xlsx）"); 
+                alert("Please enter a valid Excel direct link (.xlsx)"); 
                 return; 
             }
             if (url.includes("github.com") && url.includes("/blob/")) {
