@@ -486,10 +486,13 @@ async function loadFromExternalUrl(url) {
         return false;
     }
     
+    // URL 编码处理括号等特殊字符
+    const encodedUrl = encodeURI(url);
+    
     stopAllReading();
     currentFileName = "";
-    currentFileNameForSentences = url;
-    currentExternalUrl = url;
+    currentFileNameForSentences = encodedUrl;
+    currentExternalUrl = encodedUrl;
     currentLevel = "";
     
     const wordDiv = document.getElementById("wordContent");
@@ -500,14 +503,14 @@ async function loadFromExternalUrl(url) {
     document.getElementById("infoTipContainer").innerHTML = '';
     
     try {
-        const res = await fetch(url);
+        const res = await fetch(encodedUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
-        const success = await parseExcelBufferAndLoad(buf, url);
+        const success = await parseExcelBufferAndLoad(buf, encodedUrl);
         if (success) {
             const tipDiv = document.getElementById("infoTipContainer");
             if (tipDiv && filteredWords.length) {
-                const shortUrl = url.length > 60 ? url.substring(0, 57) + "..." : url;
+                const shortUrl = encodedUrl.length > 60 ? encodedUrl.substring(0, 57) + "..." : encodedUrl;
                 tipDiv.innerHTML = `🔗 External: ${shortUrl} | ${filteredWords.length} words | Sentences: ${allSentences.length}`;
             }
             saveCurrentState();
@@ -786,6 +789,7 @@ function prevSentence() {
         updateSentenceUI();
         stopAllReading();
         saveCurrentState();
+        console.log('保存句子索引:', currentSentenceIdx);
     }
 }
 
@@ -795,6 +799,7 @@ function nextSentence() {
         updateSentenceUI();
         stopAllReading();
         saveCurrentState();
+        console.log('保存句子索引:', currentSentenceIdx);
     } else if (allSentences.length) {
         alert("🎉 You've completed all sentences!");
     }
@@ -1113,136 +1118,137 @@ document.addEventListener('DOMContentLoaded', async () => {
         toggleBtn.classList.add('active');
     }
     
-  // 恢复保存的状态
-if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
-    console.log('🔄 发现保存的状态，准备恢复...');
-    setTimeout(async () => {
-        console.log('开始执行恢复...');
-        const levelSelect = document.getElementById('levelSelect');
-        if (levelSelect) {
-            levelSelect.value = savedState.level;
+    // 无论什么模式，都尝试填入保存的 URL（如果存在）
+    const savedUrl = localStorage.getItem(STORAGE_KEYS.EXTERNAL_URL);
+    if (savedUrl) {
+        const urlInput = document.getElementById('externalUrlInput');
+        if (urlInput) {
+            urlInput.value = savedUrl;
+            console.log('✅ 自动填入外部 URL:', savedUrl);
         }
-        currentLevel = savedState.level;
-        
-        await loadFileListByLevel(savedState.level);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const fileSelect = document.getElementById('fileSelect');
-        if (fileSelect && savedState.fileName) {
-            const fileExists = Array.from(fileSelect.options).some(opt => opt.value === savedState.fileName);
-            if (fileExists) {
-                fileSelect.value = savedState.fileName;
-                await loadSelectedFile(savedState.fileName);
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                // ========== 修复 Day 筛选恢复 ==========
-                const daySelect = document.getElementById('daySelect');
-                const dayNum = document.getElementById('dayNum');
-                
-                console.log('恢复 Day 筛选 - dayMode:', savedState.dayMode, 'dayNumber:', savedState.dayNumber);
-                
-                if (daySelect && dayNum) {
-                    // 设置 Day 选择器的值
-                    daySelect.value = savedState.dayMode;
-                    
-                    // 触发 change 事件来更新输入框状态
-                    const changeEvent = new Event('change');
-                    daySelect.dispatchEvent(changeEvent);
-                    
-                    // 等待 UI 更新
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    // 如果是 custom 模式，设置 dayNum 的值
-                    if (savedState.dayMode === 'custom') {
-                        dayNum.value = savedState.dayNumber;
-                        // 确保 dayNum 是数字输入框
-                        dayNum.type = 'number';
-                        dayNum.readOnly = false;
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                    
-                    // 调用筛选函数
-                    filterByDay();
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                }
-                
-                // 恢复单词位置
-                if (filteredWords.length > 0) {
-                    if (savedState.wordIndex < filteredWords.length) {
-                        currentWordIdx = savedState.wordIndex;
-                    } else {
-                        console.log('⚠️ 保存的索引超出范围，重置为第一个单词');
-                        currentWordIdx = 0;
-                    }
-                    showWord();
-                    console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1} / ${filteredWords.length}`);
-                } else {
-                    console.log('⚠️ 没有单词可显示');
-                }
-                
-                // 恢复句子位置
-                if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
-                    currentSentenceIdx = savedState.sentenceIndex;
-                    updateSentenceUI();
-                    console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1}`);
-                }
-                
-            } else {
-                console.log('⚠️ 保存的文件不存在于列表中:', savedState.fileName);
-            }
-        }
-    }, 1000);
-} else if (savedState.mode === 'external' && savedState.externalUrl) {
-    console.log('🔄 发现保存的外部链接状态，准备恢复...');
-    
-    // 先将 URL 填入文本框
-    const urlInput = document.getElementById('externalUrlInput');
-    if (urlInput) {
-        urlInput.value = savedState.externalUrl;
-        console.log('✅ 已填入 URL 到文本框:', savedState.externalUrl);
-    } else {
-        console.log('⚠️ 找不到 externalUrlInput 元素');
     }
     
-    setTimeout(async () => {
-        await loadFromExternalUrl(savedState.externalUrl);
-        await new Promise(resolve => setTimeout(resolve, 800));
+    // 恢复保存的状态
+    if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
+        console.log('🔄 发现保存的本地状态，准备恢复...');
+        setTimeout(async () => {
+            console.log('开始执行本地恢复...');
+            const levelSelect = document.getElementById('levelSelect');
+            if (levelSelect) {
+                levelSelect.value = savedState.level;
+            }
+            currentLevel = savedState.level;
+            
+            await loadFileListByLevel(savedState.level);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const fileSelect = document.getElementById('fileSelect');
+            if (fileSelect && savedState.fileName) {
+                const fileExists = Array.from(fileSelect.options).some(opt => opt.value === savedState.fileName);
+                if (fileExists) {
+                    fileSelect.value = savedState.fileName;
+                    await loadSelectedFile(savedState.fileName);
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    
+                    // 恢复 Day 筛选
+                    const daySelect = document.getElementById('daySelect');
+                    const dayNum = document.getElementById('dayNum');
+                    
+                    console.log('恢复 Day 筛选 - dayMode:', savedState.dayMode, 'dayNumber:', savedState.dayNumber);
+                    
+                    if (daySelect && dayNum) {
+                        daySelect.value = savedState.dayMode;
+                        const changeEvent = new Event('change');
+                        daySelect.dispatchEvent(changeEvent);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        if (savedState.dayMode === 'custom') {
+                            dayNum.value = savedState.dayNumber;
+                            dayNum.type = 'number';
+                            dayNum.readOnly = false;
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        filterByDay();
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    
+                    // 恢复单词位置
+                    if (filteredWords.length > 0) {
+                        if (savedState.wordIndex < filteredWords.length) {
+                            currentWordIdx = savedState.wordIndex;
+                        } else {
+                            console.log('⚠️ 保存的单词索引超出范围，重置为第一个');
+                            currentWordIdx = 0;
+                        }
+                        showWord();
+                        console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1} / ${filteredWords.length}`);
+                    }
+                    
+                    // 恢复句子位置
+                    if (allSentences.length > 0) {
+                        if (savedState.sentenceIndex < allSentences.length) {
+                            currentSentenceIdx = savedState.sentenceIndex;
+                        } else {
+                            currentSentenceIdx = 0;
+                        }
+                        updateSentenceUI();
+                        console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1} / ${allSentences.length}`);
+                    }
+                    
+                } else {
+                    console.log('⚠️ 保存的文件不存在于列表中:', savedState.fileName);
+                }
+            }
+        }, 1000);
+    } else if (savedState.mode === 'external' && savedState.externalUrl) {
+        console.log('🔄 发现保存的外部链接状态，准备恢复...');
         
-        // 恢复 Day 筛选
-        const daySelect = document.getElementById('daySelect');
-        const dayNum = document.getElementById('dayNum');
-        
-        if (daySelect && dayNum && savedState.dayMode === 'custom') {
-            daySelect.value = savedState.dayMode;
-            const changeEvent = new Event('change');
-            daySelect.dispatchEvent(changeEvent);
-            await new Promise(resolve => setTimeout(resolve, 100));
-            dayNum.value = savedState.dayNumber;
-            filterByDay();
-            await new Promise(resolve => setTimeout(resolve, 300));
+        // 确保文本框已有 URL
+        const urlInput = document.getElementById('externalUrlInput');
+        if (urlInput && !urlInput.value) {
+            urlInput.value = savedState.externalUrl;
+            console.log('✅ 已填入 URL 到文本框:', savedState.externalUrl);
         }
         
-        // 恢复单词位置
-        if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-            currentWordIdx = savedState.wordIndex;
-            showWord();
-            console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
-        }
-        
-        // ========== 新增：恢复句子位置 ==========
-        if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
-            currentSentenceIdx = savedState.sentenceIndex;
-            updateSentenceUI();
-            console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1}`);
-        } else if (allSentences.length > 0) {
-            // 如果保存的索引无效，重置为第一个
-            currentSentenceIdx = 0;
-            updateSentenceUI();
-            console.log(`ℹ️ 句子索引无效，重置为第1句`);
-        }
-        
-    }, 1000);
-} else {
-    console.log('ℹ️ 没有找到可恢复的保存状态');
-}
+        setTimeout(async () => {
+            await loadFromExternalUrl(savedState.externalUrl);
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // 恢复 Day 筛选
+            const daySelect = document.getElementById('daySelect');
+            const dayNum = document.getElementById('dayNum');
+            
+            if (daySelect && dayNum && savedState.dayMode === 'custom') {
+                daySelect.value = savedState.dayMode;
+                const changeEvent = new Event('change');
+                daySelect.dispatchEvent(changeEvent);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                dayNum.value = savedState.dayNumber;
+                filterByDay();
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
+            // 恢复单词位置
+            if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
+                currentWordIdx = savedState.wordIndex;
+                showWord();
+                console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
+            }
+            
+            // 恢复句子位置
+            if (allSentences.length > 0) {
+                if (savedState.sentenceIndex < allSentences.length) {
+                    currentSentenceIdx = savedState.sentenceIndex;
+                } else {
+                    currentSentenceIdx = 0;
+                }
+                updateSentenceUI();
+                console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1} / ${allSentences.length}`);
+            }
+            
+        }, 1000);
+    } else {
+        console.log('ℹ️ 没有找到可恢复的保存状态');
+    }
 });
