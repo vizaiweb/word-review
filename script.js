@@ -1,19 +1,18 @@
 // 全局状态变量
-let allWords = [];          // 存储当前文件的所有单词
-let filteredWords = [];     // 存储筛选后的单词（按Day/All）
-let currentWordIdx = 0;     // 当前显示的单词索引
-let currentFileName = "";   // 当前选中的文件名
-let currentLevel = "";      // 当前选中的级别(P1/P2)
+let allWords = [];          
+let filteredWords = [];     
+let currentWordIdx = 0;     
+let currentFileName = "";   
+let currentLevel = "";      
 
-let allSentences = [];      // 存储所有句子
-let currentSentenceIdx = 0; // 当前句子索引
-let currentFileNameForSentences = ""; // 句子对应的文件名
-let currentExternalUrl = ""; // 外部链接URL
-let currentMode = "local";   // 当前模式: local 或 external
+let allSentences = [];      
+let currentSentenceIdx = 0; 
+let currentFileNameForSentences = ""; 
+let currentExternalUrl = ""; 
+let currentMode = "local";   
 
-const synth = window.speechSynthesis; // 语音合成API
+const synth = window.speechSynthesis;
 
-// 朗读相关定时器
 let wordReadTimer = null;
 let sentenceReadTimer = null;
 let isSentenceReading = false;
@@ -33,6 +32,7 @@ const STORAGE_KEYS = {
 
 // ====================== 本地存储功能 ======================
 function saveCurrentState() {
+    console.log('🔵 saveCurrentState 被调用了！');
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
     
@@ -56,7 +56,7 @@ function saveCurrentState() {
         localStorage.setItem(STORAGE_KEYS.SENTENCE_INDEX, state.sentenceIndex);
         localStorage.setItem(STORAGE_KEYS.DAY_MODE, state.dayMode);
         localStorage.setItem(STORAGE_KEYS.DAY_NUMBER, state.dayNumber);
-        console.log('State saved:', state);
+        console.log('✅ State saved:', state);
     } catch (e) {
         console.error('Failed to save state:', e);
     }
@@ -104,11 +104,8 @@ function restoreDaySelectState(dayMode, dayNumber) {
     
     if (daySelect && dayNum) {
         daySelect.value = dayMode;
-        
-        // 触发change事件来更新输入框状态
         const changeEvent = new Event('change');
         daySelect.dispatchEvent(changeEvent);
-        
         if (dayMode === 'custom') {
             dayNum.value = dayNumber;
         }
@@ -116,9 +113,8 @@ function restoreDaySelectState(dayMode, dayNumber) {
 }
 
 async function applySavedState(savedState) {
-    console.log('Applying saved state:', savedState);
+    console.log('🔄 Applying saved state:', savedState);
     
-    // 1. 恢复模式切换
     if (savedState.mode === 'external') {
         const toggleBtn = document.getElementById('modeToggleBtn');
         if (toggleBtn && currentMode !== 'external') {
@@ -126,17 +122,14 @@ async function applySavedState(savedState) {
         }
     }
     
-    // 等待模式切换完成
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    // 2. 根据模式恢复具体内容
     if (savedState.mode === 'local') {
         if (savedState.level) {
             const levelSelect = document.getElementById('levelSelect');
             if (levelSelect) {
                 levelSelect.value = savedState.level;
                 currentLevel = savedState.level;
-                
                 await loadFileListByLevel(savedState.level);
                 await new Promise(resolve => setTimeout(resolve, 300));
                 
@@ -149,7 +142,6 @@ async function applySavedState(savedState) {
                         fileSelect.value = savedState.fileName;
                         await loadSelectedFile(savedState.fileName);
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        
                         restoreDaySelectState(savedState.dayMode, savedState.dayNumber);
                         
                         if (savedState.dayMode === 'custom') {
@@ -176,7 +168,6 @@ async function applySavedState(savedState) {
             urlInput.value = savedState.externalUrl;
             await loadFromExternalUrl(savedState.externalUrl);
             await new Promise(resolve => setTimeout(resolve, 500));
-            
             restoreDaySelectState(savedState.dayMode, savedState.dayNumber);
             
             if (savedState.dayMode === 'custom') {
@@ -202,14 +193,11 @@ function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
         return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
     }
-    
     const host = window.location.hostname;
     const path = window.location.pathname;
-    
     if (host.includes('dev') || path.includes('dev')) {
         return 'https://raw.githubusercontent.com/vizaiweb/word-review/dev';
     }
-    
     return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
 }
 
@@ -397,8 +385,6 @@ async function loadFileListByLevel(level) {
 async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
     try {
         const wb = XLSX.read(buf, { type: "array" });
-        
-        // ========== Words from Sheet0 ==========
         const sheetName0 = wb.SheetNames[0];
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         
@@ -409,13 +395,10 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         }));
         
         console.log(`✅ Successfully loaded ${allWords.length} words`);
-        
         filteredWords = [...allWords];
         currentWordIdx = 0;
         
-        // ========== Sentences from Sheet1 ==========
         allSentences = [];
-        
         if (wb.SheetNames.length >= 2) {
             const sheetName1 = wb.SheetNames[1];
             const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
@@ -436,7 +419,6 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
             }
         }
         
-        // Update UI
         const wordDiv = document.getElementById("wordContent");
         if (filteredWords.length) {
             showWord();
@@ -482,13 +464,10 @@ async function loadSelectedFile(filename) {
     try {
         const url = getXlsxFileUrl(currentLevel, filename);
         console.log("正在加载 Excel：", url);
-        
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
         const buf = await res.arrayBuffer();
         const success = await parseExcelBufferAndLoad(buf, filename);
-        
         if (!success) {
             wordDiv.innerHTML = '<p>❌ Invalid file format</p>';
         }
@@ -521,10 +500,8 @@ async function loadFromExternalUrl(url) {
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
         const buf = await res.arrayBuffer();
         const success = await parseExcelBufferAndLoad(buf, url);
-        
         if (success) {
             const tipDiv = document.getElementById("infoTipContainer");
             if (tipDiv && filteredWords.length) {
@@ -548,7 +525,6 @@ async function loadFromExternalUrl(url) {
 // ====================== 筛选逻辑（Day/All） ======================
 function filterByDay() {
     stopAllReading();
-    
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
     
@@ -564,7 +540,6 @@ function filterByDay() {
             dayNum.focus();
             return;
         }
-        
         filteredWords = allWords.filter(item => item.day === day);
         if (filteredWords.length === 0) {
             alert(`No words for Day ${day}.`);
@@ -572,7 +547,6 @@ function filterByDay() {
         currentWordIdx = 0;
         showWord();
     }
-    
     updateInfoTip();
     saveCurrentState();
 }
@@ -1006,7 +980,6 @@ function toggleMode(mode) {
     saveCurrentState();
 }
 
-// ====================== 清除存储功能（可选，在控制台调用） ======================
 function clearSavedState() {
     Object.values(STORAGE_KEYS).forEach(key => {
         localStorage.removeItem(key);
@@ -1029,13 +1002,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const modeToggle = document.getElementById('modeToggleBtn');
     const externalConfirm = document.getElementById('externalUrlConfirmBtn');
     
-    // 模式切换
     modeToggle.addEventListener('click', () => {
         if (currentMode === "local") toggleMode("external");
         else toggleMode("local");
     });
     
-    // 等级确认
     levelConfirm.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -1064,7 +1035,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveCurrentState();
     });
     
-    // 文件确认
     fileConfirm.addEventListener('click', async function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -1083,7 +1053,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadSelectedFile(selected);
     });
     
-    // 外部链接确认
     externalConfirm.addEventListener('click', async () => {
         if (currentMode !== "external") return;
         
@@ -1093,7 +1062,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // 转换 GitHub blob 链接为 raw 链接
         if (url.includes("github.com") && url.includes("/blob/")) {
             url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
             document.getElementById('externalUrlInput').value = url;
@@ -1102,20 +1070,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadFromExternalUrl(url);
     });
     
-    // 筛选按钮
     filterBtn.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
         filterByDay();
     });
     
-    // 显示所有单词按钮
     showAllBtn.addEventListener('click', showAllWords);
     
-    // 设置初始模式
     toggleMode("local");
     
-    // 加载保存的状态
     const savedState = loadSavedState();
     if (savedState.mode === 'local' && savedState.level) {
         setTimeout(() => {
