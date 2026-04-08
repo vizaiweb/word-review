@@ -19,184 +19,6 @@ let sentenceReadTimer = null;
 let isSentenceReading = false;
 let currentReadButton = null;
 
-// ====================== 本地存储键名常量 ======================
-const STORAGE_KEYS = {
-    MODE: 'wordReview_mode',
-    LEVEL: 'wordReview_level',
-    FILE_NAME: 'wordReview_fileName',
-    EXTERNAL_URL: 'wordReview_externalUrl',
-    WORD_INDEX: 'wordReview_wordIndex',
-    SENTENCE_INDEX: 'wordReview_sentenceIndex',
-    DAY_MODE: 'wordReview_dayMode',
-    DAY_NUMBER: 'wordReview_dayNumber'
-};
-
-// ====================== 本地存储功能 ======================
-function saveCurrentState() {
-    const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    
-    const state = {
-        mode: currentMode,
-        level: currentLevel,
-        fileName: currentFileName,
-        externalUrl: currentExternalUrl,
-        wordIndex: currentWordIdx,
-        sentenceIndex: currentSentenceIdx,
-        dayMode: daySelect ? daySelect.value : 'all',
-        dayNumber: dayNum ? dayNum.value : '1'
-    };
-    
-    try {
-        localStorage.setItem(STORAGE_KEYS.MODE, state.mode);
-        localStorage.setItem(STORAGE_KEYS.LEVEL, state.level);
-        localStorage.setItem(STORAGE_KEYS.FILE_NAME, state.fileName);
-        localStorage.setItem(STORAGE_KEYS.EXTERNAL_URL, state.externalUrl);
-        localStorage.setItem(STORAGE_KEYS.WORD_INDEX, state.wordIndex);
-        localStorage.setItem(STORAGE_KEYS.SENTENCE_INDEX, state.sentenceIndex);
-        localStorage.setItem(STORAGE_KEYS.DAY_MODE, state.dayMode);
-        localStorage.setItem(STORAGE_KEYS.DAY_NUMBER, state.dayNumber);
-        console.log('State saved:', state);
-    } catch (e) {
-        console.error('Failed to save state:', e);
-    }
-}
-
-function loadSavedState() {
-    try {
-        const savedMode = localStorage.getItem(STORAGE_KEYS.MODE);
-        const savedLevel = localStorage.getItem(STORAGE_KEYS.LEVEL);
-        const savedFileName = localStorage.getItem(STORAGE_KEYS.FILE_NAME);
-        const savedExternalUrl = localStorage.getItem(STORAGE_KEYS.EXTERNAL_URL);
-        const savedWordIndex = localStorage.getItem(STORAGE_KEYS.WORD_INDEX);
-        const savedSentenceIndex = localStorage.getItem(STORAGE_KEYS.SENTENCE_INDEX);
-        const savedDayMode = localStorage.getItem(STORAGE_KEYS.DAY_MODE);
-        const savedDayNumber = localStorage.getItem(STORAGE_KEYS.DAY_NUMBER);
-        
-        return {
-            mode: savedMode || 'local',
-            level: savedLevel || '',
-            fileName: savedFileName || '',
-            externalUrl: savedExternalUrl || '',
-            wordIndex: savedWordIndex ? parseInt(savedWordIndex) : 0,
-            sentenceIndex: savedSentenceIndex ? parseInt(savedSentenceIndex) : 0,
-            dayMode: savedDayMode || 'all',
-            dayNumber: savedDayNumber || '1'
-        };
-    } catch (e) {
-        console.error('Failed to load state:', e);
-        return {
-            mode: 'local',
-            level: '',
-            fileName: '',
-            externalUrl: '',
-            wordIndex: 0,
-            sentenceIndex: 0,
-            dayMode: 'all',
-            dayNumber: '1'
-        };
-    }
-}
-
-function restoreDaySelectState(dayMode, dayNumber) {
-    const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    
-    if (daySelect && dayNum) {
-        daySelect.value = dayMode;
-        
-        // 触发change事件来更新输入框状态
-        const changeEvent = new Event('change');
-        daySelect.dispatchEvent(changeEvent);
-        
-        if (dayMode === 'custom') {
-            dayNum.value = dayNumber;
-        }
-    }
-}
-
-async function applySavedState(savedState) {
-    console.log('Applying saved state:', savedState);
-    
-    // 1. 恢复模式切换
-    if (savedState.mode === 'external') {
-        const toggleBtn = document.getElementById('modeToggleBtn');
-        if (toggleBtn && currentMode !== 'external') {
-            toggleBtn.click();
-        }
-    }
-    
-    // 等待模式切换完成
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // 2. 根据模式恢复具体内容
-    if (savedState.mode === 'local') {
-        if (savedState.level) {
-            const levelSelect = document.getElementById('levelSelect');
-            if (levelSelect) {
-                levelSelect.value = savedState.level;
-                currentLevel = savedState.level;
-                
-                await loadFileListByLevel(savedState.level);
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                if (savedState.fileName) {
-                    const fileSelect = document.getElementById('fileSelect');
-                    const fileOptions = Array.from(fileSelect.options);
-                    const fileExists = fileOptions.some(opt => opt.value === savedState.fileName);
-                    
-                    if (fileExists) {
-                        fileSelect.value = savedState.fileName;
-                        await loadSelectedFile(savedState.fileName);
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        restoreDaySelectState(savedState.dayMode, savedState.dayNumber);
-                        
-                        if (savedState.dayMode === 'custom') {
-                            filterByDay();
-                            await new Promise(resolve => setTimeout(resolve, 200));
-                        }
-                        
-                        if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-                            currentWordIdx = savedState.wordIndex;
-                            showWord();
-                        }
-                        
-                        if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
-                            currentSentenceIdx = savedState.sentenceIndex;
-                            updateSentenceUI();
-                        }
-                    }
-                }
-            }
-        }
-    } else if (savedState.mode === 'external' && savedState.externalUrl) {
-        const urlInput = document.getElementById('externalUrlInput');
-        if (urlInput) {
-            urlInput.value = savedState.externalUrl;
-            await loadFromExternalUrl(savedState.externalUrl);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            restoreDaySelectState(savedState.dayMode, savedState.dayNumber);
-            
-            if (savedState.dayMode === 'custom') {
-                filterByDay();
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-            
-            if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-                currentWordIdx = savedState.wordIndex;
-                showWord();
-            }
-            
-            if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
-                currentSentenceIdx = savedState.sentenceIndex;
-                updateSentenceUI();
-            }
-        }
-    }
-}
-
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
@@ -456,7 +278,6 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
             updateSentenceStats();
         }
         
-        saveCurrentState();
         return true;
     } catch (parseErr) {
         console.error("Excel parsing failed", parseErr);
@@ -531,7 +352,6 @@ async function loadFromExternalUrl(url) {
                 const shortUrl = url.length > 60 ? url.substring(0, 57) + "..." : url;
                 tipDiv.innerHTML = `🔗 External: ${shortUrl} | ${filteredWords.length} words | Sentences: ${allSentences.length}`;
             }
-            saveCurrentState();
             return true;
         } else {
             throw new Error("Parse failed, please check file format");
@@ -574,7 +394,6 @@ function filterByDay() {
     }
     
     updateInfoTip();
-    saveCurrentState();
 }
 
 // ====================== 单词导航逻辑 ======================
@@ -621,7 +440,6 @@ function showWord() {
         if (currentWordIdx > 0) {
             currentWordIdx--;
             showWord();
-            saveCurrentState();
         }
     });
     
@@ -629,7 +447,6 @@ function showWord() {
         if (currentWordIdx + 1 <= filteredWords.length) {
             currentWordIdx++;
             showWord();
-            saveCurrentState();
         }
     });
 }
@@ -809,7 +626,6 @@ function prevSentence() {
         currentSentenceIdx--;
         updateSentenceUI();
         stopAllReading();
-        saveCurrentState();
     }
 }
 
@@ -818,7 +634,6 @@ function nextSentence() {
         currentSentenceIdx++;
         updateSentenceUI();
         stopAllReading();
-        saveCurrentState();
     } else if (allSentences.length) {
         alert("🎉 You've completed all sentences!");
     }
@@ -1002,20 +817,10 @@ function toggleMode(mode) {
             currentLevel = "";
         }
     }
-    
-    saveCurrentState();
-}
-
-// ====================== 清除存储功能（可选，在控制台调用） ======================
-function clearSavedState() {
-    Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
-    });
-    console.log('All saved states cleared');
 }
 
 // ====================== 初始化 ======================
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     initDaySelectToggle();
     
     if (synth.getVoices().length === 0) {
@@ -1060,8 +865,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         allWords = [];
         filteredWords = [];
         allSentences = [];
-        
-        saveCurrentState();
     });
     
     // 文件确认
@@ -1114,16 +917,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // 设置初始模式
     toggleMode("local");
-    
-    // 加载保存的状态
-    const savedState = loadSavedState();
-    if (savedState.mode === 'local' && savedState.level) {
-        setTimeout(() => {
-            applySavedState(savedState);
-        }, 500);
-    } else if (savedState.mode === 'external' && savedState.externalUrl) {
-        setTimeout(() => {
-            applySavedState(savedState);
-        }, 500);
-    }
 });
