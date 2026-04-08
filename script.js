@@ -1,41 +1,38 @@
 // 全局状态变量
-let allWords = [];          // 存储当前文件的所有单词
-let filteredWords = [];     // 存储筛选后的单词（按Day/All）
-let currentWordIdx = 0;     // 当前显示的单词索引
-let currentFileName = "";   // 当前选中的文件名
-let currentLevel = "";      // 当前选中的级别(P1/P2)
+let allWords = [];          
+let filteredWords = [];     
+let currentWordIdx = 0;     
+let currentFileName = "";   
+let currentLevel = "";      
 
-let allSentences = [];      // 存储所有句子
-let currentSentenceIdx = 0; // 当前句子索引
-let currentFileNameForSentences = ""; // 句子对应的文件名
-let currentExternalUrl = ""; // 外部链接URL
-let currentMode = "local";   // 当前模式: local 或 external
+let allSentences = [];      
+let currentSentenceIdx = 0; 
+let currentFileNameForSentences = ""; 
+let currentExternalUrl = ""; 
+let currentMode = "local";   
 
-const synth = window.speechSynthesis; // 语音合成API
+const synth = window.speechSynthesis;
 
 // 朗读相关变量
 let wordReadTimer = null;
 let sentenceReadTimer = null;
-let isWordReading = false;      // 单词是否正在朗读
-let isSentenceReading = false;  // 句子是否正在朗读
-let currentWordReadButton = null;   // 当前单词朗读按钮
-let currentSentenceReadButton = null; // 当前句子朗读按钮
-let currentWordText = "";       // 正在朗读的单词文本
-let currentSentenceText = "";   // 正在朗读的句子文本
+let isWordReading = false;
+let isSentenceReading = false;
+let currentWordReadButton = null;
+let currentSentenceReadButton = null;
+let currentWordText = "";
+let currentSentenceText = "";
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
         return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
     }
-    
     const host = window.location.hostname;
     const path = window.location.pathname;
-    
     if (host.includes('dev') || path.includes('dev')) {
         return 'https://raw.githubusercontent.com/vizaiweb/word-review/dev';
     }
-    
     return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
 }
 
@@ -133,7 +130,6 @@ function stopWordReading() {
             currentWordReadButton = null;
         }
         currentWordText = "";
-        console.log('单词朗读已停止');
     }
 }
 
@@ -153,7 +149,6 @@ function stopSentenceReading() {
             currentSentenceReadButton = null;
         }
         currentSentenceText = "";
-        console.log('句子朗读已停止');
     }
 }
 
@@ -165,11 +160,8 @@ function stopAllReading() {
 
 // 单词朗读（支持停止）
 function toggleWordReading(word, buttonElement) {
-    console.log('toggleWordReading 被调用, word:', word, 'isWordReading:', isWordReading, 'currentWordText:', currentWordText);
-    
     // 如果正在朗读同一个单词，则停止
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
-        console.log('停止单词朗读');
         stopWordReading();
         return;
     }
@@ -180,29 +172,23 @@ function toggleWordReading(word, buttonElement) {
     }
     
     // 开始新的朗读
-    stopWordReading(); // 确保清理干净
     currentWordText = word;
     currentWordReadButton = buttonElement;
     
     // 改变按钮文字和样式
     buttonElement.textContent = "⏹️ 停止";
     buttonElement.classList.add('reading-disabled');
-    buttonElement.disabled = false; // 允许点击停止
+    buttonElement.disabled = false;
     
     let readCount = 0;
     isWordReading = true;
     
     function speakNext() {
-        if (!isWordReading) {
-            console.log('朗读被中断');
-            return;
-        }
+        if (!isWordReading) return;
         if (readCount >= 3) {
-            console.log('3次朗读完成');
             stopWordReading();
             return;
         }
-        console.log('朗读第', readCount + 1, '次');
         speakTextWithCallback(word, () => {
             if (!isWordReading) return;
             readCount++;
@@ -220,11 +206,8 @@ function toggleWordReading(word, buttonElement) {
 
 // 句子朗读（支持停止）
 function toggleSentenceReading(sentenceText, buttonElement) {
-    console.log('toggleSentenceReading 被调用, sentenceText:', sentenceText, 'isSentenceReading:', isSentenceReading);
-    
     // 如果正在朗读同一个句子，则停止
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
-        console.log('停止句子朗读');
         stopSentenceReading();
         return;
     }
@@ -235,7 +218,6 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     }
     
     // 开始新的朗读
-    stopSentenceReading(); // 确保清理干净
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     
@@ -304,8 +286,6 @@ async function loadFileListByLevel(level) {
 async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
     try {
         const wb = XLSX.read(buf, { type: "array" });
-        
-        // ========== Words from Sheet0 ==========
         const sheetName0 = wb.SheetNames[0];
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         
@@ -315,14 +295,10 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
             day: Number(item.day)
         }));
         
-        console.log(`✅ Successfully loaded ${allWords.length} words`);
-        
         filteredWords = [...allWords];
         currentWordIdx = 0;
         
-        // ========== Sentences from Sheet1 ==========
         allSentences = [];
-        
         if (wb.SheetNames.length >= 2) {
             const sheetName1 = wb.SheetNames[1];
             const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
@@ -339,11 +315,9 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
                         });
                     }
                 }
-                console.log(`✅ Successfully loaded ${allSentences.length} sentences`);
             }
         }
         
-        // Update UI
         const wordDiv = document.getElementById("wordContent");
         if (filteredWords.length) {
             showWord();
@@ -387,17 +361,10 @@ async function loadSelectedFile(filename) {
     
     try {
         const url = getXlsxFileUrl(currentLevel, filename);
-        console.log("正在加载 Excel：", url);
-        
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
         const buf = await res.arrayBuffer();
-        const success = await parseExcelBufferAndLoad(buf, filename);
-        
-        if (!success) {
-            wordDiv.innerHTML = '<p>❌ Invalid file format</p>';
-        }
+        await parseExcelBufferAndLoad(buf, filename);
     } catch (err) {
         wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file.</p>';
         document.getElementById("sentenceArea").style.display = 'none';
@@ -427,10 +394,8 @@ async function loadFromExternalUrl(url) {
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
         const buf = await res.arrayBuffer();
         const success = await parseExcelBufferAndLoad(buf, url);
-        
         if (success) {
             const tipDiv = document.getElementById("infoTipContainer");
             if (tipDiv && filteredWords.length) {
@@ -442,7 +407,7 @@ async function loadFromExternalUrl(url) {
             throw new Error("Parse failed, please check file format");
         }
     } catch (err) {
-        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}<br>Please ensure you provide a raw Excel download link</p>`;
+        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}</p>`;
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         console.error(err);
@@ -450,10 +415,9 @@ async function loadFromExternalUrl(url) {
     }
 }
 
-// ====================== 筛选逻辑（Day/All） ======================
+// ====================== 筛选逻辑 ======================
 function filterByDay() {
     stopAllReading();
-    
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
     
@@ -469,7 +433,6 @@ function filterByDay() {
             dayNum.focus();
             return;
         }
-        
         filteredWords = allWords.filter(item => item.day === day);
         if (filteredWords.length === 0) {
             alert(`No words for Day ${day}.`);
@@ -477,7 +440,6 @@ function filterByDay() {
         currentWordIdx = 0;
         showWord();
     }
-    
     updateInfoTip();
 }
 
@@ -514,45 +476,29 @@ function showWord() {
     
     updateInfoTip();
     
-    // 绑定显示单词按钮
-    const showBtn = document.getElementById("btnShowWord");
-    if (showBtn) {
-        showBtn.onclick = () => {
-            const span = document.getElementById("currentWordSpan");
-            if (span) span.style.display = "block";
-        };
-    }
+    document.getElementById("btnShowWord")?.addEventListener("click", () => {
+        const span = document.getElementById("currentWordSpan");
+        if (span) span.style.display = "block";
+    });
     
-    // 绑定朗读按钮
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
-        // 移除旧监听器，避免重复绑定
-        const newReadBtn = readBtn.cloneNode(true);
-        readBtn.parentNode.replaceChild(newReadBtn, readBtn);
-        newReadBtn.onclick = () => toggleWordReading(w.word, newReadBtn);
+        readBtn.onclick = () => toggleWordReading(w.word, readBtn);
     }
     
-    // 绑定上一个按钮
-    const prevBtn = document.getElementById("btnPrevWord");
-    if (prevBtn) {
-        prevBtn.onclick = () => {
-            if (currentWordIdx > 0) {
-                currentWordIdx--;
-                showWord();
-            }
-        };
-    }
+    document.getElementById("btnPrevWord")?.addEventListener("click", () => {
+        if (currentWordIdx > 0) {
+            currentWordIdx--;
+            showWord();
+        }
+    });
     
-    // 绑定下一个按钮
-    const nextBtn = document.getElementById("btnNextWord");
-    if (nextBtn) {
-        nextBtn.onclick = () => {
-            if (currentWordIdx + 1 <= filteredWords.length) {
-                currentWordIdx++;
-                showWord();
-            }
-        };
-    }
+    document.getElementById("btnNextWord")?.addEventListener("click", () => {
+        if (currentWordIdx + 1 <= filteredWords.length) {
+            currentWordIdx++;
+            showWord();
+        }
+    });
 }
 
 function updateInfoTip() {
@@ -586,106 +532,17 @@ function showAllWords() {
         </tr>
     `).join('');
     
-    const allWordsHtml = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>All Words - ${fileNice}</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: 'Segoe UI', Arial, sans-serif;
-                    padding: 30px 20px;
-                    background: linear-gradient(135deg, #fef3e8 0%, #fff5eb 100%);
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 900px;
-                    margin: 0 auto;
-                    background: white;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                }
-                h2 {
-                    background: linear-gradient(135deg, #ff9a56, #ff6b35);
-                    color: white;
-                    padding: 20px;
-                    margin: 0;
-                    text-align: center;
-                    font-size: 24px;
-                }
-                .word-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .word-table th {
-                    background: #ff9a56;
-                    color: white;
-                    padding: 14px 12px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    text-align: left;
-                }
-                .word-table td {
-                    padding: 12px;
-                    border-bottom: 1px solid #ffe0b5;
-                }
-                .word-table tr:hover {
-                    background: #fff7ed;
-                }
-                .close-btn {
-                    display: block;
-                    width: 120px;
-                    margin: 20px auto;
-                    padding: 10px 20px;
-                    background: #ff6b35;
-                    color: white;
-                    border: none;
-                    border-radius: 30px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    transition: transform 0.1s;
-                }
-                .close-btn:hover {
-                    transform: scale(1.02);
-                    background: #ff8c5a;
-                }
-                .stats {
-                    text-align: center;
-                    padding: 12px;
-                    background: #fff1e0;
-                    color: #b45f2b;
-                    font-size: 14px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>📖 ${currentLevel} - ${fileNice} (All Words)</h2>
-                <div class="stats">✨ Total: ${allWords.length} words ✨</div>
-                <table class="word-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px;">Day</th>
-                            <th>Word</th>
-                            <th>Meaning</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
-                </table>
-                <button class="close-btn" onclick="window.close()">Close</button>
-            </div>
-        </body>
-        </html>
-    `;
+    const allWordsHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
+        h2 { color: #ff9a56; text-align: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        th { background: #ff9a56; color: white; }
+        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><tr><th>Day</th><th>Word</th><th>Meaning</th></tr>${tableRows}</table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
-    const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+    const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
     newWindow.document.close();
 }
@@ -749,111 +606,23 @@ function showAllSentencesPopup() {
     const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : "External Link";
     const tableRows = allSentences.map((s, idx) => `
         <tr>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center; width: 70px;">${idx + 1}</td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;"><strong>${s.sentence_en}</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;">${s.sentence_zh}</td>
+            <td style="padding: 12px; text-align: center;">${idx + 1}</td>
+            <td><strong>${s.sentence_en}</strong></td>
+            <td>${s.sentence_zh}</td>
         </tr>
     `).join('');
     
-    const winHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>All Sentences - ${fileNice}</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: 'Segoe UI', Arial, sans-serif;
-                    padding: 30px 20px;
-                    background: linear-gradient(135deg, #fef3e8 0%, #fff5eb 100%);
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 1000px;
-                    margin: 0 auto;
-                    background: white;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                }
-                h2 {
-                    background: linear-gradient(135deg, #ff9a56, #ff6b35);
-                    color: white;
-                    padding: 20px;
-                    margin: 0;
-                    text-align: center;
-                    font-size: 24px;
-                }
-                .sentence-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .sentence-table th {
-                    background: #ff9a56;
-                    color: white;
-                    padding: 14px 12px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    text-align: left;
-                }
-                .sentence-table td {
-                    padding: 12px;
-                    border-bottom: 1px solid #ffe0b5;
-                    vertical-align: top;
-                }
-                .sentence-table tr:hover {
-                    background: #fff7ed;
-                }
-                .close-btn {
-                    display: block;
-                    width: 120px;
-                    margin: 20px auto;
-                    padding: 10px 20px;
-                    background: #ff6b35;
-                    color: white;
-                    border: none;
-                    border-radius: 30px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    transition: transform 0.1s;
-                }
-                .close-btn:hover {
-                    transform: scale(1.02);
-                    background: #ff8c5a;
-                }
-                .stats {
-                    text-align: center;
-                    padding: 12px;
-                    background: #fff1e0;
-                    color: #b45f2b;
-                    font-size: 14px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>📝 ${currentLevel} - ${fileNice} (All Sentences)</h2>
-                <div class="stats">✨ Total: ${allSentences.length} sentences ✨</div>
-                <table class="sentence-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 70px;">#</th>
-                            <th>English Sentence</th>
-                            <th>Chinese</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
-                </table>
-                <button class="close-btn" onclick="window.close()">Close</button>
-            </div>
-        </body>
-        </html>`;
+    const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
+        h2 { color: #ff9a56; text-align: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+        th { background: #ff9a56; color: white; }
+        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><tr><th>#</th><th>English</th><th>Chinese</th></tr>${tableRows}</table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
-    const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+    const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
     win.document.close();
 }
@@ -865,31 +634,16 @@ function attachSentenceEvents() {
     const nextBtn = document.getElementById("nextSentenceBtn");
     const allBtn = document.getElementById("showAllSentencesBtn");
     
-    if (showBtn) {
-        showBtn.onclick = () => showCurrentSentence();
-    }
-    
+    if (showBtn) showBtn.onclick = () => showCurrentSentence();
     if (readBtn) {
-        // 移除旧监听器，避免重复绑定
-        const newReadBtn = readBtn.cloneNode(true);
-        readBtn.parentNode.replaceChild(newReadBtn, readBtn);
-        newReadBtn.onclick = () => {
+        readBtn.onclick = () => {
             const currentSent = allSentences[currentSentenceIdx];
-            if (currentSent) toggleSentenceReading(currentSent.sentence_en, newReadBtn);
+            if (currentSent) toggleSentenceReading(currentSent.sentence_en, readBtn);
         };
     }
-    
-    if (prevBtn) {
-        prevBtn.onclick = () => prevSentence();
-    }
-    
-    if (nextBtn) {
-        nextBtn.onclick = () => nextSentence();
-    }
-    
-    if (allBtn) {
-        allBtn.onclick = () => showAllSentencesPopup();
-    }
+    if (prevBtn) prevBtn.onclick = () => prevSentence();
+    if (nextBtn) nextBtn.onclick = () => nextSentence();
+    if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
 // ====================== 模式切换 ======================
@@ -955,13 +709,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeToggle = document.getElementById('modeToggleBtn');
     const externalConfirm = document.getElementById('externalUrlConfirmBtn');
     
-    // 模式切换
     modeToggle.addEventListener('click', () => {
         if (currentMode === "local") toggleMode("external");
         else toggleMode("local");
     });
     
-    // 等级确认
     levelConfirm.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -988,7 +740,6 @@ document.addEventListener('DOMContentLoaded', () => {
         allSentences = [];
     });
     
-    // 文件确认
     fileConfirm.addEventListener('click', async function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -1007,7 +758,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSelectedFile(selected);
     });
     
-    // 外部链接确认
     externalConfirm.addEventListener('click', async () => {
         if (currentMode !== "external") return;
         
@@ -1017,7 +767,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // 转换 GitHub blob 链接为 raw 链接
         if (url.includes("github.com") && url.includes("/blob/")) {
             url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
             document.getElementById('externalUrlInput').value = url;
@@ -1026,16 +775,13 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadFromExternalUrl(url);
     });
     
-    // 筛选按钮
     filterBtn.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
         filterByDay();
     });
     
-    // 显示所有单词按钮
     showAllBtn.addEventListener('click', showAllWords);
     
-    // 设置初始模式
     toggleMode("local");
 });
