@@ -126,7 +126,6 @@ function stopWordReading() {
         if (currentWordReadButton) {
             currentWordReadButton.textContent = "🔊 Read 3x";
             currentWordReadButton.classList.remove('reading-disabled');
-            currentWordReadButton.disabled = false;
             currentWordReadButton = null;
         }
         currentWordText = "";
@@ -145,7 +144,6 @@ function stopSentenceReading() {
         if (currentSentenceReadButton) {
             currentSentenceReadButton.textContent = "🔊 Read 3x";
             currentSentenceReadButton.classList.remove('reading-disabled');
-            currentSentenceReadButton.disabled = false;
             currentSentenceReadButton = null;
         }
         currentSentenceText = "";
@@ -158,7 +156,7 @@ function stopAllReading() {
     stopSentenceReading();
 }
 
-// 单词朗读（支持停止）
+// 单词朗读（支持停止）- 按钮保持可点击
 function toggleWordReading(word, buttonElement) {
     // 如果正在朗读同一个单词，则停止
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
@@ -175,7 +173,7 @@ function toggleWordReading(word, buttonElement) {
     currentWordText = word;
     currentWordReadButton = buttonElement;
     
-    // 改变按钮文字和样式
+    // 改变按钮文字和样式（不禁用按钮，保持可点击）
     buttonElement.textContent = "⏹️ 停止";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
@@ -204,7 +202,7 @@ function toggleWordReading(word, buttonElement) {
     speakNext();
 }
 
-// 句子朗读（支持停止）
+// 句子朗读（支持停止）- 按钮保持可点击
 function toggleSentenceReading(sentenceText, buttonElement) {
     // 如果正在朗读同一个句子，则停止
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
@@ -221,7 +219,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     
-    // 改变按钮文字和样式
+    // 改变按钮文字和样式（不禁用按钮，保持可点击）
     buttonElement.textContent = "⏹️ 停止";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
@@ -540,7 +538,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><tr><th>Day</th><th>Word</th><th>Meaning</th></tr>${tableRows}</table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -620,7 +618,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><tr><th>#</th><th>English</th><th>Chinese</th></tr>${tableRows}</table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
