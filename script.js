@@ -1082,13 +1082,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    // 先设置默认模式为 local
-    toggleMode("local");
-    
-    // 恢复保存的状态
+    // ========== 关键修改：先读取保存的状态，再设置界面 ==========
     const savedState = loadSavedState();
     console.log('📀 读取到的保存状态:', savedState);
     
+    // 根据保存的状态设置模式（但不触发保存）
+    if (savedState.mode === 'external') {
+        currentMode = 'external';
+        const fileRow = document.getElementById('fileRow');
+        const externalRow = document.getElementById('externalUrlRow');
+        const levelRow = document.getElementById('levelRow');
+        const toggleBtn = document.getElementById('modeToggleBtn');
+        
+        fileRow.style.display = 'none';
+        externalRow.style.display = 'flex';
+        levelRow.classList.add('hidden-level');
+        toggleBtn.textContent = "🌐 External Link";
+        toggleBtn.classList.remove('active');
+    } else {
+        currentMode = 'local';
+        const fileRow = document.getElementById('fileRow');
+        const externalRow = document.getElementById('externalUrlRow');
+        const levelRow = document.getElementById('levelRow');
+        const toggleBtn = document.getElementById('modeToggleBtn');
+        
+        fileRow.style.display = 'flex';
+        externalRow.style.display = 'none';
+        levelRow.classList.remove('hidden-level');
+        toggleBtn.textContent = "📁 Built-in DB";
+        toggleBtn.classList.add('active');
+    }
+    
+    // 恢复保存的状态
     if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
         console.log('🔄 发现保存的状态，准备恢复...');
         setTimeout(async () => {
