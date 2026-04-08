@@ -98,6 +98,91 @@ function loadSavedState() {
     }
 }
 
+function resetLocalStateToInitial() {
+    console.log('🔄 重置 Local 模式状态至初始值');
+    // 重置全局变量
+    allWords = [];
+    filteredWords = [];
+    currentWordIdx = 0;
+    currentFileName = "";
+    currentLevel = "";
+    allSentences = [];
+    currentSentenceIdx = 0;
+    currentFileNameForSentences = "";
+    
+    // 重置 UI
+    const wordDiv = document.getElementById("wordContent");
+    if (wordDiv) {
+        wordDiv.innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
+    }
+    document.getElementById("sentenceArea").style.display = 'none';
+    document.getElementById("showAllBtn").style.display = 'none';
+    document.getElementById("dayRow").style.display = 'none';
+    document.getElementById("infoTipContainer").innerHTML = '';
+    
+    // 重置 Day 选择器
+    const daySelect = document.getElementById('daySelect');
+    const dayNum = document.getElementById('dayNum');
+    if (daySelect) daySelect.value = 'all';
+    if (dayNum) {
+        dayNum.type = 'text';
+        dayNum.value = '--';
+        dayNum.readOnly = true;
+    }
+    
+    // 重置文件选择器
+    const fileSelect = document.getElementById('fileSelect');
+    if (fileSelect) {
+        fileSelect.innerHTML = '<option value="">Loading...</option>';
+    }
+    
+    // 重置等级选择器
+    const levelSelect = document.getElementById('levelSelect');
+    if (levelSelect) levelSelect.value = '';
+    
+    // 保存重置后的状态
+    saveCurrentState();
+}
+
+function resetExternalStateToInitial() {
+    console.log('🔄 重置 External 模式状态至初始值');
+    // 重置全局变量
+    allWords = [];
+    filteredWords = [];
+    currentWordIdx = 0;
+    currentFileName = "";
+    currentLevel = "";
+    allSentences = [];
+    currentSentenceIdx = 0;
+    currentFileNameForSentences = "";
+    currentExternalUrl = "";
+    
+    // 重置 UI
+    const wordDiv = document.getElementById("wordContent");
+    if (wordDiv) {
+        wordDiv.innerHTML = '<p style="color:#64748b;">🔗 Enter URL and click Load</p>';
+    }
+    document.getElementById("sentenceArea").style.display = 'none';
+    document.getElementById("showAllBtn").style.display = 'none';
+    document.getElementById("dayRow").style.display = 'none';
+    document.getElementById("infoTipContainer").innerHTML = '';
+    
+    // 重置 Day 选择器
+    const daySelect = document.getElementById('daySelect');
+    const dayNum = document.getElementById('dayNum');
+    if (daySelect) daySelect.value = 'all';
+    if (dayNum) {
+        dayNum.type = 'text';
+        dayNum.value = '--';
+        dayNum.readOnly = true;
+    }
+    
+    // 注意：不重置 URL 输入框的内容，让用户可以看到之前输入的 URL
+    
+    // 保存重置后的状态
+    saveCurrentState();
+}
+
 function restoreDaySelectState(dayMode, dayNumber) {
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
@@ -1097,6 +1182,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentMode !== "local") return;
         stopAllReading();
         
+        // 重置 Local 模式状态至初始值
+        resetLocalStateToInitial();
+        
         const level = document.getElementById('levelSelect').value;
         if (!level) {
             alert('Please select P1 or P2 first!');
@@ -1124,6 +1212,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (currentMode !== "local") return;
         
+        // 重置 Local 模式状态至初始值（但保留等级选择）
+        resetLocalStateToInitial();
+        
         const fileSelect = document.getElementById('fileSelect');
         const selected = fileSelect.value;
         const invalid = ["", "Loading...", "No files available", "Load failed"];
@@ -1138,6 +1229,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     externalConfirm.addEventListener('click', async () => {
         if (currentMode !== "external") return;
+        
+        // 重置 External 模式状态至初始值
+        resetExternalStateToInitial();
         
         let url = document.getElementById('externalUrlInput').value.trim();
         if (!url) {
