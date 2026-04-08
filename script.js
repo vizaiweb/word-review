@@ -129,7 +129,6 @@ function resetProgress() {
     const dayNum = document.getElementById('dayNum');
     if (daySelect) {
         daySelect.value = 'all';
-        // 触发 change 事件更新输入框状态
         const changeEvent = new Event('change');
         daySelect.dispatchEvent(changeEvent);
     }
@@ -534,7 +533,6 @@ async function loadFromExternalUrl(url) {
         return false;
     }
     
-    // URL 编码处理括号等特殊字符
     const encodedUrl = encodeURI(url);
     
     stopAllReading();
@@ -661,19 +659,36 @@ function showWord() {
     });
 }
 
+// ====================== 提示信息（修复：正确区分 Local/External 模式） ======================
 function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
     if (!container) return;
     
-    if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
-        const displayFile = removeFileExtension(currentFileName);
-        const currentWord = filteredWords[currentWordIdx];
-        container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
-    } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
-        const currentWord = filteredWords[currentWordIdx];
-        container.innerHTML = `🔗 External | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
-    } else if (allSentences.length > 0) {
-        container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
+    // 根据当前模式显示不同的信息
+    if (currentMode === "local") {
+        // Local 模式：只有选中文件并有单词时才显示详细信息
+        if (currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
+            const displayFile = removeFileExtension(currentFileName);
+            const currentWord = filteredWords[currentWordIdx];
+            container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        } else if (currentLevel && !currentFileName) {
+            container.innerHTML = `📁 已选择等级 ${currentLevel}，请选择一个文件开始复习`;
+        } else if (currentLevel && currentFileName && filteredWords.length === 0) {
+            container.innerHTML = `📁 文件 ${removeFileExtension(currentFileName)} 加载中或没有单词数据`;
+        } else {
+            container.innerHTML = `📁 Local 模式 - 请选择等级和文件`;
+        }
+    } else if (currentMode === "external") {
+        // External 模式：只有加载成功并有单词时才显示详细信息
+        if (currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
+            const currentWord = filteredWords[currentWordIdx];
+            const shortUrl = currentExternalUrl.length > 50 ? currentExternalUrl.substring(0, 47) + "..." : currentExternalUrl;
+            container.innerHTML = `🔗 ${shortUrl} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        } else if (currentExternalUrl && filteredWords.length === 0) {
+            container.innerHTML = `🔗 正在加载或解析文件: ${currentExternalUrl.substring(0, 60)}...`;
+        } else {
+            container.innerHTML = `🔗 External 模式 - 请输入 Excel 文件链接并点击 Load`;
+        }
     } else {
         container.innerHTML = '';
     }
@@ -985,7 +1000,7 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
- // ====================== 模式切换 ======================
+// ====================== 模式切换 ======================
 function toggleMode(mode) {
     const previousMode = currentMode;
     currentMode = mode;
@@ -1006,6 +1021,9 @@ function toggleMode(mode) {
         allWords = [];
         filteredWords = [];
         allSentences = [];
+        currentWordIdx = 0;
+        currentSentenceIdx = 0;
+        currentFileName = "";
         document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ 切换到 Local 模式，请选择等级和文件 ✨</p>';
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
@@ -1023,6 +1041,9 @@ function toggleMode(mode) {
         allWords = [];
         filteredWords = [];
         allSentences = [];
+        currentWordIdx = 0;
+        currentSentenceIdx = 0;
+        currentFileName = "";
         document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">🔗 切换到 External 模式，请输入 URL 并点击 Load 🔗</p>';
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
@@ -1166,7 +1187,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentMode !== "local") return;
         stopAllReading();
         
-        // 重置进度（单词位置和句子位置归零）
         resetProgress();
         
         const level = document.getElementById('levelSelect').value;
@@ -1196,7 +1216,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (currentMode !== "local") return;
         
-        // 重置进度（单词位置和句子位置归零）
         resetProgress();
         
         const fileSelect = document.getElementById('fileSelect');
@@ -1214,7 +1233,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     externalConfirm.addEventListener('click', async () => {
         if (currentMode !== "external") return;
         
-        // 重置进度（单词位置和句子位置归零）
         resetProgress();
         
         let url = document.getElementById('externalUrlInput').value.trim();
@@ -1239,6 +1257,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    // 设置默认模式为 local（toggleMode 内部会自动恢复该模式的状态）
     toggleMode("local");
 });
