@@ -113,6 +113,9 @@ function restoreDaySelectState(dayMode, dayNumber) {
 }
 
 async function applySavedState(savedState) {
+    console.log('🔄 applySavedState 开始执行');
+    console.log('传入的状态:', savedState);
+    console.log('当前 currentMode:', currentMode);
     console.log('🔄 Applying saved state:', savedState);
     
     if (savedState.mode === 'external') {
@@ -989,6 +992,8 @@ function clearSavedState() {
 
 // ====================== 初始化 ======================
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🟢 页面加载完成，开始初始化...');
+    
     initDaySelectToggle();
     
     if (synth.getVoices().length === 0) {
@@ -1078,16 +1083,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
+    // 先设置默认模式为 local
     toggleMode("local");
     
+    // 尝试恢复保存的状态
     const savedState = loadSavedState();
-    if (savedState.mode === 'local' && savedState.level) {
-        setTimeout(() => {
-            applySavedState(savedState);
+    console.log('📀 读取到的保存状态:', savedState);
+    
+    if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
+        console.log('🔄 尝试恢复本地模式状态...');
+        // 延迟执行，确保 DOM 完全加载
+        setTimeout(async () => {
+            await applySavedState(savedState);
         }, 500);
     } else if (savedState.mode === 'external' && savedState.externalUrl) {
-        setTimeout(() => {
-            applySavedState(savedState);
+        console.log('🔄 尝试恢复外部链接模式状态...');
+        setTimeout(async () => {
+            await applySavedState(savedState);
         }, 500);
+    } else {
+        console.log('ℹ️ 没有找到可恢复的保存状态');
     }
 });
