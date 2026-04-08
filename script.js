@@ -173,8 +173,8 @@ function toggleWordReading(word, buttonElement) {
     currentWordText = word;
     currentWordReadButton = buttonElement;
     
-    // 改变按钮文字和样式（不禁用按钮，保持可点击）
-    buttonElement.textContent = "⏹️ 停止";
+    // 改变按钮文字和样式（改为英文 Stop）
+    buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
@@ -219,8 +219,8 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     
-    // 改变按钮文字和样式（不禁用按钮，保持可点击）
-    buttonElement.textContent = "⏹️ 停止";
+    // 改变按钮文字和样式（改为英文 Stop）
+    buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
@@ -441,6 +441,18 @@ function filterByDay() {
     updateInfoTip();
 }
 
+// 获取所有单词中的最大天数
+function getMaxDay() {
+    if (allWords.length === 0) return 0;
+    let max = 0;
+    for (let i = 0; i < allWords.length; i++) {
+        if (allWords[i].day > max) {
+            max = allWords[i].day;
+        }
+    }
+    return max;
+}
+
 // ====================== 单词导航逻辑 ======================
 function showWord() {
     stopAllReading();
@@ -503,13 +515,17 @@ function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
     if (!container) return;
     
+    // 计算最大天数
+    const maxDay = getMaxDay();
+    const dayDisplay = maxDay > 0 ? `Day ${filteredWords[currentWordIdx]?.day}/${maxDay}` : `Day ${filteredWords[currentWordIdx]?.day}`;
+    
     if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
         const displayFile = removeFileExtension(currentFileName);
         const currentWord = filteredWords[currentWordIdx];
-        container.innerHTML = `${displayFile} | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
         const currentWord = filteredWords[currentWordIdx];
-        container.innerHTML = `🔗 External | Day ${currentWord.day} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        container.innerHTML = `🔗 External | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (allSentences.length > 0) {
         container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
     } else {
