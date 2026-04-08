@@ -174,7 +174,7 @@ function toggleWordReading(word, buttonElement) {
     currentWordReadButton = buttonElement;
     
     // 改变按钮文字和样式（改为英文 Stop）
-    buttonElement.textContent = "Stop";
+    buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
@@ -220,7 +220,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     currentSentenceReadButton = buttonElement;
     
     // 改变按钮文字和样式（改为英文 Stop）
-    buttonElement.textContent = "Stop";
+    buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
