@@ -1082,7 +1082,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    // ========== 关键修改：先读取保存的状态，再设置界面 ==========
+    // ========== 先读取保存的状态，再设置界面 ==========
     const savedState = loadSavedState();
     console.log('📀 读取到的保存状态:', savedState);
     
@@ -1135,20 +1135,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await loadSelectedFile(savedState.fileName);
                     await new Promise(resolve => setTimeout(resolve, 800));
                     
-                    if (savedState.dayMode === 'custom') {
-                        const dayNum = document.getElementById('dayNum');
-                        if (dayNum) dayNum.value = savedState.dayNumber;
+                    // ========== 修复 Day 筛选恢复 ==========
+                    const daySelect = document.getElementById('daySelect');
+                    const dayNum = document.getElementById('dayNum');
+                    
+                    console.log('恢复 Day 筛选 - dayMode:', savedState.dayMode, 'dayNumber:', savedState.dayNumber);
+                    
+                    if (daySelect && dayNum) {
+                        // 设置 Day 选择器的值
+                        daySelect.value = savedState.dayMode;
+                        
+                        // 触发 change 事件来更新输入框状态
+                        const changeEvent = new Event('change');
+                        daySelect.dispatchEvent(changeEvent);
+                        
+                        // 等待 UI 更新
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // 如果是 custom 模式，设置 dayNum 的值
+                        if (savedState.dayMode === 'custom') {
+                            dayNum.value = savedState.dayNumber;
+                            // 确保 dayNum 是数字输入框
+                            dayNum.type = 'number';
+                            dayNum.readOnly = false;
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        // 调用筛选函数
                         filterByDay();
                         await new Promise(resolve => setTimeout(resolve, 300));
                     }
                     
-                    if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-                        currentWordIdx = savedState.wordIndex;
+                    // 恢复单词位置
+                    if (filteredWords.length > 0) {
+                        if (savedState.wordIndex < filteredWords.length) {
+                            currentWordIdx = savedState.wordIndex;
+                        } else {
+                            console.log('⚠️ 保存的索引超出范围，重置为第一个单词');
+                            currentWordIdx = 0;
+                        }
                         showWord();
-                        console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
+                        console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1} / ${filteredWords.length}`);
                     } else {
-                        console.log('⚠️ 无法恢复单词位置，单词数量:', filteredWords.length, '保存的索引:', savedState.wordIndex);
+                        console.log('⚠️ 没有单词可显示');
                     }
+                    
+                    // 恢复句子位置
+                    if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
+                        currentSentenceIdx = savedState.sentenceIndex;
+                        updateSentenceUI();
+                        console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1}`);
+                    }
+                    
                 } else {
                     console.log('⚠️ 保存的文件不存在于列表中:', savedState.fileName);
                 }
@@ -1159,6 +1197,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(async () => {
             await loadFromExternalUrl(savedState.externalUrl);
             await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // 恢复 Day 筛选
+            const daySelect = document.getElementById('daySelect');
+            const dayNum = document.getElementById('dayNum');
+            
+            if (daySelect && dayNum && savedState.dayMode === 'custom') {
+                daySelect.value = savedState.dayMode;
+                const changeEvent = new Event('change');
+                daySelect.dispatchEvent(changeEvent);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                dayNum.value = savedState.dayNumber;
+                filterByDay();
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
             if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
                 currentWordIdx = savedState.wordIndex;
                 showWord();
