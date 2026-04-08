@@ -13,11 +13,15 @@ let currentMode = "local";   // 当前模式: local 或 external
 
 const synth = window.speechSynthesis; // 语音合成API
 
-// 朗读相关定时器
+// 朗读相关变量
 let wordReadTimer = null;
 let sentenceReadTimer = null;
-let isSentenceReading = false;
-let currentReadButton = null;
+let isWordReading = false;      // 单词是否正在朗读
+let isSentenceReading = false;  // 句子是否正在朗读
+let currentWordReadButton = null;   // 当前单词朗读按钮
+let currentSentenceReadButton = null; // 当前句子朗读按钮
+let currentWordText = "";       // 正在朗读的单词文本
+let currentSentenceText = "";   // 正在朗读的句子文本
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -113,74 +117,146 @@ function speakTextWithCallback(text, onEnd, rate = 0.8) {
     });
 }
 
-function read3Times(word) {
-    if (wordReadTimer) clearInterval(wordReadTimer);
-    synth.cancel();
-    let count = 0;
-    
-    function speakNext() {
-        if (count >= 3) return;
-        speakTextWithCallback(word, () => {
-            count++;
-            if (count < 3) speakNext();
-        }, 0.8);
+// 停止单词朗读
+function stopWordReading() {
+    if (wordReadTimer) {
+        clearInterval(wordReadTimer);
+        wordReadTimer = null;
     }
-    speakNext();
+    if (isWordReading) {
+        synth.cancel();
+        isWordReading = false;
+        if (currentWordReadButton) {
+            currentWordReadButton.textContent = "🔊 Read 3x";
+            currentWordReadButton.classList.remove('reading-disabled');
+            currentWordReadButton.disabled = false;
+            currentWordReadButton = null;
+        }
+        currentWordText = "";
+        console.log('单词朗读已停止');
+    }
 }
 
-function readSentence3Times(sentenceText, buttonElement) {
-    if (!sentenceText) return;
-    if (sentenceReadTimer) clearInterval(sentenceReadTimer);
+// 停止句子朗读
+function stopSentenceReading() {
+    if (sentenceReadTimer) {
+        clearInterval(sentenceReadTimer);
+        sentenceReadTimer = null;
+    }
     if (isSentenceReading) {
         synth.cancel();
         isSentenceReading = false;
-        if (currentReadButton) {
-            currentReadButton.classList.remove('reading-disabled');
-            currentReadButton.disabled = false;
+        if (currentSentenceReadButton) {
+            currentSentenceReadButton.textContent = "🔊 Read 3x";
+            currentSentenceReadButton.classList.remove('reading-disabled');
+            currentSentenceReadButton.disabled = false;
+            currentSentenceReadButton = null;
         }
+        currentSentenceText = "";
+        console.log('句子朗读已停止');
+    }
+}
+
+// 停止所有朗读
+function stopAllReading() {
+    stopWordReading();
+    stopSentenceReading();
+}
+
+// 单词朗读（支持停止）
+function toggleWordReading(word, buttonElement) {
+    // 如果正在朗读同一个单词，则停止
+    if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
+        stopWordReading();
+        return;
     }
     
-    currentReadButton = buttonElement;
-    if (currentReadButton) {
-        currentReadButton.classList.add('reading-disabled');
-        currentReadButton.disabled = true;
+    // 如果正在朗读其他内容，先停止
+    if (isWordReading || isSentenceReading) {
+        stopAllReading();
     }
+    
+    // 开始新的朗读
+    stopWordReading(); // 确保清理干净
+    currentWordText = word;
+    currentWordReadButton = buttonElement;
+    
+    // 改变按钮文字和样式
+    buttonElement.textContent = "⏹️ 停止";
+    buttonElement.classList.add('reading-disabled');
+    buttonElement.disabled = false; // 允许点击停止
+    
+    let readCount = 0;
+    isWordReading = true;
+    
+    function speakNext() {
+        if (!isWordReading) return;
+        if (readCount >= 3) {
+            // 朗读完成，恢复按钮
+            stopWordReading();
+            return;
+        }
+        speakTextWithCallback(word, () => {
+            if (!isWordReading) return;
+            readCount++;
+            if (readCount < 3) {
+                speakNext();
+            } else {
+                // 3次完成，恢复按钮
+                stopWordReading();
+            }
+        }, 0.8);
+    }
+    
+    synth.cancel();
+    speakNext();
+}
+
+// 句子朗读（支持停止）
+function toggleSentenceReading(sentenceText, buttonElement) {
+    // 如果正在朗读同一个句子，则停止
+    if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
+        stopSentenceReading();
+        return;
+    }
+    
+    // 如果正在朗读其他内容，先停止
+    if (isWordReading || isSentenceReading) {
+        stopAllReading();
+    }
+    
+    // 开始新的朗读
+    stopSentenceReading(); // 确保清理干净
+    currentSentenceText = sentenceText;
+    currentSentenceReadButton = buttonElement;
+    
+    // 改变按钮文字和样式
+    buttonElement.textContent = "⏹️ 停止";
+    buttonElement.classList.add('reading-disabled');
+    buttonElement.disabled = false; // 允许点击停止
     
     let readCount = 0;
     isSentenceReading = true;
     
     function speakNext() {
+        if (!isSentenceReading) return;
         if (readCount >= 3) {
-            if (currentReadButton) {
-                currentReadButton.classList.remove('reading-disabled');
-                currentReadButton.disabled = false;
-            }
-            isSentenceReading = false;
-            currentReadButton = null;
+            stopSentenceReading();
             return;
         }
         speakTextWithCallback(sentenceText, () => {
+            if (!isSentenceReading) return;
             readCount++;
-            speakNext();
+            if (readCount < 3) {
+                speakNext();
+            } else {
+                stopSentenceReading();
+            }
         }, 0.8);
     }
     
     synth.cancel();
     speakNext();
-}
-
-function stopAllReading() {
-    synth.cancel();
-    if (wordReadTimer) clearInterval(wordReadTimer);
-    if (sentenceReadTimer) clearInterval(sentenceReadTimer);
-    if (isSentenceReading) {
-        isSentenceReading = false;
-        if (currentReadButton) {
-            currentReadButton.classList.remove('reading-disabled');
-            currentReadButton.disabled = false;
-            currentReadButton = null;
-        }
-    }
 }
 
 // ====================== 数据加载逻辑 ======================
@@ -434,7 +510,8 @@ function showWord() {
         if (span) span.style.display = "block";
     });
     
-    document.getElementById("btnReadWord")?.addEventListener("click", () => read3Times(w.word));
+    const readBtn = document.getElementById("btnReadWord");
+    readBtn?.addEventListener("click", () => toggleWordReading(w.word, readBtn));
     
     document.getElementById("btnPrevWord")?.addEventListener("click", () => {
         if (currentWordIdx > 0) {
@@ -762,10 +839,15 @@ function attachSentenceEvents() {
     const allBtn = document.getElementById("showAllSentencesBtn");
     
     if (showBtn) showBtn.onclick = () => showCurrentSentence();
-    if (readBtn) readBtn.onclick = () => {
-        const currentSent = allSentences[currentSentenceIdx];
-        if (currentSent) readSentence3Times(currentSent.sentence_en, readBtn);
-    };
+    if (readBtn) {
+        // 移除原有监听，重新绑定
+        const newReadBtn = readBtn.cloneNode(true);
+        readBtn.parentNode.replaceChild(newReadBtn, readBtn);
+        newReadBtn.onclick = () => {
+            const currentSent = allSentences[currentSentenceIdx];
+            if (currentSent) toggleSentenceReading(currentSent.sentence_en, newReadBtn);
+        };
+    }
     if (prevBtn) prevBtn.onclick = () => prevSentence();
     if (nextBtn) nextBtn.onclick = () => nextSentence();
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
