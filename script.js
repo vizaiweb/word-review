@@ -1195,7 +1195,7 @@ if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
 } else if (savedState.mode === 'external' && savedState.externalUrl) {
     console.log('🔄 发现保存的外部链接状态，准备恢复...');
     
-    // ========== 新增：先将 URL 填入文本框 ==========
+    // 先将 URL 填入文本框
     const urlInput = document.getElementById('externalUrlInput');
     if (urlInput) {
         urlInput.value = savedState.externalUrl;
