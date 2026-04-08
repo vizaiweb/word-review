@@ -165,8 +165,11 @@ function stopAllReading() {
 
 // 单词朗读（支持停止）
 function toggleWordReading(word, buttonElement) {
+    console.log('toggleWordReading 被调用, word:', word, 'isWordReading:', isWordReading, 'currentWordText:', currentWordText);
+    
     // 如果正在朗读同一个单词，则停止
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
+        console.log('停止单词朗读');
         stopWordReading();
         return;
     }
@@ -190,19 +193,22 @@ function toggleWordReading(word, buttonElement) {
     isWordReading = true;
     
     function speakNext() {
-        if (!isWordReading) return;
+        if (!isWordReading) {
+            console.log('朗读被中断');
+            return;
+        }
         if (readCount >= 3) {
-            // 朗读完成，恢复按钮
+            console.log('3次朗读完成');
             stopWordReading();
             return;
         }
+        console.log('朗读第', readCount + 1, '次');
         speakTextWithCallback(word, () => {
             if (!isWordReading) return;
             readCount++;
             if (readCount < 3) {
                 speakNext();
             } else {
-                // 3次完成，恢复按钮
                 stopWordReading();
             }
         }, 0.8);
@@ -214,8 +220,11 @@ function toggleWordReading(word, buttonElement) {
 
 // 句子朗读（支持停止）
 function toggleSentenceReading(sentenceText, buttonElement) {
+    console.log('toggleSentenceReading 被调用, sentenceText:', sentenceText, 'isSentenceReading:', isSentenceReading);
+    
     // 如果正在朗读同一个句子，则停止
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
+        console.log('停止句子朗读');
         stopSentenceReading();
         return;
     }
@@ -233,7 +242,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     // 改变按钮文字和样式
     buttonElement.textContent = "⏹️ 停止";
     buttonElement.classList.add('reading-disabled');
-    buttonElement.disabled = false; // 允许点击停止
+    buttonElement.disabled = false;
     
     let readCount = 0;
     isSentenceReading = true;
@@ -505,27 +514,45 @@ function showWord() {
     
     updateInfoTip();
     
-    document.getElementById("btnShowWord")?.addEventListener("click", () => {
-        const span = document.getElementById("currentWordSpan");
-        if (span) span.style.display = "block";
-    });
+    // 绑定显示单词按钮
+    const showBtn = document.getElementById("btnShowWord");
+    if (showBtn) {
+        showBtn.onclick = () => {
+            const span = document.getElementById("currentWordSpan");
+            if (span) span.style.display = "block";
+        };
+    }
     
+    // 绑定朗读按钮
     const readBtn = document.getElementById("btnReadWord");
-    readBtn?.addEventListener("click", () => toggleWordReading(w.word, readBtn));
+    if (readBtn) {
+        // 移除旧监听器，避免重复绑定
+        const newReadBtn = readBtn.cloneNode(true);
+        readBtn.parentNode.replaceChild(newReadBtn, readBtn);
+        newReadBtn.onclick = () => toggleWordReading(w.word, newReadBtn);
+    }
     
-    document.getElementById("btnPrevWord")?.addEventListener("click", () => {
-        if (currentWordIdx > 0) {
-            currentWordIdx--;
-            showWord();
-        }
-    });
+    // 绑定上一个按钮
+    const prevBtn = document.getElementById("btnPrevWord");
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            if (currentWordIdx > 0) {
+                currentWordIdx--;
+                showWord();
+            }
+        };
+    }
     
-    document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx + 1 <= filteredWords.length) {
-            currentWordIdx++;
-            showWord();
-        }
-    });
+    // 绑定下一个按钮
+    const nextBtn = document.getElementById("btnNextWord");
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            if (currentWordIdx + 1 <= filteredWords.length) {
+                currentWordIdx++;
+                showWord();
+            }
+        };
+    }
 }
 
 function updateInfoTip() {
@@ -838,9 +865,12 @@ function attachSentenceEvents() {
     const nextBtn = document.getElementById("nextSentenceBtn");
     const allBtn = document.getElementById("showAllSentencesBtn");
     
-    if (showBtn) showBtn.onclick = () => showCurrentSentence();
+    if (showBtn) {
+        showBtn.onclick = () => showCurrentSentence();
+    }
+    
     if (readBtn) {
-        // 移除原有监听，重新绑定
+        // 移除旧监听器，避免重复绑定
         const newReadBtn = readBtn.cloneNode(true);
         readBtn.parentNode.replaceChild(newReadBtn, readBtn);
         newReadBtn.onclick = () => {
@@ -848,9 +878,18 @@ function attachSentenceEvents() {
             if (currentSent) toggleSentenceReading(currentSent.sentence_en, newReadBtn);
         };
     }
-    if (prevBtn) prevBtn.onclick = () => prevSentence();
-    if (nextBtn) nextBtn.onclick = () => nextSentence();
-    if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
+    
+    if (prevBtn) {
+        prevBtn.onclick = () => prevSentence();
+    }
+    
+    if (nextBtn) {
+        nextBtn.onclick = () => nextSentence();
+    }
+    
+    if (allBtn) {
+        allBtn.onclick = () => showAllSentencesPopup();
+    }
 }
 
 // ====================== 模式切换 ======================
