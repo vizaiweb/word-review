@@ -985,7 +985,7 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
-// ====================== 模式切换 ======================
+ // ====================== 模式切换 ======================
 function toggleMode(mode) {
     const previousMode = currentMode;
     currentMode = mode;
@@ -1001,12 +1001,33 @@ function toggleMode(mode) {
         levelRow.classList.remove('hidden-level');
         toggleBtn.textContent = "📁 Built-in DB";
         toggleBtn.classList.add('active');
+        
+        // 清空当前显示的句子和单词数据
+        allWords = [];
+        filteredWords = [];
+        allSentences = [];
+        document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ 切换到 Local 模式，请选择等级和文件 ✨</p>';
+        document.getElementById("sentenceArea").style.display = 'none';
+        document.getElementById("showAllBtn").style.display = 'none';
+        document.getElementById("dayRow").style.display = 'none';
+        document.getElementById("infoTipContainer").innerHTML = '';
+        
     } else {
         fileRow.style.display = 'none';
         externalRow.style.display = 'flex';
         levelRow.classList.add('hidden-level');
         toggleBtn.textContent = "🌐 External Link";
         toggleBtn.classList.remove('active');
+        
+        // 清空当前显示的句子和单词数据
+        allWords = [];
+        filteredWords = [];
+        allSentences = [];
+        document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">🔗 切换到 External 模式，请输入 URL 并点击 Load 🔗</p>';
+        document.getElementById("sentenceArea").style.display = 'none';
+        document.getElementById("showAllBtn").style.display = 'none';
+        document.getElementById("dayRow").style.display = 'none';
+        document.getElementById("infoTipContainer").innerHTML = '';
     }
     
     saveCurrentState();
