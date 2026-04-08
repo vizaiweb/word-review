@@ -1222,11 +1222,25 @@ if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
             await new Promise(resolve => setTimeout(resolve, 300));
         }
         
+        // 恢复单词位置
         if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
             currentWordIdx = savedState.wordIndex;
             showWord();
             console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
         }
+        
+        // ========== 新增：恢复句子位置 ==========
+        if (allSentences.length > 0 && savedState.sentenceIndex < allSentences.length) {
+            currentSentenceIdx = savedState.sentenceIndex;
+            updateSentenceUI();
+            console.log(`✅ 自动恢复到句子 #${currentSentenceIdx + 1}`);
+        } else if (allSentences.length > 0) {
+            // 如果保存的索引无效，重置为第一个
+            currentSentenceIdx = 0;
+            updateSentenceUI();
+            console.log(`ℹ️ 句子索引无效，重置为第1句`);
+        }
+        
     }, 1000);
 } else {
     console.log('ℹ️ 没有找到可恢复的保存状态');
