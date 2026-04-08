@@ -116,7 +116,6 @@ async function applySavedState(savedState) {
     console.log('🔄 applySavedState 开始执行');
     console.log('传入的状态:', savedState);
     console.log('当前 currentMode:', currentMode);
-    console.log('🔄 Applying saved state:', savedState);
     
     if (savedState.mode === 'external') {
         const toggleBtn = document.getElementById('modeToggleBtn');
@@ -1086,71 +1085,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 先设置默认模式为 local
     toggleMode("local");
     
-   // 替换原来的恢复代码
-const savedState = loadSavedState();
-console.log('📀 读取到的保存状态:', savedState);
-
-if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
-    console.log('🔄 发现保存的状态，准备恢复...');
-    // 延迟更长时间，确保所有东西都加载完
-    setTimeout(async () => {
-        console.log('开始执行恢复...');
-        // 先设置等级
-        const levelSelect = document.getElementById('levelSelect');
-        if (levelSelect) {
-            levelSelect.value = savedState.level;
-        }
-        currentLevel = savedState.level;
-        
-        // 加载文件列表
-        await loadFileListByLevel(savedState.level);
-        
-        // 等待一下让文件列表填充
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 选择文件
-        const fileSelect = document.getElementById('fileSelect');
-        if (fileSelect && savedState.fileName) {
-            // 检查文件是否存在
-            const fileExists = Array.from(fileSelect.options).some(opt => opt.value === savedState.fileName);
-            if (fileExists) {
-                fileSelect.value = savedState.fileName;
-                await loadSelectedFile(savedState.fileName);
-                
-                // 等待文件加载完成
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                // 恢复 Day 筛选
-                if (savedState.dayMode === 'custom') {
-                    const dayNum = document.getElementById('dayNum');
-                    if (dayNum) dayNum.value = savedState.dayNumber;
-                    filterByDay();
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                }
-                
-                // 恢复单词位置
-                if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-                    currentWordIdx = savedState.wordIndex;
-                    showWord();
-                    console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
-                } else {
-                    console.log('⚠️ 无法恢复单词位置，单词数量:', filteredWords.length, '保存的索引:', savedState.wordIndex);
-                }
-            } else {
-                console.log('⚠️ 保存的文件不存在于列表中:', savedState.fileName);
+    // 恢复保存的状态
+    const savedState = loadSavedState();
+    console.log('📀 读取到的保存状态:', savedState);
+    
+    if (savedState.mode === 'local' && savedState.level && savedState.fileName) {
+        console.log('🔄 发现保存的状态，准备恢复...');
+        setTimeout(async () => {
+            console.log('开始执行恢复...');
+            const levelSelect = document.getElementById('levelSelect');
+            if (levelSelect) {
+                levelSelect.value = savedState.level;
             }
-        }
-    }, 1000); // 延迟 1 秒
-} else if (savedState.mode === 'external' && savedState.externalUrl) {
-    console.log('🔄 发现保存的外部链接状态，准备恢复...');
-    setTimeout(async () => {
-        await loadFromExternalUrl(savedState.externalUrl);
-        await new Promise(resolve => setTimeout(resolve, 800));
-        if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
-            currentWordIdx = savedState.wordIndex;
-            showWord();
-        }
-    }, 1000);
-} else {
-    console.log('ℹ️ 没有找到可恢复的保存状态');
-}
+            currentLevel = savedState.level;
+            
+            await loadFileListByLevel(savedState.level);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const fileSelect = document.getElementById('fileSelect');
+            if (fileSelect && savedState.fileName) {
+                const fileExists = Array.from(fileSelect.options).some(opt => opt.value === savedState.fileName);
+                if (fileExists) {
+                    fileSelect.value = savedState.fileName;
+                    await loadSelectedFile(savedState.fileName);
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    
+                    if (savedState.dayMode === 'custom') {
+                        const dayNum = document.getElementById('dayNum');
+                        if (dayNum) dayNum.value = savedState.dayNumber;
+                        filterByDay();
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    
+                    if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
+                        currentWordIdx = savedState.wordIndex;
+                        showWord();
+                        console.log(`✅ 自动恢复到单词 #${currentWordIdx + 1}`);
+                    } else {
+                        console.log('⚠️ 无法恢复单词位置，单词数量:', filteredWords.length, '保存的索引:', savedState.wordIndex);
+                    }
+                } else {
+                    console.log('⚠️ 保存的文件不存在于列表中:', savedState.fileName);
+                }
+            }
+        }, 1000);
+    } else if (savedState.mode === 'external' && savedState.externalUrl) {
+        console.log('🔄 发现保存的外部链接状态，准备恢复...');
+        setTimeout(async () => {
+            await loadFromExternalUrl(savedState.externalUrl);
+            await new Promise(resolve => setTimeout(resolve, 800));
+            if (filteredWords.length > 0 && savedState.wordIndex < filteredWords.length) {
+                currentWordIdx = savedState.wordIndex;
+                showWord();
+            }
+        }, 1000);
+    } else {
+        console.log('ℹ️ 没有找到可恢复的保存状态');
+    }
+});
