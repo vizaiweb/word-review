@@ -98,89 +98,52 @@ function loadSavedState() {
     }
 }
 
-function resetLocalStateToInitial() {
-    console.log('🔄 重置 Local 模式状态至初始值');
-    // 重置全局变量
-    allWords = [];
-    filteredWords = [];
-    currentWordIdx = 0;
-    currentFileName = "";
-    currentLevel = "";
-    allSentences = [];
-    currentSentenceIdx = 0;
-    currentFileNameForSentences = "";
+// ====================== 重置进度（不清空基本功能） ======================
+function resetProgress() {
+    console.log('🔄 重置进度（单词位置和句子位置归零）');
     
-    // 重置 UI
+    // 重置索引
+    currentWordIdx = 0;
+    currentSentenceIdx = 0;
+    
+    // 清空当前显示的单词和句子内容
     const wordDiv = document.getElementById("wordContent");
     if (wordDiv) {
-        wordDiv.innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
+        wordDiv.innerHTML = '<p style="color:#64748b;">✨ 正在加载，请稍候...</p>';
     }
-    document.getElementById("sentenceArea").style.display = 'none';
-    document.getElementById("showAllBtn").style.display = 'none';
-    document.getElementById("dayRow").style.display = 'none';
-    document.getElementById("infoTipContainer").innerHTML = '';
     
-    // 重置 Day 选择器
+    // 隐藏句子区域（会在加载完成后重新显示）
+    const sentenceArea = document.getElementById("sentenceArea");
+    if (sentenceArea) {
+        sentenceArea.style.display = 'none';
+    }
+    
+    // 隐藏显示所有单词按钮
+    const showAllBtn = document.getElementById("showAllBtn");
+    if (showAllBtn) {
+        showAllBtn.style.display = 'none';
+    }
+    
+    // 重置 Day 选择器为 All
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
-    if (daySelect) daySelect.value = 'all';
+    if (daySelect) {
+        daySelect.value = 'all';
+        // 触发 change 事件更新输入框状态
+        const changeEvent = new Event('change');
+        daySelect.dispatchEvent(changeEvent);
+    }
     if (dayNum) {
         dayNum.type = 'text';
         dayNum.value = '--';
         dayNum.readOnly = true;
     }
     
-    // 重置文件选择器
-    const fileSelect = document.getElementById('fileSelect');
-    if (fileSelect) {
-        fileSelect.innerHTML = '<option value="">Loading...</option>';
+    // 清空提示信息
+    const infoTip = document.getElementById("infoTipContainer");
+    if (infoTip) {
+        infoTip.innerHTML = '';
     }
-    
-    // 重置等级选择器
-    const levelSelect = document.getElementById('levelSelect');
-    if (levelSelect) levelSelect.value = '';
-    
-    // 保存重置后的状态
-    saveCurrentState();
-}
-
-function resetExternalStateToInitial() {
-    console.log('🔄 重置 External 模式状态至初始值');
-    // 重置全局变量
-    allWords = [];
-    filteredWords = [];
-    currentWordIdx = 0;
-    currentFileName = "";
-    currentLevel = "";
-    allSentences = [];
-    currentSentenceIdx = 0;
-    currentFileNameForSentences = "";
-    currentExternalUrl = "";
-    
-    // 重置 UI
-    const wordDiv = document.getElementById("wordContent");
-    if (wordDiv) {
-        wordDiv.innerHTML = '<p style="color:#64748b;">🔗 Enter URL and click Load</p>';
-    }
-    document.getElementById("sentenceArea").style.display = 'none';
-    document.getElementById("showAllBtn").style.display = 'none';
-    document.getElementById("dayRow").style.display = 'none';
-    document.getElementById("infoTipContainer").innerHTML = '';
-    
-    // 重置 Day 选择器
-    const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    if (daySelect) daySelect.value = 'all';
-    if (dayNum) {
-        dayNum.type = 'text';
-        dayNum.value = '--';
-        dayNum.readOnly = true;
-    }
-    
-    // 注意：不重置 URL 输入框的内容，让用户可以看到之前输入的 URL
-    
-    // 保存重置后的状态
-    saveCurrentState();
 }
 
 function restoreDaySelectState(dayMode, dayNumber) {
@@ -1182,8 +1145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentMode !== "local") return;
         stopAllReading();
         
-        // 重置 Local 模式状态至初始值
-        resetLocalStateToInitial();
+        // 重置进度（单词位置和句子位置归零）
+        resetProgress();
         
         const level = document.getElementById('levelSelect').value;
         if (!level) {
@@ -1212,8 +1175,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (currentMode !== "local") return;
         
-        // 重置 Local 模式状态至初始值（但保留等级选择）
-        resetLocalStateToInitial();
+        // 重置进度（单词位置和句子位置归零）
+        resetProgress();
         
         const fileSelect = document.getElementById('fileSelect');
         const selected = fileSelect.value;
@@ -1230,8 +1193,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     externalConfirm.addEventListener('click', async () => {
         if (currentMode !== "external") return;
         
-        // 重置 External 模式状态至初始值
-        resetExternalStateToInitial();
+        // 重置进度（单词位置和句子位置归零）
+        resetProgress();
         
         let url = document.getElementById('externalUrlInput').value.trim();
         if (!url) {
