@@ -509,7 +509,7 @@ function showWord() {
     }
     
     if (currentWordIdx >= filteredWords.length) {
-        container.innerHTML = '<p style="color:#22c55e; font-size:24px;">🎉 Practice Complete!</p>';
+        container.innerHTML = '<p style="color:#22c55e; font-size:24px; font-weight:bold;">🎉 Practice Complete!</p>';
         updateInfoTip();
         return;
     }
@@ -518,13 +518,13 @@ function showWord() {
     const isFirst = currentWordIdx === 0;
     
     container.innerHTML = `
-        <div class="meaning">💡 ${w.meaning}</div>
-        <div class="word" id="currentWordSpan" style="display:none;">${w.word.toUpperCase()}</div>
+        <div class="meaning-box">💡 ${w.meaning}</div>
+        <div class="word-text" id="currentWordSpan" style="visibility:hidden;">${w.word.toUpperCase()}</div>
         <div class="btn-group">
-            <button class="btn-show" id="btnShowWord">👀 Show Word</button>
-            <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
-            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
-            <button class="btn-next" id="btnNextWord">➡️ Next</button>
+            <button class="btn-act btn-show" id="btnShowWord">👀 Show</button>
+            <button class="btn-act btn-read" id="btnReadWord">🔊 Read 3x</button>
+            <button class="btn-act btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Prev</button>
+            <button class="btn-act btn-next" id="btnNextWord">Next ➡️</button>
         </div>
     `;
     
@@ -532,26 +532,18 @@ function showWord() {
     
     document.getElementById("btnShowWord")?.addEventListener("click", () => {
         const span = document.getElementById("currentWordSpan");
-        if (span) span.style.display = "block";
+        if (span) span.style.visibility = "visible";
     });
     
     const readBtn = document.getElementById("btnReadWord");
-    if (readBtn) {
-        readBtn.onclick = () => toggleWordReading(w.word, readBtn);
-    }
+    if (readBtn) readBtn.onclick = () => toggleWordReading(w.word, readBtn);
     
     document.getElementById("btnPrevWord")?.addEventListener("click", () => {
-        if (currentWordIdx > 0) {
-            currentWordIdx--;
-            showWord();
-        }
+        if (currentWordIdx > 0) { currentWordIdx--; showWord(); }
     });
     
     document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx + 1 <= filteredWords.length) {
-            currentWordIdx++;
-            showWord();
-        }
+        if (currentWordIdx < filteredWords.length) { currentWordIdx++; showWord(); }
     });
 }
 
