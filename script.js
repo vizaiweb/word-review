@@ -199,7 +199,7 @@ function startWordReading(word, buttonElement) {
     currentWordText = word;
     currentWordReadButton = buttonElement;
     
-    buttonElement.textContent = "Stop";
+    buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
@@ -258,7 +258,7 @@ function startSentenceReading(sentenceText, buttonElement) {
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     
-    buttonElement.textContent = "Stop";
+    buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
