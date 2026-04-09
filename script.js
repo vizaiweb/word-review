@@ -221,7 +221,7 @@ function startWordReading(word, buttonElement) {
     currentWordReadButton = buttonElement;
     
     // 改变按钮文字和样式
-    buttonElement.textContent = "⏹️ Stop";
+    buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
@@ -276,7 +276,7 @@ function startSentenceReading(sentenceText, buttonElement) {
     currentSentenceReadButton = buttonElement;
     
     // 改变按钮文字和样式
-    buttonElement.textContent = "⏹️ Stop";
+    buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
     
