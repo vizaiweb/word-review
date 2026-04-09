@@ -22,7 +22,8 @@ let currentWordReadButton = null;
 let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
-let isStopping = false;  // 新增：防止停止过程中重复触发
+let isStopping = false;
+let pendingStart = null;
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -115,28 +116,6 @@ function speakTextWithCallback(text, onEnd, rate = 0.8) {
     });
 }
 
-// 强制停止所有语音（手机兼容版）
-function forceStopSpeech() {
-    // 立即取消所有正在进行的语音
-    synth.cancel();
-    
-    // 对于手机浏览器，需要额外清空可能存在的队列
-    // 创建一个空的 utterance 并立即取消，强制刷新语音队列
-    const emptyUtterance = new SpeechSynthesisUtterance('');
-    synth.speak(emptyUtterance);
-    synth.cancel();
-    
-    // 重置所有朗读状态
-    if (wordReadTimer) {
-        clearInterval(wordReadTimer);
-        wordReadTimer = null;
-    }
-    if (sentenceReadTimer) {
-        clearInterval(sentenceReadTimer);
-        sentenceReadTimer = null;
-    }
-}
-
 // 停止单词朗读
 function stopWordReading() {
     if (isStopping) return;
@@ -146,18 +125,17 @@ function stopWordReading() {
         clearInterval(wordReadTimer);
         wordReadTimer = null;
     }
-    if (isWordReading) {
-        forceStopSpeech();
-        isWordReading = false;
-        if (currentWordReadButton) {
-            currentWordReadButton.textContent = "🔊 Read 3x";
-            currentWordReadButton.classList.remove('reading-disabled');
-            currentWordReadButton = null;
-        }
-        currentWordText = "";
-    }
     
-    // 重置停止标志
+    synth.cancel();
+    
+    isWordReading = false;
+    if (currentWordReadButton) {
+        currentWordReadButton.textContent = "🔊 Read 3x";
+        currentWordReadButton.classList.remove('reading-disabled');
+        currentWordReadButton = null;
+    }
+    currentWordText = "";
+    
     setTimeout(() => {
         isStopping = false;
     }, 50);
@@ -172,16 +150,16 @@ function stopSentenceReading() {
         clearInterval(sentenceReadTimer);
         sentenceReadTimer = null;
     }
-    if (isSentenceReading) {
-        forceStopSpeech();
-        isSentenceReading = false;
-        if (currentSentenceReadButton) {
-            currentSentenceReadButton.textContent = "🔊 Read 3x";
-            currentSentenceReadButton.classList.remove('reading-disabled');
-            currentSentenceReadButton = null;
-        }
-        currentSentenceText = "";
+    
+    synth.cancel();
+    
+    isSentenceReading = false;
+    if (currentSentenceReadButton) {
+        currentSentenceReadButton.textContent = "🔊 Read 3x";
+        currentSentenceReadButton.classList.remove('reading-disabled');
+        currentSentenceReadButton = null;
     }
+    currentSentenceText = "";
     
     setTimeout(() => {
         isStopping = false;
@@ -194,21 +172,18 @@ function stopAllReading() {
     stopSentenceReading();
 }
 
-// 单词朗读（支持停止）- 按钮保持可点击
+// 单词朗读
 function toggleWordReading(word, buttonElement) {
-    // 如果正在朗读同一个单词，则停止
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
         stopWordReading();
         return;
     }
     
-    // 如果正在朗读其他内容，先停止
     if (isWordReading || isSentenceReading) {
         stopAllReading();
-        // 给手机浏览器一点时间完成停止
         setTimeout(() => {
             startWordReading(word, buttonElement);
-        }, 100);
+        }, 150);
         return;
     }
     
@@ -216,11 +191,14 @@ function toggleWordReading(word, buttonElement) {
 }
 
 function startWordReading(word, buttonElement) {
-    // 开始新的朗读
+    if (pendingStart) {
+        clearTimeout(pendingStart);
+        pendingStart = null;
+    }
+    
     currentWordText = word;
     currentWordReadButton = buttonElement;
     
-    // 改变按钮文字和样式
     buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
@@ -245,25 +223,26 @@ function startWordReading(word, buttonElement) {
         }, 0.8);
     }
     
-    // 确保先停止之前的语音
-    forceStopSpeech();
-    speakNext();
+    synth.cancel();
+    setTimeout(() => {
+        if (isWordReading) {
+            speakNext();
+        }
+    }, 10);
 }
 
-// 句子朗读（支持停止）- 按钮保持可点击
+// 句子朗读
 function toggleSentenceReading(sentenceText, buttonElement) {
-    // 如果正在朗读同一个句子，则停止
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
         stopSentenceReading();
         return;
     }
     
-    // 如果正在朗读其他内容，先停止
     if (isWordReading || isSentenceReading) {
         stopAllReading();
         setTimeout(() => {
             startSentenceReading(sentenceText, buttonElement);
-        }, 100);
+        }, 150);
         return;
     }
     
@@ -271,11 +250,14 @@ function toggleSentenceReading(sentenceText, buttonElement) {
 }
 
 function startSentenceReading(sentenceText, buttonElement) {
-    // 开始新的朗读
+    if (pendingStart) {
+        clearTimeout(pendingStart);
+        pendingStart = null;
+    }
+    
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     
-    // 改变按钮文字和样式
     buttonElement.textContent = "Stop";
     buttonElement.classList.add('reading-disabled');
     buttonElement.disabled = false;
@@ -300,8 +282,12 @@ function startSentenceReading(sentenceText, buttonElement) {
         }, 0.8);
     }
     
-    forceStopSpeech();
-    speakNext();
+    synth.cancel();
+    setTimeout(() => {
+        if (isSentenceReading) {
+            speakNext();
+        }
+    }, 10);
 }
 
 // ====================== 数据加载逻辑 ======================
@@ -571,7 +557,6 @@ function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
     if (!container) return;
     
-    // 计算最大天数
     const maxDay = getMaxDay();
     const dayDisplay = maxDay > 0 && filteredWords[currentWordIdx] ? `Day ${filteredWords[currentWordIdx].day}/${maxDay}` : `Day ${filteredWords[currentWordIdx]?.day}`;
     
@@ -610,7 +595,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -690,7 +675,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><td><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
