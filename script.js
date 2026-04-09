@@ -22,7 +22,7 @@ let currentWordReadButton = null;
 let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
-let isStopping = false; // 状态锁：防止手機版 cancel 觸發 onend 回調
+let isStopping = false;
 let pendingStart = null;
 
 // ====================== 动态分支路径工具 ======================
@@ -75,7 +75,7 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 语音朗读功能 (核心修復版) ======================
+// ====================== 语音朗读功能 ======================
 function getVoices() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
@@ -92,7 +92,7 @@ function getVoices() {
 }
 
 function speakTextWithCallback(text, onEnd, rate = 0.8) {
-    if (!text || isStopping) {
+    if (!text) {
         if (onEnd) onEnd();
         return;
     }
@@ -110,75 +110,69 @@ function speakTextWithCallback(text, onEnd, rate = 0.8) {
         );
         if (femaleVoice) utterance.voice = femaleVoice;
         
-        // 手機版關鍵：在回調中再次檢查 isStopping
-        utterance.onend = () => { 
-            if (!isStopping && onEnd) onEnd(); 
-        };
-        utterance.onerror = () => { 
-            if (!isStopping && onEnd) onEnd(); 
-        };
-
-        if (!isStopping) {
-            synth.speak(utterance);
-        }
+        utterance.onend = () => { if (onEnd) onEnd(); };
+        utterance.onerror = () => { if (onEnd) onEnd(); };
+        synth.speak(utterance);
     });
 }
 
+// 停止单词朗读
 function stopWordReading() {
     if (isStopping) return;
     isStopping = true;
-    isWordReading = false; 
     
     if (wordReadTimer) {
         clearInterval(wordReadTimer);
         wordReadTimer = null;
     }
     
-    // 立即重置 UI
+    synth.cancel();
+    
+    isWordReading = false;
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
         currentWordReadButton.classList.remove('reading-disabled');
         currentWordReadButton = null;
     }
-    
-    synth.cancel(); // 觸發 cancel 後，speakTextWithCallback 的 onend 會被攔截
     currentWordText = "";
     
     setTimeout(() => {
         isStopping = false;
-    }, 300); // 增加緩衝時間以消化手機瀏覽器的語音事件流
+    }, 50);
 }
 
+// 停止句子朗读
 function stopSentenceReading() {
     if (isStopping) return;
     isStopping = true;
-    isSentenceReading = false;
-
+    
     if (sentenceReadTimer) {
         clearInterval(sentenceReadTimer);
         sentenceReadTimer = null;
     }
     
+    synth.cancel();
+    
+    isSentenceReading = false;
     if (currentSentenceReadButton) {
         currentSentenceReadButton.textContent = "🔊 Read 3x";
         currentSentenceReadButton.classList.remove('reading-disabled');
         currentSentenceReadButton = null;
     }
-
-    synth.cancel();
     currentSentenceText = "";
     
     setTimeout(() => {
         isStopping = false;
-    }, 300);
+    }, 50);
 }
 
+// 停止所有朗读
 function stopAllReading() {
     stopWordReading();
     stopSentenceReading();
 }
 
-// 单词朗读控制
+// 单词朗读
 function toggleWordReading(word, buttonElement) {
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
         stopWordReading();
@@ -189,7 +183,7 @@ function toggleWordReading(word, buttonElement) {
         stopAllReading();
         setTimeout(() => {
             startWordReading(word, buttonElement);
-        }, 350);
+        }, 150);
         return;
     }
     
@@ -207,18 +201,19 @@ function startWordReading(word, buttonElement) {
     
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
+    buttonElement.disabled = false;
     
     let readCount = 0;
     isWordReading = true;
     
     function speakNext() {
-        if (!isWordReading || isStopping) return;
+        if (!isWordReading) return;
         if (readCount >= 3) {
             stopWordReading();
             return;
         }
         speakTextWithCallback(word, () => {
-            if (!isWordReading || isStopping) return;
+            if (!isWordReading) return;
             readCount++;
             if (readCount < 3) {
                 speakNext();
@@ -230,13 +225,13 @@ function startWordReading(word, buttonElement) {
     
     synth.cancel();
     setTimeout(() => {
-        if (isWordReading && !isStopping) {
+        if (isWordReading) {
             speakNext();
         }
-    }, 50);
+    }, 10);
 }
 
-// 句子朗读控制
+// 句子朗读
 function toggleSentenceReading(sentenceText, buttonElement) {
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
         stopSentenceReading();
@@ -247,7 +242,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
         stopAllReading();
         setTimeout(() => {
             startSentenceReading(sentenceText, buttonElement);
-        }, 350);
+        }, 150);
         return;
     }
     
@@ -265,18 +260,19 @@ function startSentenceReading(sentenceText, buttonElement) {
     
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
+    buttonElement.disabled = false;
     
     let readCount = 0;
     isSentenceReading = true;
     
     function speakNext() {
-        if (!isSentenceReading || isStopping) return;
+        if (!isSentenceReading) return;
         if (readCount >= 3) {
             stopSentenceReading();
             return;
         }
         speakTextWithCallback(sentenceText, () => {
-            if (!isSentenceReading || isStopping) return;
+            if (!isSentenceReading) return;
             readCount++;
             if (readCount < 3) {
                 speakNext();
@@ -288,10 +284,10 @@ function startSentenceReading(sentenceText, buttonElement) {
     
     synth.cancel();
     setTimeout(() => {
-        if (isSentenceReading && !isStopping) {
+        if (isSentenceReading) {
             speakNext();
         }
-    }, 50);
+    }, 10);
 }
 
 // ====================== 数据加载逻辑 ======================
@@ -459,7 +455,7 @@ async function loadFromExternalUrl(url) {
     }
 }
 
-// ====================== 筛选与导航逻辑 ======================
+// ====================== 筛选逻辑 ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
@@ -487,6 +483,7 @@ function filterByDay() {
     updateInfoTip();
 }
 
+// 获取所有单词中的最大天数
 function getMaxDay() {
     if (allWords.length === 0) return 0;
     let max = 0;
@@ -498,35 +495,34 @@ function getMaxDay() {
     return max;
 }
 
+// ====================== 单词导航逻辑 ======================
 function showWord() {
     stopAllReading();
     const container = document.getElementById("wordContent");
     
     if (filteredWords.length === 0) {
-        container.innerHTML = '<p style="color:#ef4444; margin:20px 0">No words for this day.</p>';
+        container.innerHTML = '<p style="color:#ef4444;">No words for this day</p>';
         updateInfoTip();
         return;
     }
     
     if (currentWordIdx >= filteredWords.length) {
-        container.innerHTML = '<p style="color:#22c55e; font-size:20px; font-weight:bold; margin:30px 0">🎉 Practice Complete!</p>';
+        container.innerHTML = '<p style="color:#22c55e; font-size:24px;">🎉 Practice Complete!</p>';
         updateInfoTip();
         return;
     }
     
     const w = filteredWords[currentWordIdx];
     const isFirst = currentWordIdx === 0;
-    const isLast = currentWordIdx === filteredWords.length - 1;
     
-    // UI 專業化：意思在單詞上方
     container.innerHTML = `
-        <div class="meaning-box">💡 ${w.meaning}</div>
-        <div class="word-text" id="currentWordSpan" style="visibility:hidden;">${w.word.toUpperCase()}</div>
-        <div class="btn-grid">
-            <button class="btn-act btn-show" id="btnShowWord">👀 Show Word</button>
-            <button class="btn-act btn-read" id="btnReadWord">🔊 Read 3x</button>
-            <button class="btn-act btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Prev</button>
-            <button class="btn-act btn-next" id="btnNextWord" ${isLast ? "No" : ""}>Next ➡️</button>
+        <div class="meaning">💡 ${w.meaning}</div>
+        <div class="word" id="currentWordSpan" style="display:none;">${w.word.toUpperCase()}</div>
+        <div class="btn-group">
+            <button class="btn-show" id="btnShowWord">👀 Show Word</button>
+            <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
+            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
+            <button class="btn-next" id="btnNextWord">➡️ Next</button>
         </div>
     `;
     
@@ -534,18 +530,26 @@ function showWord() {
     
     document.getElementById("btnShowWord")?.addEventListener("click", () => {
         const span = document.getElementById("currentWordSpan");
-        if (span) span.style.visibility = "visible";
+        if (span) span.style.display = "block";
     });
     
     const readBtn = document.getElementById("btnReadWord");
-    if (readBtn) readBtn.onclick = () => toggleWordReading(w.word, readBtn);
+    if (readBtn) {
+        readBtn.onclick = () => toggleWordReading(w.word, readBtn);
+    }
     
     document.getElementById("btnPrevWord")?.addEventListener("click", () => {
-        if (currentWordIdx > 0) { currentWordIdx--; showWord(); }
+        if (currentWordIdx > 0) {
+            currentWordIdx--;
+            showWord();
+        }
     });
     
     document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx < filteredWords.length - 1) { currentWordIdx++; showWord(); }
+        if (currentWordIdx + 1 <= filteredWords.length) {
+            currentWordIdx++;
+            showWord();
+        }
     });
 }
 
@@ -558,8 +562,10 @@ function updateInfoTip() {
     
     if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
         const displayFile = removeFileExtension(currentFileName);
+        const currentWord = filteredWords[currentWordIdx];
         container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
+        const currentWord = filteredWords[currentWordIdx];
         container.innerHTML = `🔗 External | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (allSentences.length > 0) {
         container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
@@ -568,25 +574,55 @@ function updateInfoTip() {
     }
 }
 
+// ====================== 显示所有单词 ======================
+function showAllWords() {
+    if (allWords.length === 0) return;
+    
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : "External Link";
+    const tableRows = allWords.map(w => `
+        <tr>
+            <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;"><strong>${w.word.toUpperCase()}</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;">${w.meaning}</td>
+        </tr>
+    `).join('');
+    
+    const allWordsHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
+        h2 { color: #ff9a56; text-align: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        th { background: #ff9a56; color: white; }
+        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    
+    const newWindow = window.open('', '_blank', 'width=900,height=700');
+    newWindow.document.write(allWordsHtml);
+    newWindow.document.close();
+}
+
 // ====================== 句子相关功能 ======================
 function updateSentenceUI() {
     if (!allSentences.length) return;
     
     const sent = allSentences[currentSentenceIdx];
-    const meaningDiv = document.querySelector("#sentenceContent .sentence-zh"); // 注意類名匹配
-    const enHiddenSpan = document.getElementById("sentenceEnHidden");
+    const meaningDiv = document.querySelector("#sentenceContent .sentence-meaning");
+    const enSpan = document.getElementById("sentenceEnHidden");
     
     if (meaningDiv) meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
-    if (enHiddenSpan) {
-        enHiddenSpan.innerText = sent.sentence_en;
-        enHiddenSpan.style.display = "none";
+    if (enSpan) {
+        enSpan.innerText = sent.sentence_en;
+        enSpan.style.display = "none";
     }
     
-    // UI 3.0：更新導航按鈕狀態
+    const tipSpan = document.getElementById("sentenceTip");
+    if (tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx + 1} / ${allSentences.length} sentences`;
+    
+    updateSentenceStats();
+    
     const prevBtn = document.getElementById("prevSentenceBtn");
-    const nextBtn = document.getElementById("nextSentenceBtn");
     if (prevBtn) prevBtn.disabled = currentSentenceIdx === 0;
-    if (nextBtn) nextBtn.textContent = currentSentenceIdx === allSentences.length - 1 ? "🎉 End" : "Next ➡️";
     
     attachSentenceEvents();
 }
@@ -619,25 +655,6 @@ function nextSentence() {
     }
 }
 
-function attachSentenceEvents() {
-    const showBtn = document.getElementById("showSentenceBtn");
-    const readBtn = document.getElementById("readSentenceBtn");
-    const prevBtn = document.getElementById("prevSentenceBtn");
-    const nextBtn = document.getElementById("nextSentenceBtn");
-    const allBtn = document.getElementById("showAllSentencesBtn");
-    
-    if (showBtn) showBtn.onclick = () => showCurrentSentence();
-    if (readBtn) {
-        readBtn.onclick = () => {
-            const currentSent = allSentences[currentSentenceIdx];
-            if (currentSent) toggleSentenceReading(currentSent.sentence_en, readBtn);
-        };
-    }
-    if (prevBtn) prevBtn.onclick = () => prevSentence();
-    if (nextBtn) nextBtn.onclick = () => nextSentence();
-    if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
-}
-
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
@@ -658,38 +675,30 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><td><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
     win.document.close();
 }
 
-function showAllWords() {
-    if (allWords.length === 0) return;
+function attachSentenceEvents() {
+    const showBtn = document.getElementById("showSentenceBtn");
+    const readBtn = document.getElementById("readSentenceBtn");
+    const prevBtn = document.getElementById("prevSentenceBtn");
+    const nextBtn = document.getElementById("nextSentenceBtn");
+    const allBtn = document.getElementById("showAllSentencesBtn");
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : "External Link";
-    const tableRows = allWords.map(w => `
-        <tr>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;"><strong>${w.word.toUpperCase()}</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;">${w.meaning}</td>
-        </tr>
-    `).join('');
-    
-    const allWordsHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
-        h2 { color: #ff9a56; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-        th { background: #ff9a56; color: white; }
-        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
-    
-    const newWindow = window.open('', '_blank', 'width=900,height=700');
-    newWindow.document.write(allWordsHtml);
-    newWindow.document.close();
+    if (showBtn) showBtn.onclick = () => showCurrentSentence();
+    if (readBtn) {
+        readBtn.onclick = () => {
+            const currentSent = allSentences[currentSentenceIdx];
+            if (currentSent) toggleSentenceReading(currentSent.sentence_en, readBtn);
+        };
+    }
+    if (prevBtn) prevBtn.onclick = () => prevSentence();
+    if (nextBtn) nextBtn.onclick = () => nextSentence();
+    if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
 // ====================== 模式切换 ======================
