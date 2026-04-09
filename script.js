@@ -503,28 +503,30 @@ function showWord() {
     const container = document.getElementById("wordContent");
     
     if (filteredWords.length === 0) {
-        container.innerHTML = '<p style="color:#ef4444;">No words for this day</p>';
+        container.innerHTML = '<p style="color:#ef4444; margin:20px 0">No words for this day.</p>';
         updateInfoTip();
         return;
     }
     
     if (currentWordIdx >= filteredWords.length) {
-        container.innerHTML = '<p style="color:#22c55e; font-size:24px; font-weight:bold;">🎉 Practice Complete!</p>';
+        container.innerHTML = '<p style="color:#22c55e; font-size:20px; font-weight:bold; margin:30px 0">🎉 Practice Complete!</p>';
         updateInfoTip();
         return;
     }
     
     const w = filteredWords[currentWordIdx];
     const isFirst = currentWordIdx === 0;
+    const isLast = currentWordIdx === filteredWords.length - 1;
     
+    // UI 專業化：意思在單詞上方
     container.innerHTML = `
         <div class="meaning-box">💡 ${w.meaning}</div>
         <div class="word-text" id="currentWordSpan" style="visibility:hidden;">${w.word.toUpperCase()}</div>
-        <div class="btn-group">
-            <button class="btn-act btn-show" id="btnShowWord">👀 Show</button>
+        <div class="btn-grid">
+            <button class="btn-act btn-show" id="btnShowWord">👀 Show Word</button>
             <button class="btn-act btn-read" id="btnReadWord">🔊 Read 3x</button>
             <button class="btn-act btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Prev</button>
-            <button class="btn-act btn-next" id="btnNextWord">Next ➡️</button>
+            <button class="btn-act btn-next" id="btnNextWord" ${isLast ? "No" : ""}>Next ➡️</button>
         </div>
     `;
     
@@ -543,7 +545,7 @@ function showWord() {
     });
     
     document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx < filteredWords.length) { currentWordIdx++; showWord(); }
+        if (currentWordIdx < filteredWords.length - 1) { currentWordIdx++; showWord(); }
     });
 }
 
@@ -571,22 +573,20 @@ function updateSentenceUI() {
     if (!allSentences.length) return;
     
     const sent = allSentences[currentSentenceIdx];
-    const meaningDiv = document.querySelector("#sentenceContent .sentence-meaning");
-    const enSpan = document.getElementById("sentenceEnHidden");
+    const meaningDiv = document.querySelector("#sentenceContent .sentence-zh"); // 注意類名匹配
+    const enHiddenSpan = document.getElementById("sentenceEnHidden");
     
     if (meaningDiv) meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
-    if (enSpan) {
-        enSpan.innerText = sent.sentence_en;
-        enSpan.style.display = "none";
+    if (enHiddenSpan) {
+        enHiddenSpan.innerText = sent.sentence_en;
+        enHiddenSpan.style.display = "none";
     }
     
-    const tipSpan = document.getElementById("sentenceTip");
-    if (tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx + 1} / ${allSentences.length} sentences`;
-    
-    updateSentenceStats();
-    
+    // UI 3.0：更新導航按鈕狀態
     const prevBtn = document.getElementById("prevSentenceBtn");
+    const nextBtn = document.getElementById("nextSentenceBtn");
     if (prevBtn) prevBtn.disabled = currentSentenceIdx === 0;
+    if (nextBtn) nextBtn.textContent = currentSentenceIdx === allSentences.length - 1 ? "🎉 End" : "Next ➡️";
     
     attachSentenceEvents();
 }
