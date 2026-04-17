@@ -326,13 +326,18 @@
             }
         }
         
-        .external-url-row input {
-            background: #fffaf0;
-            font-family: monospace;
-        }
-        
         .level-row.hidden-level {
             display: none !important;
+        }
+        
+        /* 文件输入框占位符样式 - 浅灰色 */
+        input[type="file"]::file-selector-button {
+            display: none;
+        }
+        
+        .file-name-placeholder {
+            color: #94a3b8;
+            font-style: italic;
         }
     </style>
 </head>
@@ -346,7 +351,6 @@
         <div class="select-row">
             <label>📀 Mode:</label>
             <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
-            <span style="font-size:12px; color:#475569;">Switch to external link mode</span>
         </div>
         
         <div class="select-row level-row" id="levelRow">
@@ -366,10 +370,10 @@
         </div>
         
         <div class="select-row external-url-row" id="externalUrlRow" style="display:none;">
-    <label>📂 File:</label>
-    <input type="file" id="localFileInput" accept=".xlsx, .xls, .csv">
-    <button class="btn-file" id="localFileConfirmBtn">Import</button>
-</div>
+            <label>📂 File:</label>
+            <input type="file" id="localFileInput" accept=".xlsx, .xls, .csv">
+            <button class="btn-file" id="localFileConfirmBtn">Import</button>
+        </div>
         
         <div class="select-row" id="dayRow" style="display:none;">
             <label>Day:</label>
