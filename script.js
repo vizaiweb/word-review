@@ -22,7 +22,7 @@ let currentWordReadButton = null;
 let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
-let isStopping = false; // 状态锁：防止手機版 cancel 觸發 onend 回調
+let isStopping = false;
 let pendingStart = null;
 
 // ====================== 动态分支路径工具 ======================
@@ -75,7 +75,7 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 语音朗读功能 (核心修復版) ======================
+// ====================== 语音朗读功能 ======================
 function getVoices() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
@@ -110,7 +110,6 @@ function speakTextWithCallback(text, onEnd, rate = 0.8) {
         );
         if (femaleVoice) utterance.voice = femaleVoice;
         
-        // 手機版關鍵：在回調中再次檢查 isStopping
         utterance.onend = () => { 
             if (!isStopping && onEnd) onEnd(); 
         };
@@ -134,19 +133,18 @@ function stopWordReading() {
         wordReadTimer = null;
     }
     
-    // 立即重置 UI
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
         currentWordReadButton.classList.remove('reading-disabled');
         currentWordReadButton = null;
     }
     
-    synth.cancel(); // 觸發 cancel 後，speakTextWithCallback 的 onend 會被攔截
+    synth.cancel();
     currentWordText = "";
     
     setTimeout(() => {
         isStopping = false;
-    }, 300); // 增加緩衝時間以消化手機瀏覽器的語音事件流
+    }, 300);
 }
 
 function stopSentenceReading() {
@@ -178,7 +176,6 @@ function stopAllReading() {
     stopSentenceReading();
 }
 
-// 单词朗读控制
 function toggleWordReading(word, buttonElement) {
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
         stopWordReading();
@@ -236,7 +233,6 @@ function startWordReading(word, buttonElement) {
     }, 50);
 }
 
-// 句子朗读控制
 function toggleSentenceReading(sentenceText, buttonElement) {
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
         stopSentenceReading();
@@ -416,42 +412,55 @@ async function loadSelectedFile(filename) {
     }
 }
 
-async function loadFromExternalUrl(url) {
-    if (!url) {
-        alert("Please enter a valid Excel direct link (.xlsx)");
+// ====================== 从本地文件导入Excel ======================
+async function loadFromLocalFile(file) {
+    if (!file) {
+        alert("请选择一个Excel文件 (.xlsx, .xls, .csv)");
+        return false;
+    }
+    
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileName = file.name;
+    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    if (!validExtensions.includes(fileExt)) {
+        alert("请选择有效的Excel文件 (.xlsx, .xls, .csv)");
         return false;
     }
     
     stopAllReading();
-    currentFileName = "";
-    currentFileNameForSentences = url;
-    currentExternalUrl = url;
+    currentFileName = fileName;
+    currentFileNameForSentences = fileName;
+    currentExternalUrl = fileName;
     currentLevel = "";
     
     const wordDiv = document.getElementById("wordContent");
-    wordDiv.innerHTML = '<p>🌐 Loading external Excel file ...</p>';
+    wordDiv.innerHTML = '<p>📂 正在导入本地Excel文件 ...</p>';
     document.getElementById("dayRow").style.display = 'none';
     document.getElementById("sentenceArea").style.display = 'none';
     document.getElementById("showAllBtn").style.display = 'none';
     document.getElementById("infoTipContainer").innerHTML = '';
     
     try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const buf = await res.arrayBuffer();
-        const success = await parseExcelBufferAndLoad(buf, url);
+        const buf = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsArrayBuffer(file);
+        });
+        
+        const success = await parseExcelBufferAndLoad(buf, fileName);
         if (success) {
             const tipDiv = document.getElementById("infoTipContainer");
             if (tipDiv && filteredWords.length) {
-                const shortUrl = url.length > 60 ? url.substring(0, 57) + "..." : url;
-                tipDiv.innerHTML = `🔗 External: ${shortUrl} | ${filteredWords.length} words | Sentences: ${allSentences.length}`;
+                const shortName = fileName.length > 60 ? fileName.substring(0, 57) + "..." : fileName;
+                tipDiv.innerHTML = `📁 本地文件: ${shortName} | ${filteredWords.length} 个单词 | 句子: ${allSentences.length}`;
             }
             return true;
         } else {
-            throw new Error("Parse failed, please check file format");
+            throw new Error("解析失败，请检查文件格式");
         }
     } catch (err) {
-        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}</p>`;
+        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ 导入失败: ${err.message}</p>`;
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         console.error(err);
@@ -566,7 +575,7 @@ function updateInfoTip() {
         const displayFile = removeFileExtension(currentFileName);
         container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
-        container.innerHTML = `🔗 External | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        container.innerHTML = `📁 本地文件 | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} 单词 | ✏️ 句子: ${allSentences.length}`;
     } else if (allSentences.length > 0) {
         container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
     } else {
@@ -649,7 +658,7 @@ function attachSentenceEvents() {
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : "External Link";
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : "本地文件";
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
@@ -676,7 +685,7 @@ function showAllSentencesPopup() {
 function showAllWords() {
     if (allWords.length === 0) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : "External Link";
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : "本地文件";
     const tableRows = allWords.map(w => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
@@ -731,14 +740,14 @@ function toggleMode(mode) {
         fileRow.style.display = 'none';
         externalRow.style.display = 'flex';
         levelRow.classList.add('hidden-level');
-        toggleBtn.textContent = "🌐 External Link";
+        toggleBtn.textContent = "📂 本地文件";
         toggleBtn.classList.remove('active');
         
         if (currentFileName && allWords.length > 0) {
             allWords = [];
             filteredWords = [];
             allSentences = [];
-            document.getElementById("wordContent").innerHTML = '<p>🔗 External mode activated, paste Excel direct link and click Load</p>';
+            document.getElementById("wordContent").innerHTML = '<p>📂 本地文件模式，请选择Excel文件并点击导入</p>';
             document.getElementById("sentenceArea").style.display = 'none';
             document.getElementById("showAllBtn").style.display = 'none';
             dayRow.style.display = 'none';
@@ -761,7 +770,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileConfirm = document.getElementById('fileConfirm');
     const filterBtn = document.getElementById('filterBtn');
     const modeToggle = document.getElementById('modeToggleBtn');
-    const externalConfirm = document.getElementById('externalUrlConfirmBtn');
+    const localFileConfirm = document.getElementById('localFileConfirmBtn');
+    const localFileInput = document.getElementById('localFileInput');
     
     modeToggle.addEventListener('click', () => {
         if (currentMode === "local") toggleMode("external");
@@ -812,22 +822,30 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSelectedFile(selected);
     });
     
-    externalConfirm.addEventListener('click', async () => {
-        if (currentMode !== "external") return;
-        
-        let url = document.getElementById('externalUrlInput').value.trim();
-        if (!url) {
-            alert("Please enter a valid Excel direct link (.xlsx)");
-            return;
-        }
-        
-        if (url.includes("github.com") && url.includes("/blob/")) {
-            url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
-            document.getElementById('externalUrlInput').value = url;
-        }
-        
-        await loadFromExternalUrl(url);
-    });
+    if (localFileConfirm) {
+        localFileConfirm.addEventListener('click', async () => {
+            if (currentMode !== "external") {
+                alert('请先切换到"本地文件"模式（点击 Mode 按钮）');
+                return;
+            }
+            
+            const file = localFileInput ? localFileInput.files[0] : null;
+            if (!file) {
+                alert("请先选择一个Excel文件");
+                return;
+            }
+            
+            await loadFromLocalFile(file);
+        });
+    }
+    
+    if (localFileInput) {
+        localFileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                console.log('已选择文件:', this.files[0].name);
+            }
+        });
+    }
     
     filterBtn.addEventListener('click', function() {
         this.style.opacity = '0.7';
