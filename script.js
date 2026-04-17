@@ -415,7 +415,7 @@ async function loadSelectedFile(filename) {
 // ====================== 从本地文件导入Excel ======================
 async function loadFromLocalFile(file) {
     if (!file) {
-        alert("请选择一个Excel文件 (.xlsx, .xls, .csv)");
+        alert("Please select an Excel file (.xlsx, .xls, .csv)");
         return false;
     }
     
@@ -423,7 +423,7 @@ async function loadFromLocalFile(file) {
     const fileName = file.name;
     const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
     if (!validExtensions.includes(fileExt)) {
-        alert("请选择有效的Excel文件 (.xlsx, .xls, .csv)");
+        alert("Please select a valid Excel file (.xlsx, .xls, .csv)");
         return false;
     }
     
@@ -434,8 +434,8 @@ async function loadFromLocalFile(file) {
     currentLevel = "";
     
     const wordDiv = document.getElementById("wordContent");
-    wordDiv.innerHTML = '<p>📂 正在导入本地Excel文件 ...</p>';
-    document.getElementById("dayRow").style.display = 'none';
+    wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
+    document.getElementById("dayRow").style.display = 'flex';
     document.getElementById("sentenceArea").style.display = 'none';
     document.getElementById("showAllBtn").style.display = 'none';
     document.getElementById("infoTipContainer").innerHTML = '';
@@ -450,17 +450,12 @@ async function loadFromLocalFile(file) {
         
         const success = await parseExcelBufferAndLoad(buf, fileName);
         if (success) {
-            const tipDiv = document.getElementById("infoTipContainer");
-            if (tipDiv && filteredWords.length) {
-                const shortName = fileName.length > 60 ? fileName.substring(0, 57) + "..." : fileName;
-                tipDiv.innerHTML = `📁 本地文件: ${shortName} | ${filteredWords.length} 个单词 | 句子: ${allSentences.length}`;
-            }
             return true;
         } else {
-            throw new Error("解析失败，请检查文件格式");
+            throw new Error("Parse failed, please check file format");
         }
     } catch (err) {
-        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ 导入失败: ${err.message}</p>`;
+        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}</p>`;
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("showAllBtn").style.display = 'none';
         console.error(err);
@@ -574,8 +569,9 @@ function updateInfoTip() {
     if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
         const displayFile = removeFileExtension(currentFileName);
         container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
-    } else if (currentMode === "external" && currentExternalUrl && filteredWords.length && filteredWords[currentWordIdx]) {
-        container.innerHTML = `📁 本地文件 | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} 单词 | ✏️ 句子: ${allSentences.length}`;
+    } else if (currentMode === "external" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
+        const displayFile = removeFileExtension(currentFileName);
+        container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (allSentences.length > 0) {
         container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
     } else {
@@ -658,12 +654,12 @@ function attachSentenceEvents() {
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : "本地文件";
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : removeFileExtension(currentFileName);
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
-            <td><strong>${s.sentence_en}</strong></td>
-            <td>${s.sentence_zh}</td>
+            <td style="padding: 12px;"><strong>${s.sentence_en}</strong></td>
+            <td style="padding: 12px;">${s.sentence_zh}</td>
         </tr>
     `).join('');
     
@@ -675,7 +671,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
@@ -685,7 +681,7 @@ function showAllSentencesPopup() {
 function showAllWords() {
     if (allWords.length === 0) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : "本地文件";
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : removeFileExtension(currentFileName);
     const tableRows = allWords.map(w => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
@@ -702,7 +698,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2><table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table><button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -725,11 +721,13 @@ function toggleMode(mode) {
         toggleBtn.textContent = "📁 Built-in DB";
         toggleBtn.classList.add('active');
         
-        if (currentExternalUrl) {
+        if (currentFileName && allWords.length > 0) {
+            // 保留当前数据，不清空
+        } else {
             allWords = [];
             filteredWords = [];
             allSentences = [];
-            document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Switched to built-in mode, please select Level and file ✨</p>';
+            document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
             document.getElementById("sentenceArea").style.display = 'none';
             document.getElementById("showAllBtn").style.display = 'none';
             dayRow.style.display = 'none';
@@ -740,14 +738,16 @@ function toggleMode(mode) {
         fileRow.style.display = 'none';
         externalRow.style.display = 'flex';
         levelRow.classList.add('hidden-level');
-        toggleBtn.textContent = "📂 本地文件";
+        toggleBtn.textContent = "📂 Local File";
         toggleBtn.classList.remove('active');
         
         if (currentFileName && allWords.length > 0) {
+            // 保留当前数据，不清空
+        } else {
             allWords = [];
             filteredWords = [];
             allSentences = [];
-            document.getElementById("wordContent").innerHTML = '<p>📂 本地文件模式，请选择Excel文件并点击导入</p>';
+            document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Select a local Excel file to start ✨</p>';
             document.getElementById("sentenceArea").style.display = 'none';
             document.getElementById("showAllBtn").style.display = 'none';
             dayRow.style.display = 'none';
@@ -825,25 +825,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (localFileConfirm) {
         localFileConfirm.addEventListener('click', async () => {
             if (currentMode !== "external") {
-                alert('请先切换到"本地文件"模式（点击 Mode 按钮）');
+                alert('Please switch to "Local File" mode first (click Mode button)');
                 return;
             }
             
             const file = localFileInput ? localFileInput.files[0] : null;
             if (!file) {
-                alert("请先选择一个Excel文件");
+                alert("Please select an Excel file first");
                 return;
             }
             
             await loadFromLocalFile(file);
-        });
-    }
-    
-    if (localFileInput) {
-        localFileInput.addEventListener('change', function(e) {
-            if (this.files.length > 0) {
-                console.log('已选择文件:', this.files[0].name);
-            }
         });
     }
     
