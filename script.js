@@ -772,6 +772,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeToggle = document.getElementById('modeToggleBtn');
     const localFileConfirm = document.getElementById('localFileConfirmBtn');
     const localFileInput = document.getElementById('localFileInput');
+    const selectFileBtn = document.getElementById('selectFileBtn');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
     
     modeToggle.addEventListener('click', () => {
         if (currentMode === "local") toggleMode("external");
@@ -821,6 +823,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         await loadSelectedFile(selected);
     });
+    
+    // "Select File" 按钮：触发隐藏的文件输入框
+    if (selectFileBtn && localFileInput) {
+        selectFileBtn.addEventListener('click', () => {
+            localFileInput.click();
+        });
+        
+        // 监听文件选择变化，更新显示的文件名
+        localFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && fileNameDisplay) {
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.remove('empty');
+            } else if (fileNameDisplay) {
+                fileNameDisplay.textContent = 'No file selected';
+                fileNameDisplay.classList.add('empty');
+            }
+        });
+    }
     
     if (localFileConfirm) {
         localFileConfirm.addEventListener('click', async () => {
