@@ -330,12 +330,29 @@
             display: none !important;
         }
         
-        /* 文件输入框占位符样式 - 浅灰色 */
-        input[type="file"]::file-selector-button {
-            display: none;
+        /* 隐藏文件输入框的默认文字 */
+        .hidden-file-input {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
         }
         
-        .file-name-placeholder {
+        .file-name-display {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #1e293b;
+            background: #f1f5f9;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .file-name-display.empty {
             color: #94a3b8;
             font-style: italic;
         }
@@ -371,7 +388,9 @@
         
         <div class="select-row external-url-row" id="externalUrlRow" style="display:none;">
             <label>📂 File:</label>
-            <input type="file" id="localFileInput" accept=".xlsx, .xls, .csv">
+            <input type="file" id="localFileInput" class="hidden-file-input" accept=".xlsx, .xls, .csv">
+            <button class="btn-file" id="selectFileBtn">Select File</button>
+            <span id="fileNameDisplay" class="file-name-display empty">No file selected</span>
             <button class="btn-file" id="localFileConfirmBtn">Import</button>
         </div>
         
