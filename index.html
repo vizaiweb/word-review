@@ -1,11 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Kids Word & Sentence Practice</title>
-    <!-- Excel 解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         /* ====================== 全局基础样式 ====================== */
@@ -22,24 +20,6 @@
             line-height: 1.5;
         }
 
-
-        .save-btn {
-    background-color: #ffffff;
-    color: #333;
-    border: 2px solid #ff9800; /* 橘色邊框 */
-    border-radius: 8px;
-    padding: 5px 15px;
-    font-weight: bold;
-    font-size: 18px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-.save-btn:hover {
-    background-color: #fff3e0;
-    transform: scale(1.05);
-}
-        
         .container {
             max-width: 700px;
             margin: 0 auto;
@@ -72,6 +52,12 @@
             gap: 8px;
             margin: 10px 0;
         }
+        
+        /* 讓 Mode 这一行支持左右分布 */
+        .mode-row {
+            justify-content: space-between;
+        }
+
         .select-row label {
             font-weight: 600;
             color: #1e293b;
@@ -102,6 +88,15 @@
         .btn-filter { background: #2b7e3a; }
         .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
         
+        /* Save 按鈕樣式 */
+        .save-btn {
+            background: white !important;
+            color: #333 !important;
+            border: 2px solid #ff9a56 !important;
+            padding: 6px 15px !important;
+        }
+        .save-btn:active { background: #fff5ed !important; }
+
         .mode-toggle {
             background: #ffb347;
             margin-bottom: 5px;
@@ -336,20 +331,10 @@
             margin: 0 6px;
         }
         
-        @media (max-width: 550px) {
-            .meaning { font-size: 22px; }
-            .sentence-meaning { font-size: 18px; }
-            .btn-group button, .sentence-buttons button, .show-all-btn, .btn-sentence-all {
-                font-size: 14px;
-                padding: 10px;
-            }
-        }
-        
         .level-row.hidden-level {
             display: none !important;
         }
         
-        /* 隐藏文件输入框的默认文字 */
         .hidden-file-input {
             position: absolute;
             width: 0;
@@ -384,15 +369,13 @@
     </div>
 
     <div class="select-section">
-    <div class="select-row" style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <label>📀 Mode:</label>
-            <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+        <div class="select-row mode-row">
+            <div>
+                <label>📀 Mode:</label>
+                <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+            </div>
+            <button id="saveSettingsBtn" class="save-btn">Save</button>
         </div>
-        <button id="saveSettingsBtn" class="save-btn">Save</button>
-    </div>
-    
-    </div>
         
         <div class="select-row level-row" id="levelRow">
             <label>Level:</label>
