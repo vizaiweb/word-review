@@ -75,63 +75,60 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 语音朗读功能 ======================
-function getVoices() {
+// ====================== 语音朗读功能 (已升级) ======================
+
+/**
+ * 獲取高品質語音：優先尋找 Google、Natural 或高品質美式英語
+ */
+function getHighQualityVoice() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
-        if (voices.length) {
-            resolve(voices);
-        } else {
-            const onVoicesChanged = () => {
-                resolve(synth.getVoices());
-                synth.onvoiceschanged = null;
-            };
-            synth.onvoiceschanged = onVoicesChanged;
+        const select = () => {
+            const vs = synth.getVoices();
+            // 優先順序：Google US English > 包含 Natural 關鍵字 > Apple Samantha > 任何美式英語
+            return vs.find(v => v.name === 'Google US English') ||
+                   vs.find(v => v.name.includes('Natural') && v.lang.includes('en-US')) ||
+                   vs.find(v => v.name.includes('Samantha')) ||
+                   vs.find(v => v.lang.includes('en-US')) ||
+                   vs.find(v => v.lang.includes('en'));
+        };
+
+        if (voices.length) resolve(select());
+        else {
+            synth.onvoiceschanged = () => resolve(select());
         }
     });
 }
 
-function speakTextWithCallback(text, onEnd, rate = 0.8) {
+async function speakTextWithCallback(text, onEnd) {
     if (!text || isStopping) {
         if (onEnd) onEnd();
         return;
     }
     
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = rate;
-    utterance.volume = 1;
-    utterance.pitch = 1;
+    const bestVoice = await getHighQualityVoice();
     
-    getVoices().then(voices => {
-        const femaleVoice = voices.find(voice => 
-            voice.lang.includes("en") && 
-            (voice.name.includes("Female") || voice.name.includes("Samantha") || voice.name.includes("Google") || voice.name.includes("Microsoft"))
-        );
-        if (femaleVoice) utterance.voice = femaleVoice;
-        
-        utterance.onend = () => { 
-            if (!isStopping && onEnd) onEnd(); 
-        };
-        utterance.onerror = () => { 
-            if (!isStopping && onEnd) onEnd(); 
-        };
+    if (bestVoice) {
+        utterance.voice = bestVoice;
+    }
 
-        if (!isStopping) {
-            synth.speak(utterance);
-        }
-    });
+    utterance.lang = "en-US";
+    // 參數優化：語速 0.85 最清晰，音調 1.0 最像真人
+    utterance.rate = 0.85; 
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onend = () => { if (!isStopping && onEnd) onEnd(); };
+    utterance.onerror = () => { if (!isStopping && onEnd) onEnd(); };
+
+    synth.speak(utterance);
 }
 
 function stopWordReading() {
     if (isStopping) return;
     isStopping = true;
     isWordReading = false; 
-    
-    if (wordReadTimer) {
-        clearInterval(wordReadTimer);
-        wordReadTimer = null;
-    }
     
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
@@ -142,9 +139,7 @@ function stopWordReading() {
     synth.cancel();
     currentWordText = "";
     
-    setTimeout(() => {
-        isStopping = false;
-    }, 300);
+    setTimeout(() => { isStopping = false; }, 300);
 }
 
 function stopSentenceReading() {
@@ -152,11 +147,6 @@ function stopSentenceReading() {
     isStopping = true;
     isSentenceReading = false;
 
-    if (sentenceReadTimer) {
-        clearInterval(sentenceReadTimer);
-        sentenceReadTimer = null;
-    }
-    
     if (currentSentenceReadButton) {
         currentSentenceReadButton.textContent = "🔊 Read 3x";
         currentSentenceReadButton.classList.remove('reading-disabled');
@@ -166,9 +156,7 @@ function stopSentenceReading() {
     synth.cancel();
     currentSentenceText = "";
     
-    setTimeout(() => {
-        isStopping = false;
-    }, 300);
+    setTimeout(() => { isStopping = false; }, 300);
 }
 
 function stopAllReading() {
@@ -182,26 +170,15 @@ function toggleWordReading(word, buttonElement) {
         return;
     }
     
-    if (isWordReading || isSentenceReading) {
-        stopAllReading();
-        setTimeout(() => {
-            startWordReading(word, buttonElement);
-        }, 350);
-        return;
-    }
-    
-    startWordReading(word, buttonElement);
+    stopAllReading();
+    setTimeout(() => {
+        startWordReading(word, buttonElement);
+    }, 350);
 }
 
 function startWordReading(word, buttonElement) {
-    if (pendingStart) {
-        clearTimeout(pendingStart);
-        pendingStart = null;
-    }
-    
     currentWordText = word;
     currentWordReadButton = buttonElement;
-    
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     
@@ -215,22 +192,18 @@ function startWordReading(word, buttonElement) {
             return;
         }
         speakTextWithCallback(word, () => {
-            if (!isWordReading || isStopping) return;
             readCount++;
-            if (readCount < 3) {
-                speakNext();
+            if (readCount < 3 && isWordReading && !isStopping) {
+                // 每次朗讀間隔 500ms，聽起來更自然
+                setTimeout(speakNext, 500);
             } else {
                 stopWordReading();
             }
-        }, 0.8);
+        });
     }
     
     synth.cancel();
-    setTimeout(() => {
-        if (isWordReading && !isStopping) {
-            speakNext();
-        }
-    }, 50);
+    setTimeout(speakNext, 100);
 }
 
 function toggleSentenceReading(sentenceText, buttonElement) {
@@ -239,26 +212,15 @@ function toggleSentenceReading(sentenceText, buttonElement) {
         return;
     }
     
-    if (isWordReading || isSentenceReading) {
-        stopAllReading();
-        setTimeout(() => {
-            startSentenceReading(sentenceText, buttonElement);
-        }, 350);
-        return;
-    }
-    
-    startSentenceReading(sentenceText, buttonElement);
+    stopAllReading();
+    setTimeout(() => {
+        startSentenceReading(sentenceText, buttonElement);
+    }, 350);
 }
 
 function startSentenceReading(sentenceText, buttonElement) {
-    if (pendingStart) {
-        clearTimeout(pendingStart);
-        pendingStart = null;
-    }
-    
     currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
-    
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     
@@ -272,25 +234,20 @@ function startSentenceReading(sentenceText, buttonElement) {
             return;
         }
         speakTextWithCallback(sentenceText, () => {
-            if (!isSentenceReading || isStopping) return;
             readCount++;
-            if (readCount < 3) {
-                speakNext();
+            if (readCount < 3 && isSentenceReading && !isStopping) {
+                setTimeout(speakNext, 600); // 句子較長，間隔稍微久一點
             } else {
                 stopSentenceReading();
             }
-        }, 0.8);
+        });
     }
     
     synth.cancel();
-    setTimeout(() => {
-        if (isSentenceReading && !isStopping) {
-            speakNext();
-        }
-    }, 50);
+    setTimeout(speakNext, 100);
 }
 
-// ====================== 数据加载逻辑 ======================
+// ====================== 数据加载逻辑 (保持原樣) ======================
 async function loadFileListByLevel(level) {
     const fileSelect = document.getElementById('fileSelect');
     const fileRow = document.getElementById('fileRow');
@@ -412,7 +369,6 @@ async function loadSelectedFile(filename) {
     }
 }
 
-// ====================== 从本地文件导入Excel ======================
 async function loadFromLocalFile(file) {
     if (!file) {
         alert("Please select an Excel file (.xlsx, .xls, .csv)");
@@ -463,7 +419,7 @@ async function loadFromLocalFile(file) {
     }
 }
 
-// ====================== 筛选与导航逻辑 ======================
+// ====================== 篩選與導航 (保持原樣) ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
@@ -579,7 +535,7 @@ function updateInfoTip() {
     }
 }
 
-// ====================== 句子相关功能 ======================
+// ====================== 句子相关功能 (已優化朗讀) ======================
 function updateSentenceUI() {
     if (!allSentences.length) return;
     
@@ -721,9 +677,7 @@ function toggleMode(mode) {
         toggleBtn.textContent = "📁 Built-in DB";
         toggleBtn.classList.add('active');
         
-        if (currentFileName && allWords.length > 0) {
-            // 保留当前数据，不清空
-        } else {
+        if (!(currentFileName && allWords.length > 0)) {
             allWords = [];
             filteredWords = [];
             allSentences = [];
@@ -741,9 +695,7 @@ function toggleMode(mode) {
         toggleBtn.textContent = "📂 Local File";
         toggleBtn.classList.remove('active');
         
-        if (currentFileName && allWords.length > 0) {
-            // 保留当前数据，不清空
-        } else {
+        if (!(currentFileName && allWords.length > 0)) {
             allWords = [];
             filteredWords = [];
             allSentences = [];
@@ -760,10 +712,6 @@ function toggleMode(mode) {
 // ====================== 初始化 ======================
 document.addEventListener('DOMContentLoaded', () => {
     initDaySelectToggle();
-    
-    if (synth.getVoices().length === 0) {
-        synth.onvoiceschanged = () => {};
-    }
     
     const showAllBtn = document.getElementById('showAllBtn');
     const levelConfirm = document.getElementById('levelConfirm');
@@ -824,13 +772,11 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSelectedFile(selected);
     });
     
-    // "Select File" 按钮：触发隐藏的文件输入框
     if (selectFileBtn && localFileInput) {
         selectFileBtn.addEventListener('click', () => {
             localFileInput.click();
         });
         
-        // 监听文件选择变化，更新显示的文件名
         localFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file && fileNameDisplay) {
