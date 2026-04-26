@@ -82,38 +82,43 @@ function initDaySelectToggle() {
  */
 // ====================== 語音功能 (手機兼容強化版) ======================
 
+// ====================== 終極兼容版語音邏輯 ======================
+
 function getHighQualityVoice() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
         
-        const findVoice = () => {
-            const vs = synth.getVoices();
-            // 手機版優先尋找高品質語音
-            return vs.find(v => v.name.includes('Google') && v.lang.includes('en')) || 
-                   vs.find(v => v.name.includes('Premium') && v.lang.includes('en')) || 
-                   vs.find(v => v.name.includes('Samantha')) || 
-                   vs.find(v => v.lang.startsWith('en-US')) || 
-                   vs.find(v => v.lang.startsWith('en'));
+        const findBest = (vList) => {
+            // 優先順序調整：針對手機優化
+            return vList.find(v => v.name.includes('Google US English')) || // Android Chrome
+                   vList.find(v => v.name.includes('Samantha') && v.name.includes('Premium')) || // iOS 高品質
+                   vList.find(v => v.name.includes('Samantha')) || // iOS 標準
+                   vList.find(v => v.lang === 'en-US' && v.localService === true) || // 本地美語
+                   vList.find(v => v.lang.includes('en-US')) ||
+                   vList[0];
         };
 
         if (voices.length > 0) {
-            resolve(findVoice());
+            resolve(findBest(voices));
         } else {
-            // 手機版通常需要等這個事件觸發
+            // 關鍵：某些手機瀏覽器必須監聽此事件才能抓到聲音
+            const timer = setTimeout(() => resolve(null), 1000); // 防止死等
             synth.onvoiceschanged = () => {
-                resolve(findVoice());
+                clearTimeout(timer);
+                resolve(findBest(synth.getVoices()));
             };
         }
     });
 }
 
+// 修正朗讀邏輯：增加「喚醒」步驟
 async function speakTextWithCallback(text, onEnd) {
     if (!text || isStopping) {
-        if (onEnd) onEnd();
+        onEnd?.();
         return;
     }
 
-    // 1. 強制停止當前朗讀（解決手機連讀卡住的問題）
+    // 解決手機連讀問題：先取消，再強制重新實例化
     synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -121,22 +126,20 @@ async function speakTextWithCallback(text, onEnd) {
     
     if (bestVoice) {
         utterance.voice = bestVoice;
-        console.log("Using voice:", bestVoice.name); // 調試用
+        utterance.voiceURI = bestVoice.voiceURI; // 強制指定路徑
     }
 
     utterance.lang = "en-US";
     utterance.rate = 0.85; 
     utterance.pitch = 1.0;
-    utterance.volume = 1.0;
     
-    utterance.onend = () => { if (!isStopping && onEnd) onEnd(); };
-    utterance.onerror = (e) => { 
-        console.error("Speech Error:", e);
-        if (!isStopping && onEnd) onEnd(); 
-    };
+    utterance.onend = () => { if (!isStopping) onEnd?.(); };
+    utterance.onerror = () => { if (!isStopping) onEnd?.(); };
 
-    // 2. 針對手機的特殊處理：必須在用戶點擊的瞬間執行
-    synth.speak(utterance);
+    // 手機版的小技巧：稍微延遲 50 毫秒給系統切換聲音
+    setTimeout(() => {
+        synth.speak(utterance);
+    }, 50);
 }
 
 function stopWordReading() {
