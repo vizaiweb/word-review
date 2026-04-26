@@ -807,66 +807,83 @@ document.addEventListener('DOMContentLoaded', () => {
     showAllBtn.addEventListener('click', showAllWords);
     
     // ======================================================
-    // ✨ 新增：Save 按鈕與自動恢復功能 (修正版本)
-    // ======================================================
+// ✨ 整合版：Save 按鈕與自動恢復功能 (包含單字與句子進度)
+// ======================================================
+
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', () => {
+        const config = {
+            mode: currentMode,
+            level: levelSelect.value,
+            file: fileSelect.value,
+            daySelect: daySelect.value,
+            dayNum: dayNum.value,
+            // 💡 新增：記錄當前的索引位置
+            wordIdx: currentWordIdx,
+            sentenceIdx: currentSentenceIdx
+        };
+        // 使用同一個 Key 儲存，保持數據乾淨
+        localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
+        alert("Progress and settings have been saved!");
+    });
+}
+
+async function autoRestore() {
+    const saved = localStorage.getItem('kidsEnglish_Config_V2');
+    if (!saved) return;
     
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', () => {
-            const config = {
-                mode: currentMode,
-                level: levelSelect.value,
-                file: fileSelect.value,
-                daySelect: daySelect.value,
-                dayNum: dayNum.value
-            };
-            localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
-            alert("All current options have been saved.");
-        });
+    const config = JSON.parse(saved);
+
+    // 1. 恢復模式
+    if (config.mode && config.mode !== currentMode) {
+        toggleMode(config.mode);
     }
 
-    async function autoRestore() {
-        const saved = localStorage.getItem('kidsEnglish_Config_V2');
-        if (!saved) return;
+    // 2. 針對 Built-in 模式恢復所有進度
+    if (config.mode === "local" && config.level) {
+        levelSelect.value = config.level;
+        currentLevel = config.level;
         
-        const config = JSON.parse(saved);
+        // 執行 Level 載入
+        await loadFileListByLevel(config.level);
 
-        // 1. 恢復模式
-        if (config.mode && config.mode !== currentMode) {
-            toggleMode(config.mode);
-        }
-
-        // 2. 針對 Built-in 模式恢復數據
-        if (config.mode === "local" && config.level) {
-            levelSelect.value = config.level;
-            currentLevel = config.level;
-            
-            // 執行原本的 Level Confirm 邏輯
-            await loadFileListByLevel(config.level);
-
-            if (config.file) {
-                // 給選單一點點渲染時間
-                setTimeout(async () => {
-                    fileSelect.value = config.file;
-                    if (fileSelect.value === config.file) {
-                        await loadSelectedFile(config.file);
+        if (config.file) {
+            // 給選單一點渲染時間
+            setTimeout(async () => {
+                fileSelect.value = config.file;
+                
+                if (fileSelect.value === config.file) {
+                    // 執行檔案內容載入
+                    await loadSelectedFile(config.file);
+                    
+                    // 3. 恢復 Day 篩選狀態
+                    if (config.daySelect) {
+                        daySelect.value = config.daySelect;
+                        // 觸發原有的輸入框切換邏輯
+                        daySelect.dispatchEvent(new Event('change'));
+                        dayNum.value = config.dayNum;
+                        filterByDay(); 
                         
-                        // 恢復 Day 設定
-                        if (config.daySelect) {
-                            daySelect.value = config.daySelect;
-                            // 觸發原始 JS 的輸入框切換邏輯
-                            daySelect.dispatchEvent(new Event('change'));
-                            dayNum.value = config.dayNum;
-                            filterByDay();
+                        // 4. ✨ 重點：等待數據加載並篩選後，恢復具體位置
+                        if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
+                            currentWordIdx = config.wordIdx;
+                            showWord(); // 重新渲染該單字
+                        }
+                        
+                        if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
+                            currentSentenceIdx = config.sentenceIdx;
+                            updateSentenceUI(); // 重新渲染該句子
                         }
                     }
-                }, 400);
-            }
+                }
+            }, 500); // 這裡的延遲是為了確保 File List 已經從 GitHub 抓回來
         }
     }
+}
 
-    // 啟動後稍微延遲載入，確保 GitHub API 請求順利
-    setTimeout(autoRestore, 800);
+// 啟動後稍微延遲載入
+setTimeout(autoRestore, 800);
     
     toggleMode("local");
 });
