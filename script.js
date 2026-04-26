@@ -23,7 +23,6 @@ let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
 let isStopping = false;
-let pendingStart = null;
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -62,7 +61,6 @@ function initDaySelectToggle() {
             dayNum.type = 'text';
             dayNum.value = '--';
             dayNum.readOnly = true;
-            dayNum.min = '';
         } else {
             dayNum.type = 'number';
             dayNum.value = '1';
@@ -75,208 +73,109 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 終極兼容版語音邏輯 ======================
-
+// ====================== 語音邏輯 ======================
 function getHighQualityVoice() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
-        
         const findBest = (vList) => {
             return vList.find(v => v.name.includes('Google US English')) || 
-                   vList.find(v => v.name.includes('Samantha') && v.name.includes('Premium')) || 
                    vList.find(v => v.name.includes('Samantha')) || 
-                   vList.find(v => v.lang === 'en-US' && v.localService === true) || 
                    vList.find(v => v.lang.includes('en-US')) ||
                    vList[0];
         };
-
-        if (voices.length > 0) {
-            resolve(findBest(voices));
-        } else {
-            const timer = setTimeout(() => resolve(null), 1000); 
-            synth.onvoiceschanged = () => {
-                clearTimeout(timer);
-                resolve(findBest(synth.getVoices()));
-            };
+        if (voices.length > 0) resolve(findBest(voices));
+        else {
+            synth.onvoiceschanged = () => resolve(findBest(synth.getVoices()));
         }
     });
 }
 
 async function speakTextWithCallback(text, onEnd) {
-    if (!text || isStopping) {
-        onEnd?.();
-        return;
-    }
-
+    if (!text || isStopping) { onEnd?.(); return; }
     synth.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     const bestVoice = await getHighQualityVoice();
-    
-    if (bestVoice) {
-        utterance.voice = bestVoice;
-        utterance.voiceURI = bestVoice.voiceURI; 
-    }
-
+    if (bestVoice) utterance.voice = bestVoice;
     utterance.lang = "en-US";
     utterance.rate = 0.85; 
-    utterance.pitch = 1.0;
-    
     utterance.onend = () => { if (!isStopping) onEnd?.(); };
     utterance.onerror = () => { if (!isStopping) onEnd?.(); };
-
-    setTimeout(() => {
-        synth.speak(utterance);
-    }, 50);
-}
-
-function stopWordReading() {
-    if (isStopping) return;
-    isStopping = true;
-    isWordReading = false; 
-    
-    if (currentWordReadButton) {
-        currentWordReadButton.textContent = "🔊 Read 3x";
-        currentWordReadButton.classList.remove('reading-disabled');
-        currentWordReadButton = null;
-    }
-    
-    synth.cancel();
-    currentWordText = "";
-    
-    setTimeout(() => { isStopping = false; }, 300);
-}
-
-function stopSentenceReading() {
-    if (isStopping) return;
-    isStopping = true;
-    isSentenceReading = false;
-
-    if (currentSentenceReadButton) {
-        currentSentenceReadButton.textContent = "🔊 Read 3x";
-        currentSentenceReadButton.classList.remove('reading-disabled');
-        currentSentenceReadButton = null;
-    }
-
-    synth.cancel();
-    currentSentenceText = "";
-    
-    setTimeout(() => { isStopping = false; }, 300);
+    setTimeout(() => synth.speak(utterance), 50);
 }
 
 function stopAllReading() {
-    stopWordReading();
-    stopSentenceReading();
+    isStopping = true;
+    isWordReading = false;
+    isSentenceReading = false;
+    if (currentWordReadButton) {
+        currentWordReadButton.textContent = "🔊 Read 3x";
+        currentWordReadButton.classList.remove('reading-disabled');
+    }
+    if (currentSentenceReadButton) {
+        currentSentenceReadButton.textContent = "🔊 Read 3x";
+        currentSentenceReadButton.classList.remove('reading-disabled');
+    }
+    synth.cancel();
+    setTimeout(() => { isStopping = false; }, 300);
 }
 
 function toggleWordReading(word, buttonElement) {
-    if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
-        stopWordReading();
-        return;
-    }
-    
+    if (isWordReading && currentWordReadButton === buttonElement) { stopAllReading(); return; }
     stopAllReading();
-    setTimeout(() => {
-        startWordReading(word, buttonElement);
-    }, 350);
+    setTimeout(() => startWordReading(word, buttonElement), 350);
 }
 
 function startWordReading(word, buttonElement) {
-    currentWordText = word;
     currentWordReadButton = buttonElement;
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
-    
     let readCount = 0;
     isWordReading = true;
-    
     function speakNext() {
         if (!isWordReading || isStopping) return;
-        if (readCount >= 3) {
-            stopWordReading();
-            return;
-        }
+        if (readCount >= 3) { stopAllReading(); return; }
         speakTextWithCallback(word, () => {
             readCount++;
-            if (readCount < 3 && isWordReading && !isStopping) {
-                setTimeout(speakNext, 500);
-            } else {
-                stopWordReading();
-            }
+            if (readCount < 3 && isWordReading && !isStopping) setTimeout(speakNext, 500);
+            else stopAllReading();
         });
     }
-    
-    synth.cancel();
     setTimeout(speakNext, 100);
 }
 
 function toggleSentenceReading(sentenceText, buttonElement) {
-    if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
-        stopSentenceReading();
-        return;
-    }
-    
+    if (isSentenceReading && currentSentenceReadButton === buttonElement) { stopAllReading(); return; }
     stopAllReading();
-    setTimeout(() => {
-        startSentenceReading(sentenceText, buttonElement);
-    }, 350);
+    setTimeout(() => startSentenceReading(sentenceText, buttonElement), 350);
 }
 
 function startSentenceReading(sentenceText, buttonElement) {
-    currentSentenceText = sentenceText;
     currentSentenceReadButton = buttonElement;
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
-    
     let readCount = 0;
     isSentenceReading = true;
-    
     function speakNext() {
         if (!isSentenceReading || isStopping) return;
-        if (readCount >= 3) {
-            stopSentenceReading();
-            return;
-        }
+        if (readCount >= 3) { stopAllReading(); return; }
         speakTextWithCallback(sentenceText, () => {
             readCount++;
-            if (readCount < 3 && isSentenceReading && !isStopping) {
-                setTimeout(speakNext, 600); 
-            } else {
-                stopSentenceReading();
-            }
+            if (readCount < 3 && isSentenceReading && !isStopping) setTimeout(speakNext, 600);
+            else stopAllReading();
         });
     }
-    
-    synth.cancel();
     setTimeout(speakNext, 100);
 }
 
 // ====================== 数据加载逻辑 ======================
 async function loadFileListByLevel(level) {
     const fileSelect = document.getElementById('fileSelect');
-    const fileRow = document.getElementById('fileRow');
-    
     fileSelect.innerHTML = '<option value="">Loading...</option>';
-    fileRow.style.display = 'flex';
-    
     try {
         const res = await fetch(getFileListUrl(level));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
         const config = await res.json();
         const files = config.files || [];
-        
-        fileSelect.innerHTML = '';
-        if (files.length === 0) {
-            fileSelect.innerHTML = '<option value="">No files available</option>';
-            return;
-        }
-        
-        const placeholder = document.createElement('option');
-        placeholder.value = "";
-        placeholder.textContent = "Select File";
-        fileSelect.appendChild(placeholder);
-
+        fileSelect.innerHTML = '<option value="">Select File</option>';
         files.forEach(file => {
             const option = document.createElement('option');
             option.value = file;
@@ -285,389 +184,157 @@ async function loadFileListByLevel(level) {
         });
     } catch (e) {
         fileSelect.innerHTML = '<option value="">Load failed</option>';
-        console.error("文件列表加载失败:", e);
     }
 }
 
-async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
+async function parseExcelBufferAndLoad(buf) {
     try {
         const wb = XLSX.read(buf, { type: "array" });
-        const sheetName0 = wb.SheetNames[0];
-        const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
-        
+        const wordData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
             word: String(item.word).trim(),
             meaning: String(item.meaning).trim(),
             day: Number(item.day)
         }));
-        
         filteredWords = [...allWords];
         currentWordIdx = 0;
         
         allSentences = [];
         if (wb.SheetNames.length >= 2) {
-            const sheetName1 = wb.SheetNames[1];
-            const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
-            
-            if (rawSentences && rawSentences.length > 0) {
-                for (let row of rawSentences) {
-                    let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
-                    let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
-                    
-                    if (en && String(en).trim()) {
-                        allSentences.push({
-                            sentence_en: String(en).trim(),
-                            sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence"
-                        });
-                    }
-                }
-            }
+            const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]]);
+            rawSentences.forEach(row => {
+                let en = row.sentence || row.sentence_en || row.english || row.en;
+                let zh = row.chinese || row.meaning || row.zh;
+                if (en) allSentences.push({ sentence_en: String(en).trim(), sentence_zh: zh ? String(zh).trim() : "✨" });
+            });
         }
         
-        const wordDiv = document.getElementById("wordContent");
-        if (filteredWords.length) {
-            showWord();
-            updateInfoTip();
-        } else {
-            wordDiv.innerHTML = '<p>⚠️ No word data in this source.</p>';
-        }
-        document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
+        // 匯入成功，解除隱藏並更新 UI
+        document.getElementById("wordArea").style.display = 'block';
         document.getElementById("dayRow").style.display = 'flex';
-        
-        if (allSentences.length === 0) {
-            document.getElementById("sentenceArea").style.display = 'none';
-        } else {
+        showWord();
+        updateInfoTip();
+
+        if (allSentences.length > 0) {
             document.getElementById("sentenceArea").style.display = 'block';
             currentSentenceIdx = 0;
             updateSentenceUI();
-            updateSentenceStats();
+        } else {
+            document.getElementById("sentenceArea").style.display = 'none';
         }
-        
+        document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
         return true;
-    } catch (parseErr) {
-        console.error("Excel parsing failed", parseErr);
+    } catch (e) {
+        console.error(e);
         return false;
     }
 }
 
 async function loadSelectedFile(filename) {
     if (!filename || !currentLevel) return;
-    
     stopAllReading();
     currentFileName = filename;
     currentFileNameForSentences = filename;
-    currentExternalUrl = "";
-    
-    const wordDiv = document.getElementById("wordContent");
-    wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
-    document.getElementById("dayRow").style.display = 'flex';
-    document.getElementById("sentenceArea").style.display = 'none';
-    document.getElementById("showAllBtn").style.display = 'none';
-    document.getElementById("infoTipContainer").innerHTML = '';
-    
     try {
-        const url = getXlsxFileUrl(currentLevel, filename);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(getXlsxFileUrl(currentLevel, filename));
         const buf = await res.arrayBuffer();
-        await parseExcelBufferAndLoad(buf, filename);
+        await parseExcelBufferAndLoad(buf);
     } catch (err) {
-        wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file.</p>';
-        document.getElementById("sentenceArea").style.display = 'none';
-        console.error(err);
+        document.getElementById("wordContent").innerHTML = '<p style="color:red;">❌ Load failed.</p>';
     }
 }
 
 async function loadFromLocalFile(file) {
-    if (!file) {
-        alert("Please select an Excel file (.xlsx, .xls, .csv)");
-        return false;
-    }
-    
-    const validExtensions = ['.xlsx', '.xls', '.csv'];
-    const fileName = file.name;
-    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-    if (!validExtensions.includes(fileExt)) {
-        alert("Please select a valid Excel file (.xlsx, .xls, .csv)");
-        return false;
-    }
-    
     stopAllReading();
-    currentFileName = fileName;
-    currentFileNameForSentences = fileName;
-    currentExternalUrl = fileName;
-    currentLevel = "";
-    
-    const wordDiv = document.getElementById("wordContent");
-    wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
-    document.getElementById("dayRow").style.display = 'flex';
-    document.getElementById("sentenceArea").style.display = 'none';
-    document.getElementById("showAllBtn").style.display = 'none';
-    document.getElementById("infoTipContainer").innerHTML = '';
-    
+    currentFileName = file.name;
+    currentFileNameForSentences = file.name;
     try {
-        const buf = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(e);
-            reader.readAsArrayBuffer(file);
-        });
-        
-        const success = await parseExcelBufferAndLoad(buf, fileName);
-        if (success) {
-            return true;
-        } else {
-            throw new Error("Parse failed, please check file format");
-        }
+        const buf = await file.arrayBuffer();
+        return await parseExcelBufferAndLoad(buf);
     } catch (err) {
-        wordDiv.innerHTML = `<p style="color:#ef4444;">❌ Load failed: ${err.message}</p>`;
-        document.getElementById("sentenceArea").style.display = 'none';
-        document.getElementById("showAllBtn").style.display = 'none';
-        console.error(err);
         return false;
     }
 }
 
-// ====================== 篩選與導航 ======================
+// ====================== 導航與顯示 ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
-    
     if (daySelect.value === 'all') {
-        filteredWords = JSON.parse(JSON.stringify(allWords));
-        currentWordIdx = 0;
-        showWord();
-        alert(`✅ Loaded all ${filteredWords.length} words!`);
+        filteredWords = [...allWords];
     } else {
         const day = Number(dayNum.value);
-        if (isNaN(day) || day < 1) {
-            alert('Please enter a valid day number (≥1)!');
-            dayNum.focus();
-            return;
-        }
         filteredWords = allWords.filter(item => item.day === day);
-        if (filteredWords.length === 0) {
-            alert(`No words for Day ${day}.`);
-        }
-        currentWordIdx = 0;
-        showWord();
     }
+    currentWordIdx = 0;
+    showWord();
     updateInfoTip();
-}
-
-function getMaxDay() {
-    if (allWords.length === 0) return 0;
-    let max = 0;
-    for (let i = 0; i < allWords.length; i++) {
-        if (allWords[i].day > max) {
-            max = allWords[i].day;
-        }
-    }
-    return max;
 }
 
 function showWord() {
     stopAllReading();
     const container = document.getElementById("wordContent");
-    
     if (filteredWords.length === 0) {
-        container.innerHTML = '<p style="color:#ef4444;">No words for this day</p>';
-        updateInfoTip();
+        container.innerHTML = '<p>No words for this day</p>';
         return;
     }
-    
-    if (currentWordIdx >= filteredWords.length) {
-        container.innerHTML = '<p style="color:#22c55e; font-size:24px;">🎉 Practice Complete!</p>';
-        updateInfoTip();
-        return;
-    }
-    
     const w = filteredWords[currentWordIdx];
-    const isFirst = currentWordIdx === 0;
-    
     container.innerHTML = `
         <div class="meaning">💡 ${w.meaning}</div>
         <div class="word" id="currentWordSpan" style="display:none;">${w.word.toUpperCase()}</div>
         <div class="btn-group">
             <button class="btn-show" id="btnShowWord">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
-            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
+            <button class="btn-prev" id="btnPrevWord" ${currentWordIdx === 0 ? "disabled" : ""}>⬅️ Previous</button>
             <button class="btn-next" id="btnNextWord">➡️ Next</button>
         </div>
     `;
-    
-    updateInfoTip();
-    
-    document.getElementById("btnShowWord")?.addEventListener("click", () => {
-        const span = document.getElementById("currentWordSpan");
-        if (span) span.style.display = "block";
-    });
-    
+    document.getElementById("btnShowWord").onclick = () => document.getElementById("currentWordSpan").style.display = "block";
     const readBtn = document.getElementById("btnReadWord");
-    if (readBtn) {
-        readBtn.onclick = () => toggleWordReading(w.word, readBtn);
-    }
-    
-    document.getElementById("btnPrevWord")?.addEventListener("click", () => {
-        if (currentWordIdx > 0) {
-            currentWordIdx--;
-            showWord();
-        }
-    });
-    
-    document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx + 1 <= filteredWords.length) {
-            currentWordIdx++;
-            showWord();
-        }
-    });
+    readBtn.onclick = () => toggleWordReading(w.word, readBtn);
+    document.getElementById("btnPrevWord").onclick = () => { if(currentWordIdx > 0) { currentWordIdx--; showWord(); updateInfoTip(); }};
+    document.getElementById("btnNextWord").onclick = () => { if(currentWordIdx < filteredWords.length - 1) { currentWordIdx++; showWord(); updateInfoTip(); }};
 }
 
 function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
-    if (!container) return;
-    
-    const maxDay = getMaxDay();
-    const dayDisplay = maxDay > 0 && filteredWords[currentWordIdx] ? `Day ${filteredWords[currentWordIdx].day}/${maxDay}` : `Day ${filteredWords[currentWordIdx]?.day}`;
-    
-    if (currentMode === "local" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
-        const displayFile = removeFileExtension(currentFileName);
-        container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
-    } else if (currentMode === "external" && currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
-        const displayFile = removeFileExtension(currentFileName);
-        container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
-    } else if (allSentences.length > 0) {
-        container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
-    } else {
-        container.innerHTML = '';
-    }
+    if (!container || !filteredWords.length) return;
+    const displayFile = removeFileExtension(currentFileName);
+    container.innerHTML = `${displayFile} | Day ${filteredWords[currentWordIdx]?.day} | ${currentWordIdx + 1}/${filteredWords.length} words`;
 }
 
-// ====================== 句子相关功能 ======================
 function updateSentenceUI() {
     if (!allSentences.length) return;
-    
     const sent = allSentences[currentSentenceIdx];
-    const meaningDiv = document.querySelector("#sentenceContent .sentence-meaning");
+    document.querySelector("#sentenceContent .sentence-meaning").innerHTML = `📖 ${sent.sentence_zh}`;
     const enSpan = document.getElementById("sentenceEnHidden");
-    
-    if (meaningDiv) meaningDiv.innerHTML = `📖 ${sent.sentence_zh}`;
-    if (enSpan) {
-        enSpan.innerText = sent.sentence_en;
-        enSpan.style.display = "none";
-    }
-    
-    const tipSpan = document.getElementById("sentenceTip");
-    if (tipSpan) tipSpan.innerText = `📌 ${currentSentenceIdx + 1} / ${allSentences.length} sentences`;
-    
-    updateSentenceStats();
-    
-    const prevBtn = document.getElementById("prevSentenceBtn");
-    if (prevBtn) prevBtn.disabled = currentSentenceIdx === 0;
-    
+    enSpan.innerText = sent.sentence_en;
+    enSpan.style.display = "none";
+    document.getElementById("sentenceTip").innerText = `📌 ${currentSentenceIdx + 1} / ${allSentences.length} sentences`;
+    document.getElementById("prevSentenceBtn").disabled = currentSentenceIdx === 0;
     attachSentenceEvents();
 }
 
-function updateSentenceStats() {
-    const statsSpan = document.getElementById("sentenceStats");
-    if (statsSpan) statsSpan.innerText = `${allSentences.length} sentences`;
-}
-
-function showCurrentSentence() {
-    const hiddenSpan = document.getElementById("sentenceEnHidden");
-    if (hiddenSpan) hiddenSpan.style.display = "block";
-}
-
-function prevSentence() {
-    if (allSentences.length && currentSentenceIdx > 0) {
-        currentSentenceIdx--;
-        updateSentenceUI();
-        stopAllReading();
-    }
-}
-
-function nextSentence() {
-    if (allSentences.length && currentSentenceIdx < allSentences.length - 1) {
-        currentSentenceIdx++;
-        updateSentenceUI();
-        stopAllReading();
-    } else if (allSentences.length) {
-        alert("🎉 You've completed all sentences!");
-    }
-}
-
 function attachSentenceEvents() {
-    const showBtn = document.getElementById("showSentenceBtn");
+    document.getElementById("showSentenceBtn").onclick = () => document.getElementById("sentenceEnHidden").style.display = "block";
     const readBtn = document.getElementById("readSentenceBtn");
-    const prevBtn = document.getElementById("prevSentenceBtn");
-    const nextBtn = document.getElementById("nextSentenceBtn");
-    const allBtn = document.getElementById("showAllSentencesBtn");
-    
-    if (showBtn) showBtn.onclick = () => showCurrentSentence();
-    if (readBtn) {
-        readBtn.onclick = () => {
-            const currentSent = allSentences[currentSentenceIdx];
-            if (currentSent) toggleSentenceReading(currentSent.sentence_en, readBtn);
-        };
-    }
-    if (prevBtn) prevBtn.onclick = () => prevSentence();
-    if (nextBtn) nextBtn.onclick = () => nextSentence();
-    if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
+    readBtn.onclick = () => toggleSentenceReading(allSentences[currentSentenceIdx].sentence_en, readBtn);
+    document.getElementById("prevSentenceBtn").onclick = () => { if(currentSentenceIdx > 0) { currentSentenceIdx--; updateSentenceUI(); }};
+    document.getElementById("nextSentenceBtn").onclick = () => { if(currentSentenceIdx < allSentences.length - 1) { currentSentenceIdx++; updateSentenceUI(); }};
+    document.getElementById("showAllSentencesBtn").onclick = showAllSentencesPopup;
 }
 
 function showAllSentencesPopup() {
-    if (!allSentences.length) return;
-    
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : removeFileExtension(currentFileName);
-    const tableRows = allSentences.map((s, idx) => `
-        <tr>
-            <td style="padding: 12px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 12px;"><strong>${s.sentence_en}</strong></td>
-            <td style="padding: 12px;">${s.sentence_zh}</td>
-        </tr>
-    `).join('');
-    
-    const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
-        h2 { color: #ff9a56; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
-        th { background: #ff9a56; color: white; }
-        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
-    
-    const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(winHtml);
-    win.document.close();
+    const tableRows = allSentences.map((s, idx) => `<tr><td>${idx+1}</td><td>${s.sentence_en}</td><td>${s.sentence_zh}</td></tr>`).join('');
+    const win = window.open('', '_blank');
+    win.document.write(`<table>${tableRows}</table>`);
 }
 
 function showAllWords() {
-    if (allWords.length === 0) return;
-    
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : removeFileExtension(currentFileName);
-    const tableRows = allWords.map(w => `
-        <tr>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;"><strong>${w.word.toUpperCase()}</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;">${w.meaning}</td>
-        </tr>
-    `).join('');
-    
-    const allWordsHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
-        h2 { color: #ff9a56; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-        th { background: #ff9a56; color: white; }
-        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
-    
-    const newWindow = window.open('', '_blank', 'width=900,height=700');
-    newWindow.document.write(allWordsHtml);
-    newWindow.document.close();
+    const tableRows = allWords.map(w => `<tr><td>${w.day}</td><td>${w.word}</td><td>${w.meaning}</td></tr>`).join('');
+    const win = window.open('', '_blank');
+    win.document.write(`<table>${tableRows}</table>`);
 }
 
 // ====================== 模式切换 ======================
@@ -678,222 +345,87 @@ function toggleMode(mode) {
     const levelRow = document.getElementById('levelRow');
     const toggleBtn = document.getElementById('modeToggleBtn');
     const dayRow = document.getElementById('dayRow');
-    
+    const wordArea = document.getElementById('wordArea');
+    const sentenceArea = document.getElementById('sentenceArea');
+
     if (mode === "local") {
         fileRow.style.display = 'flex';
         externalRow.style.display = 'none';
         levelRow.classList.remove('hidden-level');
         toggleBtn.textContent = "📁 Built-in DB";
-        toggleBtn.classList.add('active');
         
-        if (!(currentFileName && allWords.length > 0)) {
-            allWords = [];
-            filteredWords = [];
-            allSentences = [];
+        // 切換回內建模式：如果已經有數據就顯示，否則維持引導語
+        if (allWords.length > 0) {
+            wordArea.style.display = 'block';
+            dayRow.style.display = 'flex';
+            if (allSentences.length > 0) sentenceArea.style.display = 'block';
+        } else {
             document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
-            document.getElementById("sentenceArea").style.display = 'none';
-            document.getElementById("showAllBtn").style.display = 'none';
             dayRow.style.display = 'none';
-            document.getElementById("infoTipContainer").innerHTML = '';
-            currentLevel = "";
+            sentenceArea.style.display = 'none';
         }
     } else {
+        // 切換到 Local File 模式：立即隱藏數據區，等待 Import
         fileRow.style.display = 'none';
         externalRow.style.display = 'flex';
         levelRow.classList.add('hidden-level');
         toggleBtn.textContent = "📂 Local File";
-        toggleBtn.classList.remove('active');
         
-        if (!(currentFileName && allWords.length > 0)) {
-            allWords = [];
-            filteredWords = [];
-            allSentences = [];
-            document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Select a local Excel file to start ✨</p>';
-            document.getElementById("sentenceArea").style.display = 'none';
-            document.getElementById("showAllBtn").style.display = 'none';
-            dayRow.style.display = 'none';
-            document.getElementById("infoTipContainer").innerHTML = '';
-            currentLevel = "";
-        }
+        // 隱藏內容區域，等待使用者點擊 Import
+        wordArea.style.display = 'block'; // 保持區域在，但內容改為提示
+        document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Please import an Excel file (.xlsx) ✨</p>';
+        dayRow.style.display = 'none';
+        sentenceArea.style.display = 'none';
+        document.getElementById("showAllBtn").style.display = 'none';
+        document.getElementById("infoTipContainer").innerHTML = '';
     }
 }
 
-// ====================== 初始化與事件綁定 ======================
+// ====================== 初始化 ======================
 document.addEventListener('DOMContentLoaded', () => {
     initDaySelectToggle();
-    
-    const showAllBtn = document.getElementById('showAllBtn');
     const levelSelect = document.getElementById('levelSelect');
     const levelConfirm = document.getElementById('levelConfirm');
     const fileSelect = document.getElementById('fileSelect');
     const fileConfirm = document.getElementById('fileConfirm');
     const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    const filterBtn = document.getElementById('filterBtn');
     const modeToggle = document.getElementById('modeToggleBtn');
     const localFileConfirm = document.getElementById('localFileConfirmBtn');
     const localFileInput = document.getElementById('localFileInput');
-    const selectFileBtn = document.getElementById('selectFileBtn');
-    const fileNameDisplay = document.getElementById('fileNameDisplay');
-    
-    modeToggle.addEventListener('click', () => {
-        if (currentMode === "local") toggleMode("external");
-        else toggleMode("local");
-    });
-    
-    // Level Confirm 邏輯
-    levelConfirm.addEventListener('click', function() {
-        this.style.opacity = '0.7';
-        setTimeout(() => this.style.opacity = '1', 200);
-        
-        if (currentMode !== "local") return;
+
+    modeToggle.onclick = () => toggleMode(currentMode === "local" ? "external" : "local");
+
+    levelConfirm.onclick = () => {
+        if (!levelSelect.value) return;
         stopAllReading();
-        
-        const level = levelSelect.value;
-        if (!level) {
-            alert('Please select P1 or P2 first!');
-            return;
-        }
-        
-        // --- 重置邏輯：重置 File 下拉單與 Day 篩選器 ---
+        // 重置狀態
         fileSelect.innerHTML = '<option value="">Loading...</option>';
         daySelect.value = 'all';
-        daySelect.dispatchEvent(new Event('change')); // 觸發 initDaySelectToggle 的樣式重置
-        // ------------------------------------------
-
-        currentLevel = level;
-        loadFileListByLevel(level);
-        
-        document.getElementById("sentenceArea").style.display = 'none';
+        daySelect.dispatchEvent(new Event('change'));
+        currentLevel = levelSelect.value;
+        loadFileListByLevel(currentLevel);
         document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
-        document.getElementById("showAllBtn").style.display = 'none';
-        document.getElementById("infoTipContainer").innerHTML = '';
-        
-        allWords = [];
-        filteredWords = [];
-        allSentences = [];
-    });
-    
-    // File Confirm 邏輯
-    fileConfirm.addEventListener('click', async function() {
-        this.style.opacity = '0.7';
-        setTimeout(() => this.style.opacity = '1', 200);
-        
-        if (currentMode !== "local") return;
-        
-        const selected = fileSelect.value;
-        const invalid = ["", "Loading...", "No files available", "Load failed"];
-        
-        if (invalid.includes(selected)) {
-            alert('Please select a valid file!');
-            return;
-        }
-        
-        // --- 重置邏輯：更換 File 時重置 Day 篩選器 ---
+    };
+
+    fileConfirm.onclick = () => {
+        if (!fileSelect.value || fileSelect.value.includes("Select")) return;
+        // 重置 Day 狀態
         daySelect.value = 'all';
         daySelect.dispatchEvent(new Event('change'));
-        // ------------------------------------------
-        
-        await loadSelectedFile(selected);
-    });
+        loadSelectedFile(fileSelect.value);
+    };
 
-    filterBtn.addEventListener('click', function() {
-        this.style.opacity = '0.7';
-        setTimeout(() => this.style.opacity = '1', 200);
-        filterByDay();
-    });
-    
-    showAllBtn.addEventListener('click', showAllWords);
-    
-    // Local File 選取
-    if (selectFileBtn && localFileInput) {
-        selectFileBtn.onclick = () => localFileInput.click();
-        localFileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                fileNameDisplay.textContent = file.name;
-                fileNameDisplay.classList.remove('empty');
-            }
-        };
-    }
-    
-    if (localFileConfirm) {
-        localFileConfirm.onclick = async () => {
-            const file = localFileInput.files[0];
-            if (file) {
-                // --- 重置邏輯：匯入本地檔案時重置 Day 篩選器 ---
-                daySelect.value = 'all';
-                daySelect.dispatchEvent(new Event('change'));
-                // ------------------------------------------
-                await loadFromLocalFile(file);
-            } else {
-                alert("Please select a file first!");
-            }
-        };
-    }
+    document.getElementById('filterBtn').onclick = filterByDay;
+    document.getElementById('showAllBtn').onclick = showAllWords;
 
-    // ======================================================
-    // Save 按鈕與自動恢復功能
-    // ======================================================
-
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', () => {
-            const config = {
-                mode: currentMode,
-                level: levelSelect.value,
-                file: fileSelect.value,
-                daySelect: daySelect.value,
-                dayNum: dayNum.value,
-                wordIdx: currentWordIdx,
-                sentenceIdx: currentSentenceIdx
-            };
-            localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
-            alert("Progress and settings have been saved!");
-        });
-    }
-
-    async function autoRestore() {
-        const saved = localStorage.getItem('kidsEnglish_Config_V2');
-        if (!saved) return;
-        
-        const config = JSON.parse(saved);
-
-        if (config.mode && config.mode !== currentMode) {
-            toggleMode(config.mode);
+    localFileConfirm.onclick = async () => {
+        const file = localFileInput.files[0];
+        if (file) {
+            daySelect.value = 'all';
+            daySelect.dispatchEvent(new Event('change'));
+            await loadFromLocalFile(file);
         }
+    };
 
-        if (config.mode === "local" && config.level) {
-            levelSelect.value = config.level;
-            currentLevel = config.level;
-            await loadFileListByLevel(config.level);
-
-            if (config.file) {
-                setTimeout(async () => {
-                    fileSelect.value = config.file;
-                    if (fileSelect.value === config.file) {
-                        await loadSelectedFile(config.file);
-                        if (config.daySelect) {
-                            daySelect.value = config.daySelect;
-                            daySelect.dispatchEvent(new Event('change'));
-                            dayNum.value = config.dayNum;
-                            filterByDay(); 
-                            
-                            if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
-                                currentWordIdx = config.wordIdx;
-                                showWord();
-                            }
-                            if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
-                                currentSentenceIdx = config.sentenceIdx;
-                                updateSentenceUI();
-                            }
-                        }
-                    }
-                }, 500);
-            }
-        }
-    }
-
-    setTimeout(autoRestore, 800);
     toggleMode("local");
 });
