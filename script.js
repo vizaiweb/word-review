@@ -80,22 +80,29 @@ function initDaySelectToggle() {
 /**
  * 獲取高品質語音：優先尋找 Google、Natural 或高品質美式英語
  */
+// ====================== 語音功能 (手機兼容強化版) ======================
+
 function getHighQualityVoice() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
-        const select = () => {
+        
+        const findVoice = () => {
             const vs = synth.getVoices();
-            // 優先順序：Google US English > 包含 Natural 關鍵字 > Apple Samantha > 任何美式英語
-            return vs.find(v => v.name === 'Google US English') ||
-                   vs.find(v => v.name.includes('Natural') && v.lang.includes('en-US')) ||
-                   vs.find(v => v.name.includes('Samantha')) ||
-                   vs.find(v => v.lang.includes('en-US')) ||
-                   vs.find(v => v.lang.includes('en'));
+            // 手機版優先尋找高品質語音
+            return vs.find(v => v.name.includes('Google') && v.lang.includes('en')) || 
+                   vs.find(v => v.name.includes('Premium') && v.lang.includes('en')) || 
+                   vs.find(v => v.name.includes('Samantha')) || 
+                   vs.find(v => v.lang.startsWith('en-US')) || 
+                   vs.find(v => v.lang.startsWith('en'));
         };
 
-        if (voices.length) resolve(select());
-        else {
-            synth.onvoiceschanged = () => resolve(select());
+        if (voices.length > 0) {
+            resolve(findVoice());
+        } else {
+            // 手機版通常需要等這個事件觸發
+            synth.onvoiceschanged = () => {
+                resolve(findVoice());
+            };
         }
     });
 }
@@ -105,23 +112,30 @@ async function speakTextWithCallback(text, onEnd) {
         if (onEnd) onEnd();
         return;
     }
-    
+
+    // 1. 強制停止當前朗讀（解決手機連讀卡住的問題）
+    synth.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
     const bestVoice = await getHighQualityVoice();
     
     if (bestVoice) {
         utterance.voice = bestVoice;
+        console.log("Using voice:", bestVoice.name); // 調試用
     }
 
     utterance.lang = "en-US";
-    // 參數優化：語速 0.85 最清晰，音調 1.0 最像真人
     utterance.rate = 0.85; 
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     
     utterance.onend = () => { if (!isStopping && onEnd) onEnd(); };
-    utterance.onerror = () => { if (!isStopping && onEnd) onEnd(); };
+    utterance.onerror = (e) => { 
+        console.error("Speech Error:", e);
+        if (!isStopping && onEnd) onEnd(); 
+    };
 
+    // 2. 針對手機的特殊處理：必須在用戶點擊的瞬間執行
     synth.speak(utterance);
 }
 
