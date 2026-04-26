@@ -25,6 +25,44 @@ let currentSentenceText = "";
 let isStopping = false;
 let pendingStart = null;
 
+
+// 1. 定義儲存功能的函數
+function saveCurrentSettings() {
+    const settings = {
+        level: document.getElementById('levelSelect').value, // 假設你的 ID 是 levelSelect
+        file: document.getElementById('fileSelect').value,   // 假設你的 ID 是 fileSelect
+        day: document.getElementById('dayInput').value       // 假設你的數字輸入框 ID 是 dayInput
+    };
+    
+    // 將物件轉為字串存入 localStorage
+    localStorage.setItem('kidsEnglishConfig', JSON.stringify(settings));
+    alert('設定已儲存！下次開啟將自動載入。');
+}
+
+// 2. 定義載入功能的函數 (網頁開啟時執行)
+function loadSavedSettings() {
+    const savedData = localStorage.getItem('kidsEnglishConfig');
+    if (savedData) {
+        const settings = JSON.parse(savedData);
+        
+        // 將儲存的值填回下拉選單與輸入框
+        if (settings.level) document.getElementById('levelSelect').value = settings.level;
+        if (settings.file) document.getElementById('fileSelect').value = settings.file;
+        if (settings.day) document.getElementById('dayInput').value = settings.day;
+        
+        console.log('已自動載入上次的設定');
+        
+        // 建議載入後自動觸發一次 Filter 或 Confirm 的邏輯，讓畫面同步
+        // updateContent(); 
+    }
+}
+
+// 3. 綁定按鈕事件
+document.getElementById('saveSettingsBtn').addEventListener('click', saveCurrentSettings);
+
+// 4. 頁面加載完成後自動呼叫
+window.addEventListener('load', loadSavedSettings);
+
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
