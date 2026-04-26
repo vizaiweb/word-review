@@ -93,6 +93,12 @@
         }
 
         /* 儲存按鈕專屬樣式 */
+        .mode-save-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
         .save-btn {
             background: white !important;
             color: #ff6b35 !important;
@@ -362,10 +368,12 @@
         <h1>🌟 Kids English 🌟</h1>
     </div>
 
-    <div class="select-section">
-        <div class="select-row">
-            <label>📀 Mode:</label>
-            <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+<div class="select-section">
+        <div class="select-row mode-save-container">
+            <div>
+                <label>📀 Mode:</label>
+                <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+            </div>
             <button id="saveSettingsBtn" class="save-btn">Save</button>
         </div>
         
