@@ -1,9 +1,12 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Kids Word & Sentence Practice</title>
+    <!-- Excel 解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         /* ====================== 全局基础样式 ====================== */
@@ -20,6 +23,22 @@
             line-height: 1.5;
         }
 
+
+        .mode-row-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        flex-wrap: nowrap;
+    }
+    .save-btn {
+        background: white !important;
+        color: #ff6b35 !important;
+        border: 2px solid #ff9a56 !important;
+        padding: 6px 15px !important;
+        margin-bottom: 5px;
+    }
+        
         .container {
             max-width: 700px;
             margin: 0 auto;
@@ -52,7 +71,6 @@
             gap: 8px;
             margin: 10px 0;
         }
-
         .select-row label {
             font-weight: 600;
             color: #1e293b;
@@ -82,7 +100,7 @@
         .btn-file { background: #0f67b3; }
         .btn-filter { background: #2b7e3a; }
         .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
-
+        
         .mode-toggle {
             background: #ffb347;
             margin-bottom: 5px;
@@ -90,20 +108,6 @@
         .mode-toggle.active {
             background: #2b7e3a;
             box-shadow: 0 0 0 2px #f0f4f8, 0 0 0 4px #2b7e3a;
-        }
-
-        /* 儲存按鈕專屬樣式 */
-        .mode-save-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-        }
-        .save-btn {
-            background: white !important;
-            color: #ff6b35 !important;
-            border: 2px solid #ff9a56 !important;
-            margin-left: auto; /* 強制靠右 */
         }
 
         #dayRow {
@@ -331,10 +335,20 @@
             margin: 0 6px;
         }
         
+        @media (max-width: 550px) {
+            .meaning { font-size: 22px; }
+            .sentence-meaning { font-size: 18px; }
+            .btn-group button, .sentence-buttons button, .show-all-btn, .btn-sentence-all {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+        
         .level-row.hidden-level {
             display: none !important;
         }
         
+        /* 隐藏文件输入框的默认文字 */
         .hidden-file-input {
             position: absolute;
             width: 0;
@@ -368,13 +382,10 @@
         <h1>🌟 Kids English 🌟</h1>
     </div>
 
-<div class="select-section">
-        <div class="select-row mode-save-container">
-            <div>
-                <label>📀 Mode:</label>
-                <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
-            </div>
-            <button id="saveSettingsBtn" class="save-btn">Save</button>
+    <div class="select-section">
+        <div class="select-row">
+            <label>📀 Mode:</label>
+            <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
         </div>
         
         <div class="select-row level-row" id="levelRow">
@@ -400,6 +411,14 @@
             <span id="fileNameDisplay" class="file-name-display empty">No file selected</span>
             <button class="btn-file" id="localFileConfirmBtn">Import</button>
         </div>
+
+<div class="select-row mode-row-container">
+    <div>
+        <label>📀 Mode:</label>
+        <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
+    </div>
+    <button id="saveSettingsBtn" class="save-btn">Save</button>
+</div>
         
         <div class="select-row" id="dayRow" style="display:none;">
             <label>Day:</label>
