@@ -71,7 +71,7 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 終極兼容版語音邏輯 ======================
+// ====================== 語音邏輯 (保持不變) ======================
 function getHighQualityVoice() {
     return new Promise(resolve => {
         let voices = synth.getVoices();
@@ -196,23 +196,25 @@ async function parseExcelBufferAndLoad(buf) {
             });
         }
         
-        // ✨ 解除隱藏並更新 UI
-        document.getElementById("dayRow").style.display = 'flex';
-        const wordArea = document.getElementById("wordArea");
-        if(wordArea) wordArea.style.display = 'block';
-
+        // ✨ 強制解除隱藏：確保單字區與句子區顯示
+        const dayRow = document.getElementById("dayRow");
+        const sentenceArea = document.getElementById("sentenceArea");
+        const showAllBtn = document.getElementById("showAllBtn");
+        
+        if (dayRow) dayRow.style.display = 'flex';
+        
         if (allWords.length > 0) {
             showWord();
             updateInfoTip();
-            document.getElementById("showAllBtn").style.display = 'inline-block';
+            if (showAllBtn) showAllBtn.style.display = 'inline-block';
         }
 
         if (allSentences.length > 0) {
-            document.getElementById("sentenceArea").style.display = 'block';
+            if (sentenceArea) sentenceArea.style.display = 'block';
             currentSentenceIdx = 0;
             updateSentenceUI();
         } else {
-            document.getElementById("sentenceArea").style.display = 'none';
+            if (sentenceArea) sentenceArea.style.display = 'none';
         }
         return true;
     } catch (e) {
@@ -252,7 +254,7 @@ async function loadFromLocalFile(file) {
     }
 }
 
-// ====================== 導航與顯示 ======================
+// ====================== 導航與顯示 (保持不變) ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
@@ -353,7 +355,6 @@ function toggleMode(mode) {
         toggleBtn.textContent = "📁 Built-in DB";
         
         if (allWords.length > 0) {
-            document.getElementById("wordArea").style.display = 'block';
             dayRow.style.display = 'flex';
             if (allSentences.length > 0) sentenceArea.style.display = 'block';
         } else {
@@ -370,7 +371,7 @@ function toggleMode(mode) {
         document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Please import an Excel file (.xlsx) ✨</p>';
         dayRow.style.display = 'none';
         sentenceArea.style.display = 'none';
-        document.getElementById("showAllBtn").style.display = 'none';
+        if (document.getElementById("showAllBtn")) document.getElementById("showAllBtn").style.display = 'none';
         document.getElementById("infoTipContainer").innerHTML = '';
     }
 }
@@ -386,13 +387,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeToggle = document.getElementById('modeToggleBtn');
     const localFileConfirm = document.getElementById('localFileConfirmBtn');
     const localFileInput = document.getElementById('localFileInput');
+    const selectFileBtn = document.getElementById('selectFileBtn'); // 關鍵按鈕
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
 
     modeToggle.onclick = () => toggleMode(currentMode === "local" ? "external" : "local");
 
     levelConfirm.onclick = () => {
         if (!levelSelect.value) return;
         stopAllReading();
-        // 重置狀態：按 Level 重置 File 下拉單與 Day
         fileSelect.innerHTML = '<option value="">Loading...</option>';
         daySelect.value = 'all';
         daySelect.dispatchEvent(new Event('change'));
@@ -410,14 +412,29 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Please select a file!");
             return;
         }
-        // 重置狀態：按 File 重置 Day
         daySelect.value = 'all';
         daySelect.dispatchEvent(new Event('change'));
         loadSelectedFile(selected);
     };
 
     document.getElementById('filterBtn').onclick = filterByDay;
-    document.getElementById('showAllBtn').onclick = showAllWords;
+    const showAllBtn = document.getElementById('showAllBtn');
+    if (showAllBtn) showAllBtn.onclick = showAllWords;
+
+    // ✨ 修復 Local File 選擇按鈕
+    if (selectFileBtn && localFileInput) {
+        selectFileBtn.onclick = () => {
+            console.log("Select File button clicked"); // 除錯用
+            localFileInput.click();
+        };
+        localFileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file && fileNameDisplay) {
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.remove('empty');
+            }
+        };
+    }
 
     localFileConfirm.onclick = async () => {
         const file = localFileInput.files[0];
