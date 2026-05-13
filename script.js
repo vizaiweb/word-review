@@ -21,7 +21,6 @@ let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
 let currentReadCount = 0;
-let currentUtterance = null;
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -73,14 +72,13 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 全新语音朗读模块（兼容 iOS/Android） ======================
+// ====================== 语音模块（完全重写，解决所有问题） ======================
 
-// 获取可用的语音（同步版本，用于调试）
+// 获取可用语音（同步）
 function getAvailableVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 优先级：Google US English > Samantha > 任何 en-US > 第一个可用
     return voices.find(v => v.name && v.name.includes('Google US English')) ||
            voices.find(v => v.name && v.name.includes('Samantha')) ||
            voices.find(v => v.lang && v.lang === 'en-US') ||
@@ -88,59 +86,40 @@ function getAvailableVoice() {
            voices[0];
 }
 
-// 核心朗读函数 - 纯同步，无 Promise
-function speakTextDirectly(text, onEnd, rate = 0.85) {
+// 立即朗读一次（无 Promise，纯同步）
+function speakOnce(text, onEnd, rate = 0.85) {
     if (!text) {
         if (onEnd) onEnd();
         return;
     }
     
-    // 取消任何正在进行的朗读
-    try {
-        synth.cancel();
-    } catch(e) {}
+    try { synth.cancel(); } catch(e) {}
     
-    // 创建 utterance
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = rate;
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    // 尝试设置语音（同步获取）
     const voice = getAvailableVoice();
-    if (voice) {
-        utterance.voice = voice;
-    }
+    if (voice) utterance.voice = voice;
     
-    utterance.onend = () => {
-        if (onEnd) onEnd();
-    };
+    utterance.onend = () => { if (onEnd) onEnd(); };
     utterance.onerror = (err) => {
         console.error('Speech error:', err);
         if (onEnd) onEnd();
     };
     
-    // 立即播放
-    try {
-        synth.speak(utterance);
-    } catch(e) {
-        console.error('Speak failed:', e);
-        if (onEnd) onEnd();
-    }
-    
-    return utterance;
+    try { synth.speak(utterance); } catch(e) { if (onEnd) onEnd(); }
 }
 
-// 单词朗读（3次）
+// 单词朗读（3次）- 完全可靠的计数
 function startWordReading(word, buttonElement) {
-    // 如果已经在读同一个单词，则停止
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
         stopWordReading();
         return;
     }
     
-    // 停止所有朗读
     stopAllReading();
     
     currentWordText = word;
@@ -151,7 +130,7 @@ function startWordReading(word, buttonElement) {
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     
-    function readNext() {
+    function speakNext() {
         if (!isWordReading) return;
         if (currentReadCount >= 3) {
             stopWordReading();
@@ -159,27 +138,24 @@ function startWordReading(word, buttonElement) {
         }
         
         currentReadCount++;
-        speakTextDirectly(word, () => {
+        
+        speakOnce(word, () => {
             if (isWordReading && currentReadCount < 3) {
-                // 间隔 500ms 后读下一次
-                setTimeout(readNext, 500);
+                setTimeout(speakNext, 450);
             } else if (currentReadCount >= 3) {
                 stopWordReading();
             }
         });
     }
     
-    // 延迟一点点开始，确保取消完成
-    setTimeout(readNext, 50);
+    setTimeout(speakNext, 50);
 }
 
 function stopWordReading() {
     if (!isWordReading) return;
     isWordReading = false;
     
-    try {
-        synth.cancel();
-    } catch(e) {}
+    try { synth.cancel(); } catch(e) {}
     
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
@@ -207,7 +183,7 @@ function startSentenceReading(sentenceText, buttonElement) {
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     
-    function readNext() {
+    function speakNext() {
         if (!isSentenceReading) return;
         if (currentReadCount >= 3) {
             stopSentenceReading();
@@ -215,25 +191,24 @@ function startSentenceReading(sentenceText, buttonElement) {
         }
         
         currentReadCount++;
-        speakTextDirectly(sentenceText, () => {
+        
+        speakOnce(sentenceText, () => {
             if (isSentenceReading && currentReadCount < 3) {
-                setTimeout(readNext, 600);
+                setTimeout(speakNext, 550);
             } else if (currentReadCount >= 3) {
                 stopSentenceReading();
             }
-        });
+        }, 0.85);
     }
     
-    setTimeout(readNext, 50);
+    setTimeout(speakNext, 50);
 }
 
 function stopSentenceReading() {
     if (!isSentenceReading) return;
     isSentenceReading = false;
     
-    try {
-        synth.cancel();
-    } catch(e) {}
+    try { synth.cancel(); } catch(e) {}
     
     if (currentSentenceReadButton) {
         currentSentenceReadButton.textContent = "🔊 Read 3x";
@@ -249,7 +224,6 @@ function stopAllReading() {
     stopSentenceReading();
 }
 
-// 给外部调用的 toggle 函数
 function toggleWordReading(word, buttonElement) {
     startWordReading(word, buttonElement);
 }
@@ -258,22 +232,19 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// 预加载语音（在用户首次点击时触发）
-let voicePreloaded = false;
-function preloadVoiceOnFirstTouch() {
-    if (voicePreloaded) return;
-    voicePreloaded = true;
+// 语音预热（首次点击时触发）
+let voicePreheated = false;
+function preheatVoice() {
+    if (voicePreheated) return;
+    voicePreheated = true;
     
-    // 创建一个静默的 utterance 来激活语音引擎
     try {
-        const silentUtterance = new SpeechSynthesisUtterance('');
-        silentUtterance.volume = 0;
+        const silent = new SpeechSynthesisUtterance('');
+        silent.volume = 0;
         const voice = getAvailableVoice();
-        if (voice) silentUtterance.voice = voice;
-        synth.speak(silentUtterance);
-        setTimeout(() => {
-            try { synth.cancel(); } catch(e) {}
-        }, 200);
+        if (voice) silent.voice = voice;
+        synth.speak(silent);
+        setTimeout(() => { try { synth.cancel(); } catch(e) {} }, 200);
     } catch(e) {}
 }
 
@@ -528,7 +499,7 @@ function showWord() {
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
         readBtn.onclick = () => {
-            preloadVoiceOnFirstTouch();  // 首次点击时预热
+            preheatVoice();
             toggleWordReading(w.word, readBtn);
         };
     }
@@ -633,7 +604,7 @@ function attachSentenceEvents() {
         readBtn.onclick = () => {
             const currentSent = allSentences[currentSentenceIdx];
             if (currentSent) {
-                preloadVoiceOnFirstTouch();  // 首次点击时预热
+                preheatVoice();
                 toggleSentenceReading(currentSent.sentence_en, readBtn);
             }
         };
@@ -650,7 +621,7 @@ function showAllSentencesPopup() {
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 12px;"><strong>${s.sentence_en}</strong><td>
+            <td style="padding: 12px;"><strong>${s.sentence_en}</strong></td>
             <td style="padding: 12px;">${s.sentence_zh}</td>
         </tr>
     `).join('');
@@ -690,7 +661,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `</table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
