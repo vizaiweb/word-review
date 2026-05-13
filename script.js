@@ -14,20 +14,14 @@ let currentMode = "local";
 const synth = window.speechSynthesis;
 
 // 朗读相关变量
-let wordReadTimer = null;
-let sentenceReadTimer = null;
 let isWordReading = false;
 let isSentenceReading = false;
 let currentWordReadButton = null;
 let currentSentenceReadButton = null;
 let currentWordText = "";
 let currentSentenceText = "";
-let isStopping = false;
-let pendingStart = null;
-
-// ========== 语音预热相关变量 ==========
-let isVoiceReady = false;
-let pendingVoiceResolvers = [];
+let currentReadCount = 0;
+let currentUtterance = null;
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -79,185 +73,175 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 增强版语音获取函数 ======================
-function findBestVoice(voices) {
-    // 针对手机优化的语音选择
-    return voices.find(v => v.name && v.name.includes('Google US English')) || // Android Chrome
-           voices.find(v => v.name && v.name.includes('Samantha') && v.name.includes('Premium')) || // iOS 高品質
-           voices.find(v => v.name && v.name.includes('Samantha')) || // iOS 標準
-           voices.find(v => v.lang === 'en-US' && v.localService === true) || // 本地美語
-           voices.find(v => v.lang && v.lang.includes('en-US')) ||
+// ====================== 全新语音朗读模块（兼容 iOS/Android） ======================
+
+// 获取可用的语音（同步版本，用于调试）
+function getAvailableVoice() {
+    const voices = synth.getVoices();
+    if (!voices || voices.length === 0) return null;
+    
+    // 优先级：Google US English > Samantha > 任何 en-US > 第一个可用
+    return voices.find(v => v.name && v.name.includes('Google US English')) ||
+           voices.find(v => v.name && v.name.includes('Samantha')) ||
+           voices.find(v => v.lang && v.lang === 'en-US') ||
+           voices.find(v => v.lang && v.lang.includes('en')) ||
            voices[0];
 }
 
-function handleVoicesReady(voices) {
-    if (isVoiceReady) return;
-    isVoiceReady = true;
-    const bestVoice = findBestVoice(voices);
-    console.log('Voice ready:', bestVoice ? bestVoice.name : 'default');
-    pendingVoiceResolvers.forEach(resolve => resolve(bestVoice));
-    pendingVoiceResolvers = [];
-}
-
-function getHighQualityVoice() {
-    return new Promise(resolve => {
-        // 如果已经就绪，直接返回
-        if (isVoiceReady && synth.getVoices().length > 0) {
-            resolve(findBestVoice(synth.getVoices()));
-            return;
-        }
-        
-        // 否则加入等待队列
-        pendingVoiceResolvers.push(resolve);
-        
-        // 检查当前是否已经有语音
-        const voices = synth.getVoices();
-        if (voices && voices.length > 0) {
-            handleVoicesReady(voices);
-            return;
-        }
-        
-        // 监听 voiceschanged 事件（手机端关键）
-        const onVoicesChanged = () => {
-            const newVoices = synth.getVoices();
-            if (newVoices && newVoices.length > 0) {
-                handleVoicesReady(newVoices);
-            }
-            synth.removeEventListener('voiceschanged', onVoicesChanged);
-        };
-        synth.addEventListener('voiceschanged', onVoicesChanged);
-        
-        // 设置超时保护（1.5秒后如果还没有，就使用默认）
-        setTimeout(() => {
-            if (!isVoiceReady) {
-                const currentVoices = synth.getVoices();
-                if (currentVoices && currentVoices.length > 0) {
-                    handleVoicesReady(currentVoices);
-                } else {
-                    // 最后的手段：直接 resolve null
-                    console.warn('Voice loading timeout, using default');
-                    pendingVoiceResolvers.forEach(r => r(null));
-                    pendingVoiceResolvers = [];
-                    isVoiceReady = true;
-                }
-            }
-        }, 1500);
-    });
-}
-
-// ====================== 语音预热函数 ======================
-function prewarmSpeech() {
-    console.log('Pre-warming speech system...');
-    
-    // 静默获取语音
-    getHighQualityVoice().then(voice => {
-        // 更激进的预热：创建一个无声的utterance来激活语音引擎（针对 iOS）
-        if (voice) {
-            try {
-                const silentUtterance = new SpeechSynthesisUtterance('');
-                silentUtterance.volume = 0; // 静音
-                silentUtterance.voice = voice;
-                // 小延迟后播放静音片段，唤醒语音引擎
-                setTimeout(() => {
-                    synth.speak(silentUtterance);
-                    // 立即取消，只为了唤醒引擎
-                    setTimeout(() => {
-                        try { synth.cancel(); } catch(e) {}
-                    }, 100);
-                }, 100);
-            } catch(e) {
-                console.log('Silent prewarm failed, but voice should still work');
-            }
-        }
-    });
-}
-
-// ====================== 语音朗读功能（已优化） ======================
-async function speakTextWithCallback(text, onEnd) {
-    if (!text || isStopping) {
+// 核心朗读函数 - 纯同步，无 Promise
+function speakTextDirectly(text, onEnd, rate = 0.85) {
+    if (!text) {
         if (onEnd) onEnd();
         return;
     }
-
-    // 先取消任何正在播放的
-    try { synth.cancel(); } catch(e) {}
-
+    
+    // 取消任何正在进行的朗读
+    try {
+        synth.cancel();
+    } catch(e) {}
+    
+    // 创建 utterance
     const utterance = new SpeechSynthesisUtterance(text);
-    
-    // 获取最佳语音（现在会立即返回，因为已经预热）
-    const bestVoice = await getHighQualityVoice();
-    if (bestVoice && bestVoice.voiceURI) {
-        utterance.voice = bestVoice;
-    }
-    
     utterance.lang = "en-US";
-    utterance.rate = 0.85;
+    utterance.rate = rate;
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    utterance.onend = () => { 
-        if (!isStopping && onEnd) onEnd(); 
+    // 尝试设置语音（同步获取）
+    const voice = getAvailableVoice();
+    if (voice) {
+        utterance.voice = voice;
+    }
+    
+    utterance.onend = () => {
+        if (onEnd) onEnd();
     };
-    utterance.onerror = (err) => { 
+    utterance.onerror = (err) => {
         console.error('Speech error:', err);
-        if (!isStopping && onEnd) onEnd(); 
+        if (onEnd) onEnd();
     };
+    
+    // 立即播放
+    try {
+        synth.speak(utterance);
+    } catch(e) {
+        console.error('Speak failed:', e);
+        if (onEnd) onEnd();
+    }
+    
+    return utterance;
+}
 
-    // 手机端需要这个小延迟
-    setTimeout(() => {
-        if (!isStopping) {
-            try {
-                synth.speak(utterance);
-            } catch(e) {
-                console.error('Speak failed:', e);
-                if (onEnd) onEnd();
-            }
+// 单词朗读（3次）
+function startWordReading(word, buttonElement) {
+    // 如果已经在读同一个单词，则停止
+    if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
+        stopWordReading();
+        return;
+    }
+    
+    // 停止所有朗读
+    stopAllReading();
+    
+    currentWordText = word;
+    currentWordReadButton = buttonElement;
+    currentReadCount = 0;
+    isWordReading = true;
+    
+    buttonElement.textContent = "⏹️ Stop";
+    buttonElement.classList.add('reading-disabled');
+    
+    function readNext() {
+        if (!isWordReading) return;
+        if (currentReadCount >= 3) {
+            stopWordReading();
+            return;
         }
-    }, 50);
+        
+        currentReadCount++;
+        speakTextDirectly(word, () => {
+            if (isWordReading && currentReadCount < 3) {
+                // 间隔 500ms 后读下一次
+                setTimeout(readNext, 500);
+            } else if (currentReadCount >= 3) {
+                stopWordReading();
+            }
+        });
+    }
+    
+    // 延迟一点点开始，确保取消完成
+    setTimeout(readNext, 50);
 }
 
 function stopWordReading() {
-    if (isStopping) return;
-    isStopping = true;
-    isWordReading = false; 
+    if (!isWordReading) return;
+    isWordReading = false;
     
-    if (wordReadTimer) {
-        clearInterval(wordReadTimer);
-        wordReadTimer = null;
-    }
+    try {
+        synth.cancel();
+    } catch(e) {}
     
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
         currentWordReadButton.classList.remove('reading-disabled');
         currentWordReadButton = null;
     }
-    
-    try { synth.cancel(); } catch(e) {}
     currentWordText = "";
+    currentReadCount = 0;
+}
+
+// 句子朗读（3次）
+function startSentenceReading(sentenceText, buttonElement) {
+    if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
+        stopSentenceReading();
+        return;
+    }
     
-    setTimeout(() => { isStopping = false; }, 300);
+    stopAllReading();
+    
+    currentSentenceText = sentenceText;
+    currentSentenceReadButton = buttonElement;
+    currentReadCount = 0;
+    isSentenceReading = true;
+    
+    buttonElement.textContent = "⏹️ Stop";
+    buttonElement.classList.add('reading-disabled');
+    
+    function readNext() {
+        if (!isSentenceReading) return;
+        if (currentReadCount >= 3) {
+            stopSentenceReading();
+            return;
+        }
+        
+        currentReadCount++;
+        speakTextDirectly(sentenceText, () => {
+            if (isSentenceReading && currentReadCount < 3) {
+                setTimeout(readNext, 600);
+            } else if (currentReadCount >= 3) {
+                stopSentenceReading();
+            }
+        });
+    }
+    
+    setTimeout(readNext, 50);
 }
 
 function stopSentenceReading() {
-    if (isStopping) return;
-    isStopping = true;
+    if (!isSentenceReading) return;
     isSentenceReading = false;
-
-    if (sentenceReadTimer) {
-        clearInterval(sentenceReadTimer);
-        sentenceReadTimer = null;
-    }
+    
+    try {
+        synth.cancel();
+    } catch(e) {}
     
     if (currentSentenceReadButton) {
         currentSentenceReadButton.textContent = "🔊 Read 3x";
         currentSentenceReadButton.classList.remove('reading-disabled');
         currentSentenceReadButton = null;
     }
-
-    try { synth.cancel(); } catch(e) {}
     currentSentenceText = "";
-    
-    setTimeout(() => { isStopping = false; }, 300);
+    currentReadCount = 0;
 }
 
 function stopAllReading() {
@@ -265,86 +249,32 @@ function stopAllReading() {
     stopSentenceReading();
 }
 
+// 给外部调用的 toggle 函数
 function toggleWordReading(word, buttonElement) {
-    if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
-        stopWordReading();
-        return;
-    }
-    
-    stopAllReading();
-    setTimeout(() => {
-        startWordReading(word, buttonElement);
-    }, 100);
-}
-
-function startWordReading(word, buttonElement) {
-    currentWordText = word;
-    currentWordReadButton = buttonElement;
-    buttonElement.textContent = "⏹️ Stop";
-    buttonElement.classList.add('reading-disabled');
-    
-    let readCount = 0;
-    isWordReading = true;
-    
-    function speakNext() {
-        if (!isWordReading || isStopping) return;
-        if (readCount >= 3) {
-            stopWordReading();
-            return;
-        }
-        speakTextWithCallback(word, () => {
-            readCount++;
-            if (readCount < 3 && isWordReading && !isStopping) {
-                setTimeout(speakNext, 500);
-            } else {
-                stopWordReading();
-            }
-        });
-    }
-    
-    try { synth.cancel(); } catch(e) {}
-    setTimeout(speakNext, 100);
+    startWordReading(word, buttonElement);
 }
 
 function toggleSentenceReading(sentenceText, buttonElement) {
-    if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
-        stopSentenceReading();
-        return;
-    }
-    
-    stopAllReading();
-    setTimeout(() => {
-        startSentenceReading(sentenceText, buttonElement);
-    }, 100);
+    startSentenceReading(sentenceText, buttonElement);
 }
 
-function startSentenceReading(sentenceText, buttonElement) {
-    currentSentenceText = sentenceText;
-    currentSentenceReadButton = buttonElement;
-    buttonElement.textContent = "⏹️ Stop";
-    buttonElement.classList.add('reading-disabled');
+// 预加载语音（在用户首次点击时触发）
+let voicePreloaded = false;
+function preloadVoiceOnFirstTouch() {
+    if (voicePreloaded) return;
+    voicePreloaded = true;
     
-    let readCount = 0;
-    isSentenceReading = true;
-    
-    function speakNext() {
-        if (!isSentenceReading || isStopping) return;
-        if (readCount >= 3) {
-            stopSentenceReading();
-            return;
-        }
-        speakTextWithCallback(sentenceText, () => {
-            readCount++;
-            if (readCount < 3 && isSentenceReading && !isStopping) {
-                setTimeout(speakNext, 600);
-            } else {
-                stopSentenceReading();
-            }
-        });
-    }
-    
-    try { synth.cancel(); } catch(e) {}
-    setTimeout(speakNext, 100);
+    // 创建一个静默的 utterance 来激活语音引擎
+    try {
+        const silentUtterance = new SpeechSynthesisUtterance('');
+        silentUtterance.volume = 0;
+        const voice = getAvailableVoice();
+        if (voice) silentUtterance.voice = voice;
+        synth.speak(silentUtterance);
+        setTimeout(() => {
+            try { synth.cancel(); } catch(e) {}
+        }, 200);
+    } catch(e) {}
 }
 
 // ====================== 数据加载逻辑 ======================
@@ -597,7 +527,10 @@ function showWord() {
     
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
-        readBtn.onclick = () => toggleWordReading(w.word, readBtn);
+        readBtn.onclick = () => {
+            preloadVoiceOnFirstTouch();  // 首次点击时预热
+            toggleWordReading(w.word, readBtn);
+        };
     }
     
     document.getElementById("btnPrevWord")?.addEventListener("click", () => {
@@ -699,7 +632,10 @@ function attachSentenceEvents() {
     if (readBtn) {
         readBtn.onclick = () => {
             const currentSent = allSentences[currentSentenceIdx];
-            if (currentSent) toggleSentenceReading(currentSent.sentence_en, readBtn);
+            if (currentSent) {
+                preloadVoiceOnFirstTouch();  // 首次点击时预热
+                toggleSentenceReading(currentSent.sentence_en, readBtn);
+            }
         };
     }
     if (prevBtn) prevBtn.onclick = () => prevSentence();
@@ -714,7 +650,7 @@ function showAllSentencesPopup() {
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 12px;"><strong>${s.sentence_en}</strong></td>
+            <td style="padding: 12px;"><strong>${s.sentence_en}</strong><td>
             <td style="padding: 12px;">${s.sentence_zh}</td>
         </tr>
     `).join('');
@@ -754,7 +690,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `</table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -811,9 +747,6 @@ function toggleMode(mode) {
 
 // ====================== 初始化与事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
-    // ========== 关键：语音预热（解决手机首次点击不发声） ==========
-    prewarmSpeech();
-    
     initDaySelectToggle();
     
     const showAllBtn = document.getElementById('showAllBtn');
@@ -920,7 +853,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    // ========== 存储功能 ==========
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
     if (saveSettingsBtn) {
         saveSettingsBtn.addEventListener('click', () => {
