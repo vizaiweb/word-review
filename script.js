@@ -72,7 +72,7 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 语音模块（完全重写，解决所有问题） ======================
+// ====================== 语音模块（最终修复版） ======================
 
 // 获取可用语音（同步）
 function getAvailableVoice() {
@@ -86,13 +86,48 @@ function getAvailableVoice() {
            voices[0];
 }
 
-// 立即朗读一次（无 Promise，纯同步）
+// 确保语音引擎就绪
+let voiceEngineReady = false;
+function ensureVoiceEngine(callback) {
+    if (voiceEngineReady) {
+        if (callback) callback();
+        return true;
+    }
+    
+    try {
+        // 发送一个静默的语音来激活引擎
+        const silent = new SpeechSynthesisUtterance('');
+        silent.volume = 0;
+        const voice = getAvailableVoice();
+        if (voice) silent.voice = voice;
+        
+        silent.onend = () => {
+            voiceEngineReady = true;
+            if (callback) callback();
+        };
+        
+        synth.speak(silent);
+        setTimeout(() => {
+            if (!voiceEngineReady) {
+                voiceEngineReady = true;
+                if (callback) callback();
+            }
+        }, 500);
+    } catch(e) {
+        voiceEngineReady = true;
+        if (callback) callback();
+    }
+    return false;
+}
+
+// 朗读一次（强化版，确保 onend 被调用）
 function speakOnce(text, onEnd, rate = 0.85) {
     if (!text) {
         if (onEnd) onEnd();
         return;
     }
     
+    // 取消之前的播放
     try { synth.cancel(); } catch(e) {}
     
     const utterance = new SpeechSynthesisUtterance(text);
@@ -104,16 +139,38 @@ function speakOnce(text, onEnd, rate = 0.85) {
     const voice = getAvailableVoice();
     if (voice) utterance.voice = voice;
     
-    utterance.onend = () => { if (onEnd) onEnd(); };
-    utterance.onerror = (err) => {
-        console.error('Speech error:', err);
-        if (onEnd) onEnd();
+    let ended = false;
+    
+    utterance.onend = () => {
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();
+        }
     };
     
-    try { synth.speak(utterance); } catch(e) { if (onEnd) onEnd(); }
+    utterance.onerror = (err) => {
+        console.error('Speech error:', err);
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();
+        }
+    };
+    
+    try { 
+        synth.speak(utterance);
+        // 设置一个安全超时，确保 onend 一定会被调用
+        setTimeout(() => {
+            if (!ended) {
+                ended = true;
+                if (onEnd) onEnd();
+            }
+        }, Math.max(1000, text.length * 80));
+    } catch(e) { 
+        if (onEnd) onEnd(); 
+    }
 }
 
-// 单词朗读（3次）- 完全可靠的计数
+// 单词朗读（3次）- 修复第一次只读2遍的问题
 function startWordReading(word, buttonElement) {
     if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
         stopWordReading();
@@ -130,6 +187,12 @@ function startWordReading(word, buttonElement) {
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
     
+    // 核心修复：先确保语音引擎就绪，再开始朗读
+    function beginReading() {
+        if (!isWordReading) return;
+        speakNext();
+    }
+    
     function speakNext() {
         if (!isWordReading) return;
         if (currentReadCount >= 3) {
@@ -137,6 +200,7 @@ function startWordReading(word, buttonElement) {
             return;
         }
         
+        // 先增加计数
         currentReadCount++;
         
         speakOnce(word, () => {
@@ -148,7 +212,8 @@ function startWordReading(word, buttonElement) {
         });
     }
     
-    setTimeout(speakNext, 50);
+    // 等待引擎就绪后开始（第一次会等待，后续直接执行）
+    ensureVoiceEngine(beginReading);
 }
 
 function stopWordReading() {
@@ -166,7 +231,7 @@ function stopWordReading() {
     currentReadCount = 0;
 }
 
-// 句子朗读（3次）
+// 句子朗读（3次）- 同样修复
 function startSentenceReading(sentenceText, buttonElement) {
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
         stopSentenceReading();
@@ -182,6 +247,11 @@ function startSentenceReading(sentenceText, buttonElement) {
     
     buttonElement.textContent = "⏹️ Stop";
     buttonElement.classList.add('reading-disabled');
+    
+    function beginReading() {
+        if (!isSentenceReading) return;
+        speakNext();
+    }
     
     function speakNext() {
         if (!isSentenceReading) return;
@@ -201,7 +271,7 @@ function startSentenceReading(sentenceText, buttonElement) {
         }, 0.85);
     }
     
-    setTimeout(speakNext, 50);
+    ensureVoiceEngine(beginReading);
 }
 
 function stopSentenceReading() {
@@ -232,21 +302,17 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// 语音预热（首次点击时触发）
-let voicePreheated = false;
+// 预热语音（页面加载时调用一次）
 function preheatVoice() {
-    if (voicePreheated) return;
-    voicePreheated = true;
-    
-    try {
-        const silent = new SpeechSynthesisUtterance('');
-        silent.volume = 0;
-        const voice = getAvailableVoice();
-        if (voice) silent.voice = voice;
-        synth.speak(silent);
-        setTimeout(() => { try { synth.cancel(); } catch(e) {} }, 200);
-    } catch(e) {}
+    ensureVoiceEngine(function() {
+        console.log('Voice engine ready');
+    });
 }
+
+// 页面加载后自动预热
+setTimeout(function() {
+    preheatVoice();
+}, 1000);
 
 // ====================== 数据加载逻辑 ======================
 async function loadFileListByLevel(level) {
