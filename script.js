@@ -25,6 +25,10 @@ let currentSentenceText = "";
 let isStopping = false;
 let pendingStart = null;
 
+// ========== 语音预热相关变量 ==========
+let isVoiceReady = false;
+let pendingVoiceResolvers = [];
+
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
@@ -75,70 +79,140 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// ====================== 语音朗读功能 (已升级) ======================
+// ====================== 增强版语音获取函数 ======================
+function findBestVoice(voices) {
+    // 针对手机优化的语音选择
+    return voices.find(v => v.name && v.name.includes('Google US English')) || // Android Chrome
+           voices.find(v => v.name && v.name.includes('Samantha') && v.name.includes('Premium')) || // iOS 高品質
+           voices.find(v => v.name && v.name.includes('Samantha')) || // iOS 標準
+           voices.find(v => v.lang === 'en-US' && v.localService === true) || // 本地美語
+           voices.find(v => v.lang && v.lang.includes('en-US')) ||
+           voices[0];
+}
 
-/**
- * 獲取高品質語音：優先尋找 Google、Natural 或高品質美式英語
- */
-// ====================== 語音功能 (手機兼容強化版) ======================
-
-// ====================== 終極兼容版語音邏輯 ======================
+function handleVoicesReady(voices) {
+    if (isVoiceReady) return;
+    isVoiceReady = true;
+    const bestVoice = findBestVoice(voices);
+    console.log('Voice ready:', bestVoice ? bestVoice.name : 'default');
+    pendingVoiceResolvers.forEach(resolve => resolve(bestVoice));
+    pendingVoiceResolvers = [];
+}
 
 function getHighQualityVoice() {
     return new Promise(resolve => {
-        let voices = synth.getVoices();
+        // 如果已经就绪，直接返回
+        if (isVoiceReady && synth.getVoices().length > 0) {
+            resolve(findBestVoice(synth.getVoices()));
+            return;
+        }
         
-        const findBest = (vList) => {
-            // 優先順序調整：針對手機優化
-            return vList.find(v => v.name.includes('Google US English')) || // Android Chrome
-                   vList.find(v => v.name.includes('Samantha') && v.name.includes('Premium')) || // iOS 高品質
-                   vList.find(v => v.name.includes('Samantha')) || // iOS 標準
-                   vList.find(v => v.lang === 'en-US' && v.localService === true) || // 本地美語
-                   vList.find(v => v.lang.includes('en-US')) ||
-                   vList[0];
+        // 否则加入等待队列
+        pendingVoiceResolvers.push(resolve);
+        
+        // 检查当前是否已经有语音
+        const voices = synth.getVoices();
+        if (voices && voices.length > 0) {
+            handleVoicesReady(voices);
+            return;
+        }
+        
+        // 监听 voiceschanged 事件（手机端关键）
+        const onVoicesChanged = () => {
+            const newVoices = synth.getVoices();
+            if (newVoices && newVoices.length > 0) {
+                handleVoicesReady(newVoices);
+            }
+            synth.removeEventListener('voiceschanged', onVoicesChanged);
         };
+        synth.addEventListener('voiceschanged', onVoicesChanged);
+        
+        // 设置超时保护（1.5秒后如果还没有，就使用默认）
+        setTimeout(() => {
+            if (!isVoiceReady) {
+                const currentVoices = synth.getVoices();
+                if (currentVoices && currentVoices.length > 0) {
+                    handleVoicesReady(currentVoices);
+                } else {
+                    // 最后的手段：直接 resolve null
+                    console.warn('Voice loading timeout, using default');
+                    pendingVoiceResolvers.forEach(r => r(null));
+                    pendingVoiceResolvers = [];
+                    isVoiceReady = true;
+                }
+            }
+        }, 1500);
+    });
+}
 
-        if (voices.length > 0) {
-            resolve(findBest(voices));
-        } else {
-            // 關鍵：某些手機瀏覽器必須監聽此事件才能抓到聲音
-            const timer = setTimeout(() => resolve(null), 1000); // 防止死等
-            synth.onvoiceschanged = () => {
-                clearTimeout(timer);
-                resolve(findBest(synth.getVoices()));
-            };
+// ====================== 语音预热函数 ======================
+function prewarmSpeech() {
+    console.log('Pre-warming speech system...');
+    
+    // 静默获取语音
+    getHighQualityVoice().then(voice => {
+        // 更激进的预热：创建一个无声的utterance来激活语音引擎（针对 iOS）
+        if (voice) {
+            try {
+                const silentUtterance = new SpeechSynthesisUtterance('');
+                silentUtterance.volume = 0; // 静音
+                silentUtterance.voice = voice;
+                // 小延迟后播放静音片段，唤醒语音引擎
+                setTimeout(() => {
+                    synth.speak(silentUtterance);
+                    // 立即取消，只为了唤醒引擎
+                    setTimeout(() => {
+                        try { synth.cancel(); } catch(e) {}
+                    }, 100);
+                }, 100);
+            } catch(e) {
+                console.log('Silent prewarm failed, but voice should still work');
+            }
         }
     });
 }
 
-// 修正朗讀邏輯：增加「喚醒」步驟
+// ====================== 语音朗读功能（已优化） ======================
 async function speakTextWithCallback(text, onEnd) {
     if (!text || isStopping) {
-        onEnd?.();
+        if (onEnd) onEnd();
         return;
     }
 
-    // 解決手機連讀問題：先取消，再強制重新實例化
-    synth.cancel();
+    // 先取消任何正在播放的
+    try { synth.cancel(); } catch(e) {}
 
     const utterance = new SpeechSynthesisUtterance(text);
+    
+    // 获取最佳语音（现在会立即返回，因为已经预热）
     const bestVoice = await getHighQualityVoice();
-    
-    if (bestVoice) {
+    if (bestVoice && bestVoice.voiceURI) {
         utterance.voice = bestVoice;
-        utterance.voiceURI = bestVoice.voiceURI; // 強制指定路徑
     }
-
-    utterance.lang = "en-US";
-    utterance.rate = 0.85; 
-    utterance.pitch = 1.0;
     
-    utterance.onend = () => { if (!isStopping) onEnd?.(); };
-    utterance.onerror = () => { if (!isStopping) onEnd?.(); };
+    utterance.lang = "en-US";
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1;
+    
+    utterance.onend = () => { 
+        if (!isStopping && onEnd) onEnd(); 
+    };
+    utterance.onerror = (err) => { 
+        console.error('Speech error:', err);
+        if (!isStopping && onEnd) onEnd(); 
+    };
 
-    // 手機版的小技巧：稍微延遲 50 毫秒給系統切換聲音
+    // 手机端需要这个小延迟
     setTimeout(() => {
-        synth.speak(utterance);
+        if (!isStopping) {
+            try {
+                synth.speak(utterance);
+            } catch(e) {
+                console.error('Speak failed:', e);
+                if (onEnd) onEnd();
+            }
+        }
     }, 50);
 }
 
@@ -147,13 +221,18 @@ function stopWordReading() {
     isStopping = true;
     isWordReading = false; 
     
+    if (wordReadTimer) {
+        clearInterval(wordReadTimer);
+        wordReadTimer = null;
+    }
+    
     if (currentWordReadButton) {
         currentWordReadButton.textContent = "🔊 Read 3x";
         currentWordReadButton.classList.remove('reading-disabled');
         currentWordReadButton = null;
     }
     
-    synth.cancel();
+    try { synth.cancel(); } catch(e) {}
     currentWordText = "";
     
     setTimeout(() => { isStopping = false; }, 300);
@@ -164,13 +243,18 @@ function stopSentenceReading() {
     isStopping = true;
     isSentenceReading = false;
 
+    if (sentenceReadTimer) {
+        clearInterval(sentenceReadTimer);
+        sentenceReadTimer = null;
+    }
+    
     if (currentSentenceReadButton) {
         currentSentenceReadButton.textContent = "🔊 Read 3x";
         currentSentenceReadButton.classList.remove('reading-disabled');
         currentSentenceReadButton = null;
     }
 
-    synth.cancel();
+    try { synth.cancel(); } catch(e) {}
     currentSentenceText = "";
     
     setTimeout(() => { isStopping = false; }, 300);
@@ -190,7 +274,7 @@ function toggleWordReading(word, buttonElement) {
     stopAllReading();
     setTimeout(() => {
         startWordReading(word, buttonElement);
-    }, 350);
+    }, 100);
 }
 
 function startWordReading(word, buttonElement) {
@@ -211,7 +295,6 @@ function startWordReading(word, buttonElement) {
         speakTextWithCallback(word, () => {
             readCount++;
             if (readCount < 3 && isWordReading && !isStopping) {
-                // 每次朗讀間隔 500ms，聽起來更自然
                 setTimeout(speakNext, 500);
             } else {
                 stopWordReading();
@@ -219,7 +302,7 @@ function startWordReading(word, buttonElement) {
         });
     }
     
-    synth.cancel();
+    try { synth.cancel(); } catch(e) {}
     setTimeout(speakNext, 100);
 }
 
@@ -232,7 +315,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     stopAllReading();
     setTimeout(() => {
         startSentenceReading(sentenceText, buttonElement);
-    }, 350);
+    }, 100);
 }
 
 function startSentenceReading(sentenceText, buttonElement) {
@@ -253,18 +336,18 @@ function startSentenceReading(sentenceText, buttonElement) {
         speakTextWithCallback(sentenceText, () => {
             readCount++;
             if (readCount < 3 && isSentenceReading && !isStopping) {
-                setTimeout(speakNext, 600); // 句子較長，間隔稍微久一點
+                setTimeout(speakNext, 600);
             } else {
                 stopSentenceReading();
             }
         });
     }
     
-    synth.cancel();
+    try { synth.cancel(); } catch(e) {}
     setTimeout(speakNext, 100);
 }
 
-// ====================== 数据加载逻辑 (保持原樣) ======================
+// ====================== 数据加载逻辑 ======================
 async function loadFileListByLevel(level) {
     const fileSelect = document.getElementById('fileSelect');
     const fileRow = document.getElementById('fileRow');
@@ -436,7 +519,7 @@ async function loadFromLocalFile(file) {
     }
 }
 
-// ====================== 篩選與導航 (保持原樣) ======================
+// ====================== 筛选与导航逻辑 ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
@@ -552,7 +635,7 @@ function updateInfoTip() {
     }
 }
 
-// ====================== 句子相关功能 (已優化朗讀) ======================
+// ====================== 句子相关功能 ======================
 function updateSentenceUI() {
     if (!allSentences.length) return;
     
@@ -726,11 +809,11 @@ function toggleMode(mode) {
     }
 }
 
-// [ ... 前面所有的語音與解析邏輯保持不變 ... ]
-// (請直接使用您原本 script.js 從第 1 行到第 504 行的內容)
-
-// ====================== 初始化與事件綁定 (已植入儲存邏輯) ======================
+// ====================== 初始化与事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
+    // ========== 关键：语音预热（解决手机首次点击不发声） ==========
+    prewarmSpeech();
+    
     initDaySelectToggle();
     
     const showAllBtn = document.getElementById('showAllBtn');
@@ -752,7 +835,6 @@ document.addEventListener('DOMContentLoaded', () => {
         else toggleMode("local");
     });
     
-    // Level Confirm 邏輯
     levelConfirm.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -779,7 +861,6 @@ document.addEventListener('DOMContentLoaded', () => {
         allSentences = [];
     });
     
-    // File Confirm 邏輯
     fileConfirm.addEventListener('click', async function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -796,8 +877,41 @@ document.addEventListener('DOMContentLoaded', () => {
         
         await loadSelectedFile(selected);
     });
-
-    // [ ... 其餘 filterBtn, showAllBtn 等監聽器保持不變 ... ]
+    
+    if (selectFileBtn && localFileInput) {
+        selectFileBtn.addEventListener('click', () => {
+            localFileInput.click();
+        });
+        
+        localFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && fileNameDisplay) {
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.remove('empty');
+            } else if (fileNameDisplay) {
+                fileNameDisplay.textContent = 'No file selected';
+                fileNameDisplay.classList.add('empty');
+            }
+        });
+    }
+    
+    if (localFileConfirm) {
+        localFileConfirm.addEventListener('click', async () => {
+            if (currentMode !== "external") {
+                alert('Please switch to "Local File" mode first (click Mode button)');
+                return;
+            }
+            
+            const file = localFileInput ? localFileInput.files[0] : null;
+            if (!file) {
+                alert("Please select an Excel file first");
+                return;
+            }
+            
+            await loadFromLocalFile(file);
+        });
+    }
+    
     filterBtn.addEventListener('click', function() {
         this.style.opacity = '0.7';
         setTimeout(() => this.style.opacity = '1', 200);
@@ -806,84 +920,69 @@ document.addEventListener('DOMContentLoaded', () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    // ======================================================
-// ✨ 整合版：Save 按鈕與自動恢復功能 (包含單字與句子進度)
-// ======================================================
-
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-if (saveSettingsBtn) {
-    saveSettingsBtn.addEventListener('click', () => {
-        const config = {
-            mode: currentMode,
-            level: levelSelect.value,
-            file: fileSelect.value,
-            daySelect: daySelect.value,
-            dayNum: dayNum.value,
-            // 💡 新增：記錄當前的索引位置
-            wordIdx: currentWordIdx,
-            sentenceIdx: currentSentenceIdx
-        };
-        // 使用同一個 Key 儲存，保持數據乾淨
-        localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
-        alert("Progress and settings have been saved!");
-    });
-}
-
-async function autoRestore() {
-    const saved = localStorage.getItem('kidsEnglish_Config_V2');
-    if (!saved) return;
-    
-    const config = JSON.parse(saved);
-
-    // 1. 恢復模式
-    if (config.mode && config.mode !== currentMode) {
-        toggleMode(config.mode);
+    // ========== 存储功能 ==========
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', () => {
+            const config = {
+                mode: currentMode,
+                level: levelSelect.value,
+                file: fileSelect.value,
+                daySelect: daySelect.value,
+                dayNum: dayNum.value,
+                wordIdx: currentWordIdx,
+                sentenceIdx: currentSentenceIdx
+            };
+            localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
+            alert("Progress and settings have been saved!");
+        });
     }
-
-    // 2. 針對 Built-in 模式恢復所有進度
-    if (config.mode === "local" && config.level) {
-        levelSelect.value = config.level;
-        currentLevel = config.level;
+    
+    async function autoRestore() {
+        const saved = localStorage.getItem('kidsEnglish_Config_V2');
+        if (!saved) return;
         
-        // 執行 Level 載入
-        await loadFileListByLevel(config.level);
-
-        if (config.file) {
-            // 給選單一點渲染時間
-            setTimeout(async () => {
-                fileSelect.value = config.file;
-                
-                if (fileSelect.value === config.file) {
-                    // 執行檔案內容載入
-                    await loadSelectedFile(config.file);
+        const config = JSON.parse(saved);
+        
+        if (config.mode && config.mode !== currentMode) {
+            toggleMode(config.mode);
+        }
+        
+        if (config.mode === "local" && config.level) {
+            levelSelect.value = config.level;
+            currentLevel = config.level;
+            
+            await loadFileListByLevel(config.level);
+            
+            if (config.file) {
+                setTimeout(async () => {
+                    fileSelect.value = config.file;
                     
-                    // 3. 恢復 Day 篩選狀態
-                    if (config.daySelect) {
-                        daySelect.value = config.daySelect;
-                        // 觸發原有的輸入框切換邏輯
-                        daySelect.dispatchEvent(new Event('change'));
-                        dayNum.value = config.dayNum;
-                        filterByDay(); 
+                    if (fileSelect.value === config.file) {
+                        await loadSelectedFile(config.file);
                         
-                        // 4. ✨ 重點：等待數據加載並篩選後，恢復具體位置
-                        if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
-                            currentWordIdx = config.wordIdx;
-                            showWord(); // 重新渲染該單字
-                        }
-                        
-                        if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
-                            currentSentenceIdx = config.sentenceIdx;
-                            updateSentenceUI(); // 重新渲染該句子
+                        if (config.daySelect) {
+                            daySelect.value = config.daySelect;
+                            daySelect.dispatchEvent(new Event('change'));
+                            dayNum.value = config.dayNum;
+                            filterByDay();
+                            
+                            if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
+                                currentWordIdx = config.wordIdx;
+                                showWord();
+                            }
+                            
+                            if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
+                                currentSentenceIdx = config.sentenceIdx;
+                                updateSentenceUI();
+                            }
                         }
                     }
-                }
-            }, 500); // 這裡的延遲是為了確保 File List 已經從 GitHub 抓回來
+                }, 500);
+            }
         }
     }
-}
-
-// 啟動後稍微延遲載入
-setTimeout(autoRestore, 800);
     
+    setTimeout(autoRestore, 800);
     toggleMode("local");
 });
