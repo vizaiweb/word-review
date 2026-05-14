@@ -734,9 +734,15 @@ function showAllWords() {
     newWindow.document.close();
 }
 
-// ====================== 模式切换 ======================
+// ====================== 模式切换（修复版） ======================
 function toggleMode(mode) {
+    // 如果模式没有变化，不做任何操作
+    if (currentMode === mode) return;
+    
+    // 更新当前模式
     currentMode = mode;
+    
+    // 获取相关的 DOM 元素
     const fileRow = document.getElementById('fileRow');
     const externalRow = document.getElementById('externalUrlRow');
     const levelRow = document.getElementById('levelRow');
@@ -744,13 +750,15 @@ function toggleMode(mode) {
     const dayRow = document.getElementById('dayRow');
     
     if (mode === "local") {
+        // --- 切换到 Built-in DB 模式 ---
         fileRow.style.display = 'flex';
         externalRow.style.display = 'none';
         levelRow.classList.remove('hidden-level');
         toggleBtn.textContent = "📁 Built-in DB";
         toggleBtn.classList.add('active');
         
-        if (!(currentFileName && allWords.length > 0)) {
+        // 只有在没有有效数据时才清空界面
+        if (!currentFileName || allWords.length === 0) {
             allWords = [];
             filteredWords = [];
             allSentences = [];
@@ -762,13 +770,15 @@ function toggleMode(mode) {
             currentLevel = "";
         }
     } else {
+        // --- 切换到 Local File 模式 ---
         fileRow.style.display = 'none';
         externalRow.style.display = 'flex';
         levelRow.classList.add('hidden-level');
         toggleBtn.textContent = "📂 Local File";
         toggleBtn.classList.remove('active');
         
-        if (!(currentFileName && allWords.length > 0)) {
+        // 只有在没有有效数据时才清空界面
+        if (!currentFileName || allWords.length === 0) {
             allWords = [];
             filteredWords = [];
             allSentences = [];
@@ -779,6 +789,12 @@ function toggleMode(mode) {
             document.getElementById("infoTipContainer").innerHTML = '';
             currentLevel = "";
         }
+    }
+    
+    // 重要：清除可能干扰的自动恢复计时器，防止状态覆盖
+    if (window._autoRestoreTimer) {
+        clearTimeout(window._autoRestoreTimer);
+        window._autoRestoreTimer = null;
     }
 }
 
@@ -907,51 +923,85 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+        // 自动恢复保存的设置
     async function autoRestore() {
         const saved = localStorage.getItem('kidsEnglish_Config_V2');
         if (!saved) return;
         
-        const config = JSON.parse(saved);
+        let config;
+        try {
+            config = JSON.parse(saved);
+        } catch(e) {
+            console.error("Failed to parse saved config", e);
+            return;
+        }
         
+        // 如果保存的模式与当前模式不同，先切换模式（这步很重要）
         if (config.mode && config.mode !== currentMode) {
             toggleMode(config.mode);
         }
         
+        // 等待一小段时间，让 DOM 更新
+        await new Promise(r => setTimeout(r, 100));
+        
+        // 如果是 Built-in 模式且有保存的等级
         if (config.mode === "local" && config.level) {
-            levelSelect.value = config.level;
+            const levelSelect = document.getElementById('levelSelect');
+            if (levelSelect) levelSelect.value = config.level;
             currentLevel = config.level;
             
+            // 加载文件列表
             await loadFileListByLevel(config.level);
             
+            // 如果有保存的文件名
             if (config.file) {
-                setTimeout(async () => {
-                    fileSelect.value = config.file;
+                const fileSelect = document.getElementById('fileSelect');
+                // 等待文件列表加载完成
+                await new Promise(r => setTimeout(r, 300));
+                
+                if (fileSelect) {
+                    // 检查文件中是否存在该选项
+                    let optionExists = false;
+                    for (let i = 0; i < fileSelect.options.length; i++) {
+                        if (fileSelect.options[i].value === config.file) {
+                            optionExists = true;
+                            break;
+                        }
+                    }
                     
-                    if (fileSelect.value === config.file) {
+                    if (optionExists) {
+                        fileSelect.value = config.file;
+                        // 加载选中的文件
                         await loadSelectedFile(config.file);
                         
+                        // 恢复 Day 筛选和索引
                         if (config.daySelect) {
-                            daySelect.value = config.daySelect;
-                            daySelect.dispatchEvent(new Event('change'));
-                            dayNum.value = config.dayNum;
+                            const daySelect = document.getElementById('daySelect');
+                            const dayNum = document.getElementById('dayNum');
+                            if (daySelect) daySelect.value = config.daySelect;
+                            if (dayNum) dayNum.value = config.dayNum;
+                            // 触发 change 事件
+                            if (daySelect) daySelect.dispatchEvent(new Event('change'));
                             filterByDay();
                             
+                            // 恢复单词索引
                             if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
                                 currentWordIdx = config.wordIdx;
                                 showWord();
                             }
                             
+                            // 恢复句子索引
                             if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
                                 currentSentenceIdx = config.sentenceIdx;
                                 updateSentenceUI();
                             }
                         }
                     }
-                }, 500);
+                }
             }
         }
     }
     
-    setTimeout(autoRestore, 800);
+    window._autoRestoreTimer = setTimeout(autoRestore, 800);
     toggleMode("local");
 });
