@@ -1,10 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Kids Word & Sentence Practice</title>
+    <!-- Excel 解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         /* ====================== 全局基础样式 ====================== */
@@ -53,7 +53,6 @@
             gap: 8px;
             margin: 10px 0;
         }
-
         .select-row label {
             font-weight: 600;
             color: #1e293b;
@@ -83,29 +82,18 @@
         .btn-file { background: #0f67b3; }
         .btn-filter { background: #2b7e3a; }
         .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
-
-        .mode-toggle {
-            background: #ffb347;
-            margin-bottom: 5px;
-        }
-        .mode-toggle.active {
-            background: #2b7e3a;
-            box-shadow: 0 0 0 2px #f0f4f8, 0 0 0 4px #2b7e3a;
-        }
-
-        /* 新增：Save 按鈕與排版樣式 */
-        .mode-row-container {
+        
+        /* Save 按钮样式 */
+        .save-row {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
+            justify-content: flex-end;
+            margin-bottom: 10px;
         }
         .save-btn {
             background: white !important;
             color: #ff6b35 !important;
             border: 2px solid #ff9a56 !important;
             padding: 6px 15px !important;
-            margin-bottom: 5px;
         }
 
         #dayRow {
@@ -332,36 +320,6 @@
             text-decoration: none;
             margin: 0 6px;
         }
-        
-        .level-row.hidden-level {
-            display: none !important;
-        }
-        
-        .hidden-file-input {
-            position: absolute;
-            width: 0;
-            height: 0;
-            opacity: 0;
-            overflow: hidden;
-        }
-        
-        .file-name-display {
-            flex: 1;
-            padding: 8px 12px;
-            font-size: 14px;
-            color: #1e293b;
-            background: #f1f5f9;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .file-name-display.empty {
-            color: #94a3b8;
-            font-style: italic;
-        }
     </style>
 </head>
 <body>
@@ -371,15 +329,11 @@
     </div>
 
     <div class="select-section">
-        <div class="select-row mode-row-container">
-            <div>
-                <label>📀 Mode:</label>
-                <button id="modeToggleBtn" class="mode-toggle active">📁 Built-in DB</button>
-            </div>
-            <button id="saveSettingsBtn" class="save-btn">Save</button>
+        <div class="save-row">
+            <button id="saveSettingsBtn" class="save-btn">💾 Save Progress</button>
         </div>
         
-        <div class="select-row level-row" id="levelRow">
+        <div class="select-row" id="levelRow">
             <label>Level:</label>
             <select id="levelSelect">
                 <option value="">Select P1/P2</option>
@@ -393,14 +347,6 @@
             <label>File:</label>
             <select id="fileSelect"><option>Loading...</option></select>
             <button class="btn-file" id="fileConfirm">Confirm</button>
-        </div>
-        
-        <div class="select-row external-url-row" id="externalUrlRow" style="display:none;">
-            <label>📂 File:</label>
-            <input type="file" id="localFileInput" class="hidden-file-input" accept=".xlsx, .xls, .csv">
-            <button class="btn-file" id="selectFileBtn">Select File</button>
-            <span id="fileNameDisplay" class="file-name-display empty">No file selected</span>
-            <button class="btn-file" id="localFileConfirmBtn">Import</button>
         </div>
         
         <div class="select-row" id="dayRow" style="display:none;">
