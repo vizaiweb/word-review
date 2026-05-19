@@ -796,11 +796,10 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
-// 原始的 showAllSentencesPopup 函数（恢复原始样式）
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : removeFileExtension(currentFileName);
+    const fileNice = removeFileExtension(currentFileNameForSentences);
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
@@ -820,15 +819,18 @@ function showAllSentencesPopup() {
     </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(winHtml);
-    win.document.close();
+    if (win) {
+        win.document.write(winHtml);
+        win.document.close();
+    } else {
+        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    }
 }
 
-// 原始的 showAllWords 函数（恢复原始样式）
 function showAllWords() {
     if (allWords.length === 0) return;
     
-    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : removeFileExtension(currentFileName);
+    const fileNice = removeFileExtension(currentFileName);
     const tableRows = allWords.map(w => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
@@ -845,11 +847,15 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `</td><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
-    newWindow.document.write(allWordsHtml);
-    newWindow.document.close();
+    if (newWindow) {
+        newWindow.document.write(allWordsHtml);
+        newWindow.document.close();
+    } else {
+        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    }
 }
 
 // 停止所有朗读
