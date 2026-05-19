@@ -30,30 +30,7 @@ let isCantoneseReading = false;
 let currentCantoneseButton = null;
 let currentCantoneseText = "";
 
-// ====================== 调试函数：打印手机上的所有语音 ======================
-function debugVoices() {
-    if (!window.speechSynthesis) {
-        alert("不支持语音合成");
-        return;
-    }
-    const voices = synth.getVoices();
-    
-    // 筛选所有中文相关的语音
-    const zhVoices = voices.filter(v => v.lang.toLowerCase().includes('zh'));
-    
-    let info = "手机支持的中文语音有 " + zhVoices.length + " 个：\n";
-    zhVoices.forEach((v, i) => {
-        info += `${i+1}. 名称: ${v.name} | 语言: ${v.lang}\n`;
-    });
-    
-    if (zhVoices.length === 0) {
-        info += "\n⚠️ 没有找到中文语音！\n";
-        info += "如果这是 iPhone，请前往：\n设置 → 辅助功能 → 旁白 → 语音 → 添加语言 → 下载普通话";
-    }
-    
-    alert(info);
-    console.log('中文语音列表:', zhVoices);
-}
+
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -318,130 +295,139 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块（Gemini 终极兼容版） ======================
+// ====================== 普通话语音模块（最终修复版 - 等待语音加载） ======================
 
-// 获取普通话语音 - 优先级：大陆普通话 > 台湾国语 > 降级
+// 全局标记：语音列表是否已加载
+let mandarinVoicesLoaded = false;
+let pendingMandarinCallback = null;
+
+// 监听语音列表加载完成
+if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = () => {
+        console.log('语音列表已加载，共', synth.getVoices().length, '个语音');
+        mandarinVoicesLoaded = true;
+        if (pendingMandarinCallback) {
+            pendingMandarinCallback();
+            pendingMandarinCallback = null;
+        }
+    };
+}
+
+// 确保语音列表已加载（关键修复）
+function ensureMandarinVoicesLoaded(callback) {
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+        mandarinVoicesLoaded = true;
+        if (callback) callback();
+        return true;
+    }
+    pendingMandarinCallback = callback;
+    return false;
+}
+
+// 获取普通话语音（从已加载的列表中）
 function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    console.log('所有中文语音包:', voices.filter(v => v.lang.includes('zh')).map(v => ({ name: v.name, lang: v.lang })));
+    console.log('搜索普通话语音...');
+    const allZh = voices.filter(v => v.lang.includes('zh'));
+    console.log('所有中文语音:', allZh.map(v => ({ name: v.name, lang: v.lang })));
     
-    // 第一志愿：寻找纯正的中国大陆普通话（排除港台）
-    let targetVoice = voices.find(voice => {
-        const name = (voice.name || '').toLowerCase();
-        const lang = voice.lang.toLowerCase();
-        return (lang === 'zh-cn' || lang === 'zh_cn' || name.includes('mandarin')) &&
-               !name.includes('hong kong') && 
-               !name.includes('cantonese') &&
-               !name.includes('taiwan') &&
-               !name.includes('hk') &&
-               !name.includes('tw');
-    });
-    
-    // 第二志愿：如果找不到大陆普通话，退而求其次找台湾国语（总比粤语好）
-    if (!targetVoice) {
-        targetVoice = voices.find(voice => {
-            const name = (voice.name || '').toLowerCase();
-            const lang = voice.lang.toLowerCase();
-            return lang === 'zh-tw' || lang === 'zh_tw' || name.includes('taiwan');
-        });
-    }
-    
-    // 第三志愿：如果还是找不到，找任何包含 zh-CN 的
-    if (!targetVoice) {
-        targetVoice = voices.find(voice => voice.lang.toLowerCase().includes('zh-cn'));
-    }
-    
-    // 第四志愿：找任何中文语音
-    if (!targetVoice) {
-        targetVoice = voices.find(voice => voice.lang.toLowerCase().includes('zh'));
-    }
-    
+    // 优先选择 Ting-Ting 或 Tingting（iOS 普通话）
+    let targetVoice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting');
     if (targetVoice) {
-        console.log('选中的普通话语音:', targetVoice.name, targetVoice.lang);
-    } else {
-        console.warn('未找到普通话语音，将使用浏览器默认');
+        console.log('选中 Tingting 普通话语音');
+        return targetVoice;
     }
     
-    return targetVoice || null;
+    // 其次选择 zh-CN 且不包含香港/台湾的
+    targetVoice = voices.find(v => {
+        const name = (v.name || '').toLowerCase();
+        const lang = v.lang.toLowerCase();
+        return lang === 'zh-cn' && !name.includes('hong') && !name.includes('cantonese');
+    });
+    if (targetVoice) {
+        console.log('选中 zh-CN 语音:', targetVoice.name);
+        return targetVoice;
+    }
+    
+    // 再次选择 Meijia（zh-TW）作为降级
+    targetVoice = voices.find(v => v.name === 'Meijia');
+    if (targetVoice) {
+        console.log('选中 Meijia (zh-TW) 作为降级:', targetVoice.name);
+        return targetVoice;
+    }
+    
+    // 最后选择任何中文语音
+    targetVoice = voices.find(v => v.lang.includes('zh'));
+    if (targetVoice) {
+        console.log('选中其他中文语音:', targetVoice.name);
+        return targetVoice;
+    }
+    
+    console.warn('未找到任何中文语音');
+    return null;
 }
 
-let mandarinVoiceEngineReady = false;
 let mandarinVoice = null;
 
-function ensureMandarinEngine(callback) {
-    if (mandarinVoiceEngineReady && mandarinVoice) {
-        if (callback) callback();
-        return;
-    }
-    
-    try {
-        mandarinVoice = getMandarinVoice();
-        mandarinVoiceEngineReady = true;
-        if (callback) callback();
-    } catch(e) {
-        mandarinVoiceEngineReady = true;
-        if (callback) callback();
-    }
-}
-
-// 朗读普通话（终极兼容版）
+// 朗读普通话（等待语音加载完成后再播放）
 function speakMandarinOnce(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
         return;
     }
     
-    try { synth.cancel(); } catch(e) {}
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 1;
-    
-    // 获取最新语音
-    const targetVoice = getMandarinVoice();
-    
-    if (targetVoice) {
-        // ✨ 关键：如果找到了有效的普通话语音包，强制指定
-        utterance.voice = targetVoice;
-        utterance.lang = targetVoice.lang;
-        console.log('使用语音:', targetVoice.name);
-    } else {
-        // 如果手机里连一个普通话语音都没有，强制指定 lang 为 zh-CN
-        utterance.lang = 'zh-CN';
-        console.log('使用降级语音: zh-CN');
-    }
-    
-    let ended = false;
-    
-    utterance.onend = () => {
-        if (!ended) {
-            ended = true;
-            if (onEnd) onEnd();
+    // 关键：先确保语音列表已加载
+    ensureMandarinVoicesLoaded(() => {
+        try { synth.cancel(); } catch(e) {}
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1;
+        
+        mandarinVoice = getMandarinVoice();
+        
+        if (mandarinVoice) {
+            utterance.voice = mandarinVoice;
+            utterance.lang = mandarinVoice.lang;
+            console.log('使用语音:', mandarinVoice.name, mandarinVoice.lang);
+        } else {
+            utterance.lang = 'zh-CN';
+            console.log('使用降级: zh-CN');
         }
-    };
-    
-    utterance.onerror = (err) => {
-        console.error('Mandarin speech error:', err);
-        if (!ended) {
-            ended = true;
-            if (onEnd) onEnd();
-        }
-    };
-    
-    try {
-        synth.speak(utterance);
-        setTimeout(() => {
+        
+        let ended = false;
+        
+        utterance.onend = () => {
             if (!ended) {
                 ended = true;
                 if (onEnd) onEnd();
             }
-        }, Math.max(1000, text.length * 100));
-    } catch(e) {
-        if (onEnd) onEnd();
-    }
+        };
+        
+        utterance.onerror = (err) => {
+            console.error('Mandarin speech error:', err);
+            if (!ended) {
+                ended = true;
+                if (onEnd) onEnd();
+            }
+        };
+        
+        try {
+            synth.speak(utterance);
+            setTimeout(() => {
+                if (!ended) {
+                    ended = true;
+                    if (onEnd) onEnd();
+                }
+            }, Math.max(1000, text.length * 100));
+        } catch(e) {
+            if (onEnd) onEnd();
+        }
+    });
 }
 
 // 普通话朗读控制
@@ -460,14 +446,9 @@ function startMandarinReading(text, buttonElement) {
     buttonElement.textContent = "⏹️停";
     buttonElement.style.opacity = "0.6";
     
-    function beginReading() {
-        if (!isMandarinReading) return;
-        speakMandarinOnce(text, () => {
-            stopMandarinReading();
-        });
-    }
-    
-    ensureMandarinEngine(beginReading);
+    speakMandarinOnce(text, () => {
+        stopMandarinReading();
+    });
 }
 
 function stopMandarinReading() {
