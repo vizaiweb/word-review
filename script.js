@@ -30,9 +30,31 @@ let isCantoneseReading = false;
 let currentCantoneseButton = null;
 let currentCantoneseText = "";
 
-// ====================== 检测是否为手机设备 ======================
-function isMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+// 标记语音列表是否已加载
+let voicesLoaded = false;
+let pendingMandarinCallback = null;
+
+// ====================== 监听语音列表加载完成（解决手机异步问题） ======================
+if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = () => {
+        console.log('语音列表已加载，共', synth.getVoices().length, '个语音');
+        voicesLoaded = true;
+        if (pendingMandarinCallback) {
+            pendingMandarinCallback();
+            pendingMandarinCallback = null;
+        }
+    };
+}
+
+// 确保语音列表已加载
+function ensureVoicesLoaded(callback) {
+    if (voicesLoaded || synth.getVoices().length > 0) {
+        voicesLoaded = true;
+        if (callback) callback();
+        return true;
+    }
+    pendingMandarinCallback = callback;
+    return false;
 }
 
 // ====================== 动态分支路径工具 ======================
@@ -298,75 +320,116 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块（手机端使用有道 API，电脑端使用浏览器语音） ======================
+// ====================== 普通话语音模块（使用 Gemini 方案 - 强制筛选语音） ======================
 
-// 电脑端使用的普通话语音获取函数
+// 获取真正的普通话语音（排除香港/台湾/粤语）
 function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    return voices.find(v => v.name && v.name === 'Ting-Ting') ||
-           voices.find(v => v.name && v.name.includes('Google') && v.lang === 'zh-CN') ||
-           voices.find(v => v.name && v.name.includes('Chinese (China)')) ||
-           voices.find(v => v.name && v.name.includes('Mandarin')) ||
-           voices.find(v => v.lang === 'zh-CN' && v.name && v.name.includes('Female')) ||
-           voices.find(v => v.lang === 'zh-CN') ||
-           null;
+    console.log('所有中文语音包:', voices.filter(v => v.lang.includes('zh')).map(v => ({ name: v.name, lang: v.lang })));
+    
+    // 严格按照 Gemini 建议筛选：排除香港、粤语、台湾
+    let mandarinVoice = voices.find(voice => {
+        const name = (voice.name || '').toLowerCase();
+        const lang = voice.lang.toLowerCase();
+        // lang 必须是 zh-CN，且名称不包含香港、粤语、台湾、HK
+        return (lang === 'zh-cn' || lang === 'zh_cn') && 
+               !name.includes('hong kong') && 
+               !name.includes('cantonese') &&
+               !name.includes('taiwan') &&
+               !name.includes('tw') &&
+               !name.includes('hk');
+    });
+    
+    // 如果上面没找到，尝试找名称包含 mandarin 的
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => {
+            const name = (voice.name || '').toLowerCase();
+            return name.includes('mandarin') && !name.includes('taiwan');
+        });
+    }
+    
+    // 如果还是没找到，尝试找 iOS 的 Ting-Ting
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => (voice.name || '').toLowerCase() === 'ting-ting');
+    }
+    
+    // 最后降级：任何 lang 为 zh-CN 的语音
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => voice.lang.toLowerCase() === 'zh-cn');
+    }
+    
+    if (mandarinVoice) {
+        console.log('选中的普通话语音:', mandarinVoice.name, mandarinVoice.lang);
+    } else {
+        console.warn('未找到普通话语音，将使用浏览器默认');
+    }
+    
+    return mandarinVoice || null;
 }
 
 let mandarinVoiceEngineReady = false;
 let mandarinVoice = null;
 
 function ensureMandarinEngine(callback) {
-    if (mandarinVoiceEngineReady && mandarinVoice) {
-        if (callback) callback();
-        return true;
-    }
-    
-    try {
-        const silent = new SpeechSynthesisUtterance('');
-        silent.volume = 0;
-        const voice = getMandarinVoice();
-        if (voice) {
-            mandarinVoice = voice;
-            silent.voice = voice;
+    // 先确保语音列表已加载
+    ensureVoicesLoaded(() => {
+        if (mandarinVoiceEngineReady && mandarinVoice) {
+            if (callback) callback();
+            return;
         }
         
-        silent.onend = () => {
-            mandarinVoiceEngineReady = true;
-            if (callback) callback();
-        };
-        
-        synth.speak(silent);
-        setTimeout(() => {
-            if (!mandarinVoiceEngineReady) {
+        try {
+            mandarinVoice = getMandarinVoice();
+            if (mandarinVoice) {
+                // 测试语音是否可用
+                const testUtterance = new SpeechSynthesisUtterance('');
+                testUtterance.voice = mandarinVoice;
+                testUtterance.volume = 0;
+                testUtterance.onend = () => {
+                    mandarinVoiceEngineReady = true;
+                    if (callback) callback();
+                };
+                synth.speak(testUtterance);
+                setTimeout(() => {
+                    if (!mandarinVoiceEngineReady) {
+                        mandarinVoiceEngineReady = true;
+                        if (callback) callback();
+                    }
+                }, 500);
+            } else {
                 mandarinVoiceEngineReady = true;
                 if (callback) callback();
             }
-        }, 500);
-    } catch(e) {
-        mandarinVoiceEngineReady = true;
-        if (callback) callback();
-    }
-    return false;
+        } catch(e) {
+            mandarinVoiceEngineReady = true;
+            if (callback) callback();
+        }
+    });
 }
 
-// 电脑端朗读普通话（浏览器语音）
-function speakMandarinBrowser(text, onEnd) {
+// 朗读普通话（使用强制筛选的语音）
+function speakMandarinOnce(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
         return;
     }
     
+    try { synth.cancel(); } catch(e) {}
+    
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "zh-CN";
+    utterance.lang = 'zh-CN';
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
+    // 重新获取语音（确保最新）
     const voice = getMandarinVoice();
     if (voice) {
         utterance.voice = voice;
+        mandarinVoice = voice;
+        console.log('使用语音:', voice.name);
     }
     
     let ended = false;
@@ -399,54 +462,6 @@ function speakMandarinBrowser(text, onEnd) {
     }
 }
 
-// 手机端朗读普通话（有道 API）
-function speakMandarinMobile(text, onEnd) {
-    if (!text) {
-        if (onEnd) onEnd();
-        return;
-    }
-    
-    // 停止任何正在播放的音频
-    if (window.currentAudio) {
-        window.currentAudio.pause();
-        window.currentAudio = null;
-    }
-    
-    const audio = new Audio();
-    window.currentAudio = audio;
-    audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=1`;
-    
-    audio.onended = () => {
-        if (window.currentAudio === audio) {
-            window.currentAudio = null;
-        }
-        if (onEnd) onEnd();
-    };
-    
-    audio.onerror = (err) => {
-        console.error('有道 API 播放失败:', err);
-        if (window.currentAudio === audio) {
-            window.currentAudio = null;
-        }
-        // 降级：尝试使用浏览器语音
-        speakMandarinBrowser(text, onEnd);
-    };
-    
-    audio.play().catch(err => {
-        console.error('音频播放失败:', err);
-        if (onEnd) onEnd();
-    });
-}
-
-// 统一的普通话朗读入口（根据设备自动选择）
-function speakMandarinOnce(text, onEnd) {
-    if (isMobileDevice()) {
-        speakMandarinMobile(text, onEnd);
-    } else {
-        speakMandarinBrowser(text, onEnd);
-    }
-}
-
 // 普通话朗读控制
 function startMandarinReading(text, buttonElement) {
     if (isMandarinReading && currentMandarinText === text && currentMandarinButton === buttonElement) {
@@ -470,24 +485,12 @@ function startMandarinReading(text, buttonElement) {
         });
     }
     
-    if (isMobileDevice()) {
-        // 手机端直接开始，不需要预热语音引擎
-        beginReading();
-    } else {
-        // 电脑端需要确保语音引擎就绪
-        ensureMandarinEngine(beginReading);
-    }
+    ensureMandarinEngine(beginReading);
 }
 
 function stopMandarinReading() {
     if (!isMandarinReading) return;
     isMandarinReading = false;
-    
-    // 如果是手机端且正在播放音频，停止它
-    if (isMobileDevice() && window.currentAudio) {
-        window.currentAudio.pause();
-        window.currentAudio = null;
-    }
     
     if (currentMandarinButton) {
         currentMandarinButton.textContent = "🔊普 1x";
@@ -502,9 +505,6 @@ function toggleMandarinReading(text, buttonElement) {
 }
 
 // ====================== 粤语语音模块 ======================
-let cantoneseVoiceEngineReady = false;
-let cantoneseVoice = null;
-
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -517,6 +517,9 @@ function getCantoneseVoice() {
            voices.find(v => v.lang && v.lang.includes('HK')) ||
            null;
 }
+
+let cantoneseVoiceEngineReady = false;
+let cantoneseVoice = null;
 
 function ensureCantoneseEngine(callback) {
     if (cantoneseVoiceEngineReady && cantoneseVoice) {
@@ -641,21 +644,17 @@ function toggleCantoneseReading(text, buttonElement) {
     startCantoneseReading(text, buttonElement);
 }
 
-// 预热语音引擎（只预热粤语和英文，普通话手机端不需要预热）
+// 预热语音引擎
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
     });
+    ensureMandarinEngine(function() {
+        console.log('Mandarin voice engine ready');
+    });
     ensureCantoneseEngine(function() {
         console.log('Cantonese voice engine ready');
     });
-    if (!isMobileDevice()) {
-        ensureMandarinEngine(function() {
-            console.log('Mandarin voice engine ready (desktop)');
-        });
-    } else {
-        console.log('Mobile device: Mandarin will use Youdao API');
-    }
 }
 
 setTimeout(function() {
@@ -1047,7 +1046,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
@@ -1074,7 +1073,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></td></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
