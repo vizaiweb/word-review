@@ -30,6 +30,11 @@ let isCantoneseReading = false;
 let currentCantoneseButton = null;
 let currentCantoneseText = "";
 
+// ====================== 检测是否为手机设备 ======================
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
@@ -293,92 +298,38 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块（修复手机版变粤语问题） ======================
-let mandarinVoiceEngineReady = false;
-let mandarinVoice = null;
+// ====================== 普通话语音模块（手机端使用有道 API，电脑端使用浏览器语音） ======================
 
-// 获取普通话语音 - 强制筛选，排除粤语和台湾口音
+// 电脑端使用的普通话语音获取函数
 function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 调试：输出所有中文相关语音（方便排查问题）
-    console.log('所有中文语音包:', voices.filter(v => v.lang.includes('zh')).map(v => ({ name: v.name, lang: v.lang })));
-    
-    // 普通话筛选逻辑（优先级从高到低）
-    // 1. 优先选择明确标注为普通话且不包含香港/台湾/粤语的语音
-    let mandarinVoice = voices.find(voice => {
-        const name = (voice.name || '').toLowerCase();
-        const lang = voice.lang.toLowerCase();
-        return (lang === 'zh-cn' || lang === 'zh_cn' || name.includes('mandarin')) &&
-               !name.includes('hong kong') &&
-               !name.includes('cantonese') &&
-               !name.includes('粤') &&
-               !name.includes('taiwan') &&
-               !name.includes('tw');
-    });
-    
-    // 2. 如果没找到，选择名称包含 "Google" 且 lang 为 zh-CN 的语音
-    if (!mandarinVoice) {
-        mandarinVoice = voices.find(voice => {
-            const name = (voice.name || '').toLowerCase();
-            const lang = voice.lang.toLowerCase();
-            return lang === 'zh-cn' && name.includes('google');
-        });
-    }
-    
-    // 3. 如果没找到，选择名称包含 "Ting-Ting"（iOS 普通话）
-    if (!mandarinVoice) {
-        mandarinVoice = voices.find(voice => (voice.name || '').toLowerCase() === 'ting-ting');
-    }
-    
-    // 4. 如果没找到，选择任何 lang 为 zh-CN 的语音（最后手段）
-    if (!mandarinVoice) {
-        mandarinVoice = voices.find(voice => voice.lang.toLowerCase() === 'zh-cn');
-    }
-    
-    // 5. 如果还没找到，选择名称包含 "chinese" 且不包含 "hong" 的语音
-    if (!mandarinVoice) {
-        mandarinVoice = voices.find(voice => {
-            const name = (voice.name || '').toLowerCase();
-            return name.includes('chinese') && !name.includes('hong');
-        });
-    }
-    
-    if (mandarinVoice) {
-        console.log('选中的普通话语音:', mandarinVoice.name, mandarinVoice.lang);
-    } else {
-        console.warn('未找到普通话语音，将使用浏览器默认');
-    }
-    
-    return mandarinVoice || null;
+    return voices.find(v => v.name && v.name === 'Ting-Ting') ||
+           voices.find(v => v.name && v.name.includes('Google') && v.lang === 'zh-CN') ||
+           voices.find(v => v.name && v.name.includes('Chinese (China)')) ||
+           voices.find(v => v.name && v.name.includes('Mandarin')) ||
+           voices.find(v => v.lang === 'zh-CN' && v.name && v.name.includes('Female')) ||
+           voices.find(v => v.lang === 'zh-CN') ||
+           null;
 }
 
-// 确保普通话语音引擎就绪
+let mandarinVoiceEngineReady = false;
+let mandarinVoice = null;
+
 function ensureMandarinEngine(callback) {
     if (mandarinVoiceEngineReady && mandarinVoice) {
         if (callback) callback();
         return true;
     }
     
-    // 确保语音列表已加载
-    const voices = synth.getVoices();
-    if (voices.length === 0) {
-        synth.onvoiceschanged = () => {
-            mandarinVoice = getMandarinVoice();
-            mandarinVoiceEngineReady = true;
-            if (callback) callback();
-        };
-        return false;
-    }
-    
     try {
-        mandarinVoice = getMandarinVoice();
-        
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0;
-        if (mandarinVoice) {
-            silent.voice = mandarinVoice;
+        const voice = getMandarinVoice();
+        if (voice) {
+            mandarinVoice = voice;
+            silent.voice = voice;
         }
         
         silent.onend = () => {
@@ -400,8 +351,8 @@ function ensureMandarinEngine(callback) {
     return false;
 }
 
-// 朗读普通话一次（使用强制筛选的语音）
-function speakMandarinOnce(text, onEnd) {
+// 电脑端朗读普通话（浏览器语音）
+function speakMandarinBrowser(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
         return;
@@ -413,11 +364,9 @@ function speakMandarinOnce(text, onEnd) {
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    // 重新获取语音（确保最新）
     const voice = getMandarinVoice();
     if (voice) {
         utterance.voice = voice;
-        mandarinVoice = voice;
     }
     
     let ended = false;
@@ -450,6 +399,54 @@ function speakMandarinOnce(text, onEnd) {
     }
 }
 
+// 手机端朗读普通话（有道 API）
+function speakMandarinMobile(text, onEnd) {
+    if (!text) {
+        if (onEnd) onEnd();
+        return;
+    }
+    
+    // 停止任何正在播放的音频
+    if (window.currentAudio) {
+        window.currentAudio.pause();
+        window.currentAudio = null;
+    }
+    
+    const audio = new Audio();
+    window.currentAudio = audio;
+    audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=1`;
+    
+    audio.onended = () => {
+        if (window.currentAudio === audio) {
+            window.currentAudio = null;
+        }
+        if (onEnd) onEnd();
+    };
+    
+    audio.onerror = (err) => {
+        console.error('有道 API 播放失败:', err);
+        if (window.currentAudio === audio) {
+            window.currentAudio = null;
+        }
+        // 降级：尝试使用浏览器语音
+        speakMandarinBrowser(text, onEnd);
+    };
+    
+    audio.play().catch(err => {
+        console.error('音频播放失败:', err);
+        if (onEnd) onEnd();
+    });
+}
+
+// 统一的普通话朗读入口（根据设备自动选择）
+function speakMandarinOnce(text, onEnd) {
+    if (isMobileDevice()) {
+        speakMandarinMobile(text, onEnd);
+    } else {
+        speakMandarinBrowser(text, onEnd);
+    }
+}
+
 // 普通话朗读控制
 function startMandarinReading(text, buttonElement) {
     if (isMandarinReading && currentMandarinText === text && currentMandarinButton === buttonElement) {
@@ -473,12 +470,24 @@ function startMandarinReading(text, buttonElement) {
         });
     }
     
-    ensureMandarinEngine(beginReading);
+    if (isMobileDevice()) {
+        // 手机端直接开始，不需要预热语音引擎
+        beginReading();
+    } else {
+        // 电脑端需要确保语音引擎就绪
+        ensureMandarinEngine(beginReading);
+    }
 }
 
 function stopMandarinReading() {
     if (!isMandarinReading) return;
     isMandarinReading = false;
+    
+    // 如果是手机端且正在播放音频，停止它
+    if (isMobileDevice() && window.currentAudio) {
+        window.currentAudio.pause();
+        window.currentAudio = null;
+    }
     
     if (currentMandarinButton) {
         currentMandarinButton.textContent = "🔊普 1x";
@@ -496,46 +505,19 @@ function toggleMandarinReading(text, buttonElement) {
 let cantoneseVoiceEngineReady = false;
 let cantoneseVoice = null;
 
-// 获取粤语语音
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    const voiceList = voices.map(v => ({
-        voice: v,
-        nameLower: (v.name || '').toLowerCase(),
-        langLower: (v.lang || '').toLowerCase()
-    }));
-    
-    // 1. 优先选择 iOS 粤语女声
-    let found = voiceList.find(v => v.nameLower === 'sin-ji');
-    if (found) return found.voice;
-    
-    // 2. 选择包含 "google" 和 "粤语" 或 "cantonese" 的语音
-    found = voiceList.find(v => v.nameLower.includes('google') && 
-        (v.nameLower.includes('粤语') || v.nameLower.includes('cantonese')));
-    if (found) return found.voice;
-    
-    // 3. 选择包含 "cantonese" 的语音
-    found = voiceList.find(v => v.nameLower.includes('cantonese'));
-    if (found) return found.voice;
-    
-    // 4. 选择 lang 为 yue 或 zh-hk 的语音
-    found = voiceList.find(v => v.langLower === 'yue' || v.langLower === 'zh-hk');
-    if (found) return found.voice;
-    
-    // 5. 选择包含 "hong" 或 "hk" 的语音
-    found = voiceList.find(v => v.nameLower.includes('hong') || v.nameLower.includes('hk'));
-    if (found) return found.voice;
-    
-    // 6. 降级：任何 zh-HK 语音
-    found = voiceList.find(v => v.langLower === 'zh-hk');
-    if (found) return found.voice;
-    
-    return null;
+    return voices.find(v => v.name && v.name === 'Sin-Ji') ||
+           voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
+           voices.find(v => v.name && v.name.includes('Cantonese')) ||
+           voices.find(v => v.lang === 'yue') ||
+           voices.find(v => v.lang === 'zh-HK') ||
+           voices.find(v => v.lang && v.lang.includes('HK')) ||
+           null;
 }
 
-// 确保粤语语音引擎就绪
 function ensureCantoneseEngine(callback) {
     if (cantoneseVoiceEngineReady && cantoneseVoice) {
         if (callback) callback();
@@ -570,7 +552,6 @@ function ensureCantoneseEngine(callback) {
     return false;
 }
 
-// 朗读粤语一次
 function speakCantoneseOnce(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
@@ -583,14 +564,10 @@ function speakCantoneseOnce(text, onEnd) {
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    if (cantoneseVoice) {
-        utterance.voice = cantoneseVoice;
-    } else {
-        const voice = getCantoneseVoice();
-        if (voice) {
-            cantoneseVoice = voice;
-            utterance.voice = voice;
-        }
+    const voice = getCantoneseVoice();
+    if (voice) {
+        utterance.voice = voice;
+        cantoneseVoice = voice;
     }
     
     let ended = false;
@@ -623,7 +600,6 @@ function speakCantoneseOnce(text, onEnd) {
     }
 }
 
-// 粤语朗读控制
 function startCantoneseReading(text, buttonElement) {
     if (isCantoneseReading && currentCantoneseText === text && currentCantoneseButton === buttonElement) {
         stopCantoneseReading();
@@ -665,17 +641,21 @@ function toggleCantoneseReading(text, buttonElement) {
     startCantoneseReading(text, buttonElement);
 }
 
-// 预热所有语音引擎
+// 预热语音引擎（只预热粤语和英文，普通话手机端不需要预热）
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
     });
-    ensureMandarinEngine(function() {
-        console.log('Mandarin voice engine ready');
-    });
     ensureCantoneseEngine(function() {
         console.log('Cantonese voice engine ready');
     });
+    if (!isMobileDevice()) {
+        ensureMandarinEngine(function() {
+            console.log('Mandarin voice engine ready (desktop)');
+        });
+    } else {
+        console.log('Mobile device: Mandarin will use Youdao API');
+    }
 }
 
 setTimeout(function() {
@@ -844,7 +824,6 @@ function getMaxDay() {
     return max;
 }
 
-// showWord 函数 - 包含普通话和粤语两个按钮
 function showWord() {
     stopAllReading();
     const container = document.getElementById("wordContent");
@@ -864,10 +843,6 @@ function showWord() {
     const w = filteredWords[currentWordIdx];
     const isFirst = currentWordIdx === 0;
     
-    console.log('当前单词:', w.word);
-    console.log('音节:', w.syllable);
-    console.log('音标:', w.phonetics);
-    
     // 构建详细信息（音标和音节）
     let detailsHtml = '';
     if (w.syllable || w.phonetics) {
@@ -885,7 +860,6 @@ function showWord() {
         ${detailsHtml}
     `;
     
-    // 中文解释行：包含普通话和粤语两个按钮
     container.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
             <div class="meaning" style="margin-bottom: 0; flex: 1;">💡 ${w.meaning}</div>
@@ -921,7 +895,6 @@ function showWord() {
         };
     }
     
-    // Show Word 按钮
     const showBtn = document.getElementById("btnShowWord");
     if (showBtn) {
         showBtn.onclick = () => {
@@ -1101,14 +1074,14 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></td></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
     newWindow.document.close();
 }
 
-// 停止所有朗读（包括英文、普通话、粤语）
+// 停止所有朗读
 function stopAllReading() {
     stopWordReading();
     stopSentenceReading();
