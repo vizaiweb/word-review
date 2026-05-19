@@ -302,15 +302,43 @@ function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 优先级：针对不同浏览器的普通话语音
-    return voices.find(v => v.name && v.name === 'Ting-Ting') ||  // iOS 标准普通话女声
-           voices.find(v => v.name && v.name === 'Sin-Ji') ||     // iOS 另一个女声
-           voices.find(v => v.name && v.name.includes('Google') && v.lang === 'zh-CN') ||  // Android/Chrome
-           voices.find(v => v.name && v.name.includes('Chinese (China)')) ||
-           voices.find(v => v.name && v.name.includes('Mandarin')) ||
-           voices.find(v => v.lang === 'zh-CN' && v.name && v.name.includes('Female')) ||
-           voices.find(v => v.lang === 'zh-CN') ||
-           null;
+    // 将语音名称转为小写以便匹配
+    const voiceList = voices.map(v => ({
+        voice: v,
+        nameLower: (v.name || '').toLowerCase(),
+        langLower: (v.lang || '').toLowerCase()
+    }));
+    
+    // 1. 优先选择 iOS 标准普通话女声
+    let found = voiceList.find(v => v.nameLower === 'ting-ting');
+    if (found) return found.voice;
+    
+    // 2. 选择包含 "google" 和 "普通话" 或 "mandarin" 的语音
+    found = voiceList.find(v => v.nameLower.includes('google') && 
+        (v.nameLower.includes('普通话') || v.nameLower.includes('mandarin')));
+    if (found) return found.voice;
+    
+    // 3. 选择包含 "chinese" 和 "china" 的语音（避免香港）
+    found = voiceList.find(v => v.nameLower.includes('chinese') && 
+        v.nameLower.includes('china') && !v.nameLower.includes('hong'));
+    if (found) return found.voice;
+    
+    // 4. 选择包含 "mandarin" 的语音
+    found = voiceList.find(v => v.nameLower.includes('mandarin'));
+    if (found) return found.voice;
+    
+    // 5. 选择 lang 为 zh-CN 且不包含香港/粤语关键词的语音
+    found = voiceList.find(v => v.langLower === 'zh-cn' && 
+        !v.nameLower.includes('hong') && 
+        !v.nameLower.includes('cantonese') &&
+        !v.nameLower.includes('粤'));
+    if (found) return found.voice;
+    
+    // 6. 降级：任何 zh-CN 语音
+    found = voiceList.find(v => v.langLower === 'zh-cn');
+    if (found) return found.voice;
+    
+    return null;
 }
 
 // 确保普通话语音引擎就绪
@@ -452,14 +480,38 @@ function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 优先级：针对不同浏览器的粤语语音
-    return voices.find(v => v.name && v.name === 'Sin-Ji') ||  // iOS 粤语女声
-           voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
-           voices.find(v => v.name && v.name.includes('Cantonese')) ||
-           voices.find(v => v.lang === 'yue') ||
-           voices.find(v => v.lang === 'zh-HK') ||
-           voices.find(v => v.lang && v.lang.includes('HK')) ||
-           null;
+    const voiceList = voices.map(v => ({
+        voice: v,
+        nameLower: (v.name || '').toLowerCase(),
+        langLower: (v.lang || '').toLowerCase()
+    }));
+    
+    // 1. 优先选择 iOS 粤语女声
+    let found = voiceList.find(v => v.nameLower === 'sin-ji');
+    if (found) return found.voice;
+    
+    // 2. 选择包含 "google" 和 "粤语" 或 "cantonese" 的语音
+    found = voiceList.find(v => v.nameLower.includes('google') && 
+        (v.nameLower.includes('粤语') || v.nameLower.includes('cantonese')));
+    if (found) return found.voice;
+    
+    // 3. 选择包含 "cantonese" 的语音
+    found = voiceList.find(v => v.nameLower.includes('cantonese'));
+    if (found) return found.voice;
+    
+    // 4. 选择 lang 为 yue 或 zh-hk 的语音
+    found = voiceList.find(v => v.langLower === 'yue' || v.langLower === 'zh-hk');
+    if (found) return found.voice;
+    
+    // 5. 选择包含 "hong" 或 "hk" 的语音
+    found = voiceList.find(v => v.nameLower.includes('hong') || v.nameLower.includes('hk'));
+    if (found) return found.voice;
+    
+    // 6. 降级：任何 zh-HK 语音
+    found = voiceList.find(v => v.langLower === 'zh-hk');
+    if (found) return found.voice;
+    
+    return null;
 }
 
 // 确保粤语语音引擎就绪
