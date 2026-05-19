@@ -24,13 +24,12 @@ let currentReadCount = 0;
 let isMandarinReading = false;
 let currentMandarinButton = null;
 let currentMandarinText = "";
+let currentMandarinAudio = null;
 
 // 粤语朗读相关变量
 let isCantoneseReading = false;
 let currentCantoneseButton = null;
 let currentCantoneseText = "";
-
-
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -295,10 +294,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块（使用有道 API - 100% 可靠） ======================
-
-// 全局标记：防止音频重叠
-let currentMandarinAudio = null;
+// ====================== 普通话语音模块（使用有道 API） ======================
 
 // 使用有道 API 播放普通话
 function speakMandarinOnce(text, onEnd) {
@@ -313,11 +309,8 @@ function speakMandarinOnce(text, onEnd) {
         currentMandarinAudio = null;
     }
     
-    // 创建音频对象
     const audio = new Audio();
     currentMandarinAudio = audio;
-    
-    // 有道 API URL（type=1 为普通话）
     const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=1`;
     audio.src = url;
     
@@ -333,65 +326,15 @@ function speakMandarinOnce(text, onEnd) {
         if (currentMandarinAudio === audio) {
             currentMandarinAudio = null;
         }
-        // 降级方案：尝试使用浏览器语音
-        fallbackMandarinBrowser(text, onEnd);
+        if (onEnd) onEnd();
     };
     
     audio.play().catch(err => {
         console.error('音频播放失败:', err);
-        fallbackMandarinBrowser(text, onEnd);
+        if (onEnd) onEnd();
     });
 }
 
-// 降级方案：使用浏览器语音（当有道 API 失败时）
-function fallbackMandarinBrowser(text, onEnd) {
-    if (!text) {
-        if (onEnd) onEnd();
-        return;
-    }
-    
-    // 等待语音列表加载
-    const waitForVoices = () => {
-        const voices = synth.getVoices();
-        if (voices.length === 0) {
-            setTimeout(waitForVoices, 100);
-            return;
-        }
-        
-        try { synth.cancel(); } catch(e) {}
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1;
-        
-        // 优先选择 Tingting
-        let targetVoice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting');
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.lang === 'zh-CN' && !v.name.includes('Hong'));
-        }
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.lang.includes('zh'));
-        }
-        
-        if (targetVoice) {
-            utterance.voice = targetVoice;
-            utterance.lang = targetVoice.lang;
-            console.log('降级使用浏览器语音:', targetVoice.name);
-        } else {
-            utterance.lang = 'zh-CN';
-        }
-        
-        utterance.onend = () => { if (onEnd) onEnd(); };
-        utterance.onerror = () => { if (onEnd) onEnd(); };
-        
-        try { synth.speak(utterance); } catch(e) { if (onEnd) onEnd(); }
-    };
-    
-    waitForVoices();
-}
-
-// 普通话朗读控制
 function startMandarinReading(text, buttonElement) {
     if (isMandarinReading && currentMandarinText === text && currentMandarinButton === buttonElement) {
         stopMandarinReading();
@@ -416,14 +359,10 @@ function stopMandarinReading() {
     if (!isMandarinReading) return;
     isMandarinReading = false;
     
-    // 停止有道 API 音频
     if (currentMandarinAudio) {
         currentMandarinAudio.pause();
         currentMandarinAudio = null;
     }
-    
-    // 停止浏览器语音
-    try { synth.cancel(); } catch(e) {}
     
     if (currentMandarinButton) {
         currentMandarinButton.textContent = "🔊普 1x";
@@ -577,17 +516,15 @@ function toggleCantoneseReading(text, buttonElement) {
     startCantoneseReading(text, buttonElement);
 }
 
-// 预热语音引擎
+// ====================== 预热语音引擎（修复版） ======================
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
     });
-    ensureMandarinEngine(function() {
-        console.log('Mandarin voice engine ready');
-    });
     ensureCantoneseEngine(function() {
         console.log('Cantonese voice engine ready');
     });
+    console.log('普通话使用有道 API，无需预热');
 }
 
 setTimeout(function() {
@@ -979,7 +916,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th><tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
@@ -1006,7 +943,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<td><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -1020,13 +957,6 @@ function stopAllReading() {
     stopMandarinReading();
     stopCantoneseReading();
 }
-
-// ====================== 调试入口（已临时禁用，避免干扰） ======================
-// 注意：原有的 debugVoices 函数未定义，这会导致页面报错并停止执行。
-// 正确的调试应在浏览器控制台中进行，因此先注释掉这些调用。
-
-// window.speechSynthesis.onvoiceschanged = debugVoices;
-// setTimeout(debugVoices, 2000);
 
 // ====================== 初始化与事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
