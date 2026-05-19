@@ -20,12 +20,6 @@ let currentWordText = "";
 let currentSentenceText = "";
 let currentReadCount = 0;
 
-// 普通话朗读相关变量
-let isMandarinReading = false;
-let currentMandarinButton = null;
-let currentMandarinText = "";
-let currentMandarinAudio = null;
-
 // 粤语朗读相关变量
 let isCantoneseReading = false;
 let currentCantoneseButton = null;
@@ -294,88 +288,6 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块（使用有道 API） ======================
-
-// 使用有道 API 播放普通话
-function speakMandarinOnce(text, onEnd) {
-    if (!text) {
-        if (onEnd) onEnd();
-        return;
-    }
-    
-    // 停止当前正在播放的音频
-    if (currentMandarinAudio) {
-        currentMandarinAudio.pause();
-        currentMandarinAudio = null;
-    }
-    
-    const audio = new Audio();
-    currentMandarinAudio = audio;
-    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=1`;
-    audio.src = url;
-    
-    audio.onended = () => {
-        if (currentMandarinAudio === audio) {
-            currentMandarinAudio = null;
-        }
-        if (onEnd) onEnd();
-    };
-    
-    audio.onerror = (err) => {
-        console.error('有道 API 播放失败:', err);
-        if (currentMandarinAudio === audio) {
-            currentMandarinAudio = null;
-        }
-        if (onEnd) onEnd();
-    };
-    
-    audio.play().catch(err => {
-        console.error('音频播放失败:', err);
-        if (onEnd) onEnd();
-    });
-}
-
-function startMandarinReading(text, buttonElement) {
-    if (isMandarinReading && currentMandarinText === text && currentMandarinButton === buttonElement) {
-        stopMandarinReading();
-        return;
-    }
-    
-    stopMandarinReading();
-    
-    currentMandarinText = text;
-    currentMandarinButton = buttonElement;
-    isMandarinReading = true;
-    
-    buttonElement.textContent = "⏹️停";
-    buttonElement.style.opacity = "0.6";
-    
-    speakMandarinOnce(text, () => {
-        stopMandarinReading();
-    });
-}
-
-function stopMandarinReading() {
-    if (!isMandarinReading) return;
-    isMandarinReading = false;
-    
-    if (currentMandarinAudio) {
-        currentMandarinAudio.pause();
-        currentMandarinAudio = null;
-    }
-    
-    if (currentMandarinButton) {
-        currentMandarinButton.textContent = "🔊普 1x";
-        currentMandarinButton.style.opacity = "1";
-        currentMandarinButton = null;
-    }
-    currentMandarinText = "";
-}
-
-function toggleMandarinReading(text, buttonElement) {
-    startMandarinReading(text, buttonElement);
-}
-
 // ====================== 粤语语音模块 ======================
 function getCantoneseVoice() {
     const voices = synth.getVoices();
@@ -516,7 +428,7 @@ function toggleCantoneseReading(text, buttonElement) {
     startCantoneseReading(text, buttonElement);
 }
 
-// ====================== 预热语音引擎（修复版） ======================
+// 预热语音引擎
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
@@ -524,7 +436,6 @@ function preheatVoice() {
     ensureCantoneseEngine(function() {
         console.log('Cantonese voice engine ready');
     });
-    console.log('普通话使用有道 API，无需预热');
 }
 
 setTimeout(function() {
@@ -732,10 +643,7 @@ function showWord() {
     container.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
             <div class="meaning" style="margin-bottom: 0; flex: 1;">💡 ${w.meaning}</div>
-            <div style="display: flex; gap: 8px;">
-                <button id="readMandarinBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊普 1x</button>
-                <button id="readCantoneseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊粵 1x</button>
-            </div>
+            <button id="readCantoneseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊粵 1x</button>
         </div>
         <div id="currentWordSpan" style="display: none;">${hiddenContent}</div>
         <div class="btn-group">
@@ -747,14 +655,6 @@ function showWord() {
     `;
     
     updateInfoTip();
-    
-    // 绑定普通话按钮事件
-    const mandarinBtn = document.getElementById("readMandarinBtn");
-    if (mandarinBtn) {
-        mandarinBtn.onclick = () => {
-            toggleMandarinReading(w.meaning, mandarinBtn);
-        };
-    }
     
     // 绑定粤语按钮事件
     const cantoneseBtn = document.getElementById("readCantoneseBtn");
@@ -896,10 +796,11 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
+// 原始的 showAllSentencesPopup 函数（恢复原始样式）
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
-    const fileNice = removeFileExtension(currentFileNameForSentences);
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileNameForSentences) : removeFileExtension(currentFileName);
     const tableRows = allSentences.map((s, idx) => `
         <tr>
             <td style="padding: 12px; text-align: center;">${idx + 1}</td>
@@ -916,17 +817,18 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
     win.document.close();
 }
 
+// 原始的 showAllWords 函数（恢复原始样式）
 function showAllWords() {
     if (allWords.length === 0) return;
     
-    const fileNice = removeFileExtension(currentFileName);
+    const fileNice = currentMode === "local" ? removeFileExtension(currentFileName) : removeFileExtension(currentFileName);
     const tableRows = allWords.map(w => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
@@ -943,7 +845,7 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<td><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `</td><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
@@ -954,7 +856,6 @@ function showAllWords() {
 function stopAllReading() {
     stopWordReading();
     stopSentenceReading();
-    stopMandarinReading();
     stopCantoneseReading();
 }
 
