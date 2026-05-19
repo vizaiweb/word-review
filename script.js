@@ -293,52 +293,65 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 普通话语音模块 ======================
+// ====================== 普通话语音模块（修复手机版变粤语问题） ======================
 let mandarinVoiceEngineReady = false;
 let mandarinVoice = null;
 
-// 获取普通话语音（修复手机版变成粤语的问题）
+// 获取普通话语音 - 强制筛选，排除粤语和台湾口音
 function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 将语音名称转为小写以便匹配
-    const voiceList = voices.map(v => ({
-        voice: v,
-        nameLower: (v.name || '').toLowerCase(),
-        langLower: (v.lang || '').toLowerCase()
-    }));
+    // 调试：输出所有中文相关语音（方便排查问题）
+    console.log('所有中文语音包:', voices.filter(v => v.lang.includes('zh')).map(v => ({ name: v.name, lang: v.lang })));
     
-    // 1. 优先选择 iOS 标准普通话女声
-    let found = voiceList.find(v => v.nameLower === 'ting-ting');
-    if (found) return found.voice;
+    // 普通话筛选逻辑（优先级从高到低）
+    // 1. 优先选择明确标注为普通话且不包含香港/台湾/粤语的语音
+    let mandarinVoice = voices.find(voice => {
+        const name = (voice.name || '').toLowerCase();
+        const lang = voice.lang.toLowerCase();
+        return (lang === 'zh-cn' || lang === 'zh_cn' || name.includes('mandarin')) &&
+               !name.includes('hong kong') &&
+               !name.includes('cantonese') &&
+               !name.includes('粤') &&
+               !name.includes('taiwan') &&
+               !name.includes('tw');
+    });
     
-    // 2. 选择包含 "google" 和 "普通话" 或 "mandarin" 的语音
-    found = voiceList.find(v => v.nameLower.includes('google') && 
-        (v.nameLower.includes('普通话') || v.nameLower.includes('mandarin')));
-    if (found) return found.voice;
+    // 2. 如果没找到，选择名称包含 "Google" 且 lang 为 zh-CN 的语音
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => {
+            const name = (voice.name || '').toLowerCase();
+            const lang = voice.lang.toLowerCase();
+            return lang === 'zh-cn' && name.includes('google');
+        });
+    }
     
-    // 3. 选择包含 "chinese" 和 "china" 的语音（避免香港）
-    found = voiceList.find(v => v.nameLower.includes('chinese') && 
-        v.nameLower.includes('china') && !v.nameLower.includes('hong'));
-    if (found) return found.voice;
+    // 3. 如果没找到，选择名称包含 "Ting-Ting"（iOS 普通话）
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => (voice.name || '').toLowerCase() === 'ting-ting');
+    }
     
-    // 4. 选择包含 "mandarin" 的语音
-    found = voiceList.find(v => v.nameLower.includes('mandarin'));
-    if (found) return found.voice;
+    // 4. 如果没找到，选择任何 lang 为 zh-CN 的语音（最后手段）
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => voice.lang.toLowerCase() === 'zh-cn');
+    }
     
-    // 5. 选择 lang 为 zh-CN 且不包含香港/粤语关键词的语音
-    found = voiceList.find(v => v.langLower === 'zh-cn' && 
-        !v.nameLower.includes('hong') && 
-        !v.nameLower.includes('cantonese') &&
-        !v.nameLower.includes('粤'));
-    if (found) return found.voice;
+    // 5. 如果还没找到，选择名称包含 "chinese" 且不包含 "hong" 的语音
+    if (!mandarinVoice) {
+        mandarinVoice = voices.find(voice => {
+            const name = (voice.name || '').toLowerCase();
+            return name.includes('chinese') && !name.includes('hong');
+        });
+    }
     
-    // 6. 降级：任何 zh-CN 语音
-    found = voiceList.find(v => v.langLower === 'zh-cn');
-    if (found) return found.voice;
+    if (mandarinVoice) {
+        console.log('选中的普通话语音:', mandarinVoice.name, mandarinVoice.lang);
+    } else {
+        console.warn('未找到普通话语音，将使用浏览器默认');
+    }
     
-    return null;
+    return mandarinVoice || null;
 }
 
 // 确保普通话语音引擎就绪
@@ -348,13 +361,24 @@ function ensureMandarinEngine(callback) {
         return true;
     }
     
+    // 确保语音列表已加载
+    const voices = synth.getVoices();
+    if (voices.length === 0) {
+        synth.onvoiceschanged = () => {
+            mandarinVoice = getMandarinVoice();
+            mandarinVoiceEngineReady = true;
+            if (callback) callback();
+        };
+        return false;
+    }
+    
     try {
+        mandarinVoice = getMandarinVoice();
+        
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0;
-        const voice = getMandarinVoice();
-        if (voice) {
-            mandarinVoice = voice;
-            silent.voice = voice;
+        if (mandarinVoice) {
+            silent.voice = mandarinVoice;
         }
         
         silent.onend = () => {
@@ -376,7 +400,7 @@ function ensureMandarinEngine(callback) {
     return false;
 }
 
-// 朗读普通话一次
+// 朗读普通话一次（使用强制筛选的语音）
 function speakMandarinOnce(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
@@ -389,14 +413,11 @@ function speakMandarinOnce(text, onEnd) {
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    if (mandarinVoice) {
-        utterance.voice = mandarinVoice;
-    } else {
-        const voice = getMandarinVoice();
-        if (voice) {
-            mandarinVoice = voice;
-            utterance.voice = voice;
-        }
+    // 重新获取语音（确保最新）
+    const voice = getMandarinVoice();
+    if (voice) {
+        utterance.voice = voice;
+        mandarinVoice = voice;
     }
     
     let ended = false;
