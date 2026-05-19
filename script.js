@@ -1,3 +1,25 @@
+// 專門用來在手機上測試語音列表的函數
+function debugVoices() {
+    if (!window.speechSynthesis) return "不支持語音";
+    const voices = window.speechSynthesis.getVoices();
+    
+    // 篩選所有中文相關的語音
+    const zhVoices = voices.filter(v => v.lang.toLowerCase().includes('zh'));
+    
+    // 把這些語音的名字和語言拼接成文字
+    let info = "手機支持的中文語音有 " + zhVoices.length + " 個：\n";
+    zhVoices.forEach((v, i) => {
+        info += `${i}. 名稱: ${v.name} | 語言: ${v.lang} | 本地: ${v.localService}\n`;
+    });
+    
+    // 直接用 alert 彈窗在手機上顯示出來
+    alert(info);
+}
+
+// 確保手機加載時能觸發
+window.speechSynthesis.onvoiceschanged = debugVoices;
+// 也可以把 debugVoices() 綁定到你頁面的某個臨時按鈕上點擊觸發
+
 // 全局状态变量
 let allWords = [];          
 let filteredWords = [];     
