@@ -1051,12 +1051,12 @@ function stopAllReading() {
     stopCantoneseReading();
 }
 
-// ====================== 调试入口 ======================
-// 确保手机加载时能触发调试
-window.speechSynthesis.onvoiceschanged = debugVoices;
+// ====================== 调试入口（已临时禁用，避免干扰） ======================
+// 注意：原有的 debugVoices 函数未定义，这会导致页面报错并停止执行。
+// 正确的调试应在浏览器控制台中进行，因此先注释掉这些调用。
 
-// 也可以延迟执行一次
-setTimeout(debugVoices, 2000);
+// window.speechSynthesis.onvoiceschanged = debugVoices;
+// setTimeout(debugVoices, 2000);
 
 // ====================== 初始化与事件绑定 ======================
 document.addEventListener('DOMContentLoaded', () => {
