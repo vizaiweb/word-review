@@ -340,7 +340,10 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
             word: String(item.word).trim(),
             meaning: String(item.meaning).trim(),
-            day: Number(item.day)
+            day: Number(item.day),
+            // 新增：读取音标和音节划分（支持多种列名）
+            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音标 || null,
+            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音节 || item.音节划分 || null
         }));
         
         filteredWords = [...allWords];
@@ -477,9 +480,25 @@ function showWord() {
     const w = filteredWords[currentWordIdx];
     const isFirst = currentWordIdx === 0;
     
+    // 构建隐藏的详细信息（音标和音节）
+    let hiddenDetailsHtml = '';
+    if (w.syllable || w.phonetics) {
+        hiddenDetailsHtml = '<div id="wordDetails" style="display:none; margin-top: 10px;">';
+        if (w.syllable) {
+            hiddenDetailsHtml += `<div class="syllable" style="font-size: 18px; color: #ff9a56; letter-spacing: 1px;">${w.syllable}</div>`;
+        }
+        if (w.phonetics) {
+            hiddenDetailsHtml += `<div class="phonetics" style="font-size: 16px; color: #64748b; font-family: monospace;">${w.phonetics}</div>`;
+        }
+        hiddenDetailsHtml += '</div>';
+    }
+    
     container.innerHTML = `
         <div class="meaning">💡 ${w.meaning}</div>
-        <div class="word" id="currentWordSpan" style="display:none;">${w.word.toUpperCase()}</div>
+        <div class="word" id="currentWordSpan" style="display:none;">
+            ${w.word.toUpperCase()}
+            ${hiddenDetailsHtml}
+        </div>
         <div class="btn-group">
             <button class="btn-show" id="btnShowWord">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
@@ -516,7 +535,7 @@ function showWord() {
             showWord();
         }
     });
-}
+} 
 
 function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
