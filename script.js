@@ -20,10 +20,15 @@ let currentWordText = "";
 let currentSentenceText = "";
 let currentReadCount = 0;
 
-// 中文朗读相关变量
-let isChineseReading = false;
-let currentChineseButton = null;
-let currentChineseText = "";
+// 普通话朗读相关变量
+let isMandarinReading = false;
+let currentMandarinButton = null;
+let currentMandarinText = "";
+
+// 粤语朗读相关变量
+let isCantoneseReading = false;
+let currentCantoneseButton = null;
+let currentCantoneseText = "";
 
 // ====================== 动态分支路径工具 ======================
 function getRawBaseUrl() {
@@ -288,27 +293,29 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 中文语音模块（新增） ======================
-let chineseVoiceEngineReady = false;
-let chineseVoice = null;
+// ====================== 普通话语音模块 ======================
+let mandarinVoiceEngineReady = false;
+let mandarinVoice = null;
 
-// 获取中文语音
-function getChineseVoice() {
+// 获取普通话语音（修复手机版变成粤语的问题）
+function getMandarinVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    // 优先级：中文女声 > 中文男声 > 任何中文 > 台湾中文
-    return voices.find(v => v.name && (v.name.includes('Ting-Ting') || v.name.includes('Ya Ya') || v.name.includes('Sin-Ji'))) ||
-           voices.find(v => v.name && v.name.includes('Google') && v.lang === 'zh-CN') ||
+    // 优先级：针对不同浏览器的普通话语音
+    return voices.find(v => v.name && v.name === 'Ting-Ting') ||  // iOS 标准普通话女声
+           voices.find(v => v.name && v.name === 'Sin-Ji') ||     // iOS 另一个女声
+           voices.find(v => v.name && v.name.includes('Google') && v.lang === 'zh-CN') ||  // Android/Chrome
+           voices.find(v => v.name && v.name.includes('Chinese (China)')) ||
+           voices.find(v => v.name && v.name.includes('Mandarin')) ||
            voices.find(v => v.lang === 'zh-CN' && v.name && v.name.includes('Female')) ||
            voices.find(v => v.lang === 'zh-CN') ||
-           voices.find(v => v.lang === 'zh-TW') ||
            null;
 }
 
-// 确保中文语音引擎就绪
-function ensureChineseVoiceEngine(callback) {
-    if (chineseVoiceEngineReady && chineseVoice) {
+// 确保普通话语音引擎就绪
+function ensureMandarinEngine(callback) {
+    if (mandarinVoiceEngineReady && mandarinVoice) {
         if (callback) callback();
         return true;
     }
@@ -316,33 +323,33 @@ function ensureChineseVoiceEngine(callback) {
     try {
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0;
-        const voice = getChineseVoice();
+        const voice = getMandarinVoice();
         if (voice) {
-            chineseVoice = voice;
+            mandarinVoice = voice;
             silent.voice = voice;
         }
         
         silent.onend = () => {
-            chineseVoiceEngineReady = true;
+            mandarinVoiceEngineReady = true;
             if (callback) callback();
         };
         
         synth.speak(silent);
         setTimeout(() => {
-            if (!chineseVoiceEngineReady) {
-                chineseVoiceEngineReady = true;
+            if (!mandarinVoiceEngineReady) {
+                mandarinVoiceEngineReady = true;
                 if (callback) callback();
             }
         }, 500);
     } catch(e) {
-        chineseVoiceEngineReady = true;
+        mandarinVoiceEngineReady = true;
         if (callback) callback();
     }
     return false;
 }
 
-// 朗读中文一次
-function speakChineseOnce(text, onEnd) {
+// 朗读普通话一次
+function speakMandarinOnce(text, onEnd) {
     if (!text) {
         if (onEnd) onEnd();
         return;
@@ -354,12 +361,12 @@ function speakChineseOnce(text, onEnd) {
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
-    if (chineseVoice) {
-        utterance.voice = chineseVoice;
+    if (mandarinVoice) {
+        utterance.voice = mandarinVoice;
     } else {
-        const voice = getChineseVoice();
+        const voice = getMandarinVoice();
         if (voice) {
-            chineseVoice = voice;
+            mandarinVoice = voice;
             utterance.voice = voice;
         }
     }
@@ -374,7 +381,7 @@ function speakChineseOnce(text, onEnd) {
     };
     
     utterance.onerror = (err) => {
-        console.error('Chinese speech error:', err);
+        console.error('Mandarin speech error:', err);
         if (!ended) {
             ended = true;
             if (onEnd) onEnd();
@@ -394,55 +401,207 @@ function speakChineseOnce(text, onEnd) {
     }
 }
 
-// 中文朗读控制
-function startChineseReading(text, buttonElement) {
-    if (isChineseReading && currentChineseText === text && currentChineseButton === buttonElement) {
-        stopChineseReading();
+// 普通话朗读控制
+function startMandarinReading(text, buttonElement) {
+    if (isMandarinReading && currentMandarinText === text && currentMandarinButton === buttonElement) {
+        stopMandarinReading();
         return;
     }
     
-    stopChineseReading();
+    stopMandarinReading();
     
-    currentChineseText = text;
-    currentChineseButton = buttonElement;
-    isChineseReading = true;
+    currentMandarinText = text;
+    currentMandarinButton = buttonElement;
+    isMandarinReading = true;
     
-    buttonElement.textContent = "⏹️停止";
+    buttonElement.textContent = "⏹️停";
     buttonElement.style.opacity = "0.6";
     
     function beginReading() {
-        if (!isChineseReading) return;
-        speakChineseOnce(text, () => {
-            stopChineseReading();
+        if (!isMandarinReading) return;
+        speakMandarinOnce(text, () => {
+            stopMandarinReading();
         });
     }
     
-    ensureChineseVoiceEngine(beginReading);
+    ensureMandarinEngine(beginReading);
 }
 
-function stopChineseReading() {
-    if (!isChineseReading) return;
-    isChineseReading = false;
+function stopMandarinReading() {
+    if (!isMandarinReading) return;
+    isMandarinReading = false;
     
-    if (currentChineseButton) {
-        currentChineseButton.textContent = "🔊讀 1x";
-        currentChineseButton.style.opacity = "1";
-        currentChineseButton = null;
+    if (currentMandarinButton) {
+        currentMandarinButton.textContent = "🔊普 1x";
+        currentMandarinButton.style.opacity = "1";
+        currentMandarinButton = null;
     }
-    currentChineseText = "";
+    currentMandarinText = "";
 }
 
-function toggleChineseReading(text, buttonElement) {
-    startChineseReading(text, buttonElement);
+function toggleMandarinReading(text, buttonElement) {
+    startMandarinReading(text, buttonElement);
 }
 
-// 预热语音（英文+中文）
+// ====================== 粤语语音模块 ======================
+let cantoneseVoiceEngineReady = false;
+let cantoneseVoice = null;
+
+// 获取粤语语音
+function getCantoneseVoice() {
+    const voices = synth.getVoices();
+    if (!voices || voices.length === 0) return null;
+    
+    // 优先级：针对不同浏览器的粤语语音
+    return voices.find(v => v.name && v.name === 'Sin-Ji') ||  // iOS 粤语女声
+           voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
+           voices.find(v => v.name && v.name.includes('Cantonese')) ||
+           voices.find(v => v.lang === 'yue') ||
+           voices.find(v => v.lang === 'zh-HK') ||
+           voices.find(v => v.lang && v.lang.includes('HK')) ||
+           null;
+}
+
+// 确保粤语语音引擎就绪
+function ensureCantoneseEngine(callback) {
+    if (cantoneseVoiceEngineReady && cantoneseVoice) {
+        if (callback) callback();
+        return true;
+    }
+    
+    try {
+        const silent = new SpeechSynthesisUtterance('');
+        silent.volume = 0;
+        const voice = getCantoneseVoice();
+        if (voice) {
+            cantoneseVoice = voice;
+            silent.voice = voice;
+        }
+        
+        silent.onend = () => {
+            cantoneseVoiceEngineReady = true;
+            if (callback) callback();
+        };
+        
+        synth.speak(silent);
+        setTimeout(() => {
+            if (!cantoneseVoiceEngineReady) {
+                cantoneseVoiceEngineReady = true;
+                if (callback) callback();
+            }
+        }, 500);
+    } catch(e) {
+        cantoneseVoiceEngineReady = true;
+        if (callback) callback();
+    }
+    return false;
+}
+
+// 朗读粤语一次
+function speakCantoneseOnce(text, onEnd) {
+    if (!text) {
+        if (onEnd) onEnd();
+        return;
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "yue";
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1;
+    
+    if (cantoneseVoice) {
+        utterance.voice = cantoneseVoice;
+    } else {
+        const voice = getCantoneseVoice();
+        if (voice) {
+            cantoneseVoice = voice;
+            utterance.voice = voice;
+        }
+    }
+    
+    let ended = false;
+    
+    utterance.onend = () => {
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();
+        }
+    };
+    
+    utterance.onerror = (err) => {
+        console.error('Cantonese speech error:', err);
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();
+        }
+    };
+    
+    try {
+        synth.speak(utterance);
+        setTimeout(() => {
+            if (!ended) {
+                ended = true;
+                if (onEnd) onEnd();
+            }
+        }, Math.max(1000, text.length * 100));
+    } catch(e) {
+        if (onEnd) onEnd();
+    }
+}
+
+// 粤语朗读控制
+function startCantoneseReading(text, buttonElement) {
+    if (isCantoneseReading && currentCantoneseText === text && currentCantoneseButton === buttonElement) {
+        stopCantoneseReading();
+        return;
+    }
+    
+    stopCantoneseReading();
+    
+    currentCantoneseText = text;
+    currentCantoneseButton = buttonElement;
+    isCantoneseReading = true;
+    
+    buttonElement.textContent = "⏹️停";
+    buttonElement.style.opacity = "0.6";
+    
+    function beginReading() {
+        if (!isCantoneseReading) return;
+        speakCantoneseOnce(text, () => {
+            stopCantoneseReading();
+        });
+    }
+    
+    ensureCantoneseEngine(beginReading);
+}
+
+function stopCantoneseReading() {
+    if (!isCantoneseReading) return;
+    isCantoneseReading = false;
+    
+    if (currentCantoneseButton) {
+        currentCantoneseButton.textContent = "🔊粵 1x";
+        currentCantoneseButton.style.opacity = "1";
+        currentCantoneseButton = null;
+    }
+    currentCantoneseText = "";
+}
+
+function toggleCantoneseReading(text, buttonElement) {
+    startCantoneseReading(text, buttonElement);
+}
+
+// 预热所有语音引擎
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
     });
-    ensureChineseVoiceEngine(function() {
-        console.log('Chinese voice engine ready');
+    ensureMandarinEngine(function() {
+        console.log('Mandarin voice engine ready');
+    });
+    ensureCantoneseEngine(function() {
+        console.log('Cantonese voice engine ready');
     });
 }
 
@@ -612,7 +771,7 @@ function getMaxDay() {
     return max;
 }
 
-// 修改后的 showWord 函数 - 增加了中文朗读按钮
+// showWord 函数 - 包含普通话和粤语两个按钮
 function showWord() {
     stopAllReading();
     const container = document.getElementById("wordContent");
@@ -653,11 +812,14 @@ function showWord() {
         ${detailsHtml}
     `;
     
-    // 修改：中文解释和朗读按钮放在同一行
+    // 中文解释行：包含普通话和粤语两个按钮
     container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
             <div class="meaning" style="margin-bottom: 0; flex: 1;">💡 ${w.meaning}</div>
-            <button id="readChineseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🔊讀 1x</button>
+            <div style="display: flex; gap: 8px;">
+                <button id="readMandarinBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊普 1x</button>
+                <button id="readCantoneseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊粵 1x</button>
+            </div>
         </div>
         <div id="currentWordSpan" style="display: none;">${hiddenContent}</div>
         <div class="btn-group">
@@ -670,15 +832,23 @@ function showWord() {
     
     updateInfoTip();
     
-    // 绑定中文朗读按钮事件
-    const chineseBtn = document.getElementById("readChineseBtn");
-    if (chineseBtn) {
-        chineseBtn.onclick = () => {
-            toggleChineseReading(w.meaning, chineseBtn);
+    // 绑定普通话按钮事件
+    const mandarinBtn = document.getElementById("readMandarinBtn");
+    if (mandarinBtn) {
+        mandarinBtn.onclick = () => {
+            toggleMandarinReading(w.meaning, mandarinBtn);
         };
     }
     
-    // Show Word 按钮：显示单词和详细信息
+    // 绑定粤语按钮事件
+    const cantoneseBtn = document.getElementById("readCantoneseBtn");
+    if (cantoneseBtn) {
+        cantoneseBtn.onclick = () => {
+            toggleCantoneseReading(w.meaning, cantoneseBtn);
+        };
+    }
+    
+    // Show Word 按钮
     const showBtn = document.getElementById("btnShowWord");
     if (showBtn) {
         showBtn.onclick = () => {
@@ -831,7 +1001,7 @@ function showAllSentencesPopup() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(winHtml);
@@ -858,18 +1028,19 @@ function showAllWords() {
         th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
         th { background: #ff9a56; color: white; }
         .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
+    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
     
     const newWindow = window.open('', '_blank', 'width=900,height=700');
     newWindow.document.write(allWordsHtml);
     newWindow.document.close();
 }
 
-// 修改 stopAllReading 函数，增加停止中文朗读
+// 停止所有朗读（包括英文、普通话、粤语）
 function stopAllReading() {
     stopWordReading();
     stopSentenceReading();
-    stopChineseReading();
+    stopMandarinReading();
+    stopCantoneseReading();
 }
 
 // ====================== 初始化与事件绑定 ======================
