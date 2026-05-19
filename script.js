@@ -480,25 +480,31 @@ function showWord() {
     const w = filteredWords[currentWordIdx];
     const isFirst = currentWordIdx === 0;
     
-    // 构建隐藏的详细信息（音标和音节）
-    let hiddenDetailsHtml = '';
+    // 调试：在控制台输出当前单词的音标和音节
+    console.log('当前单词:', w.word);
+    console.log('音节:', w.syllable);
+    console.log('音标:', w.phonetics);
+    
+    // 构建详细信息（音标和音节）- 改进结构
+    let detailsHtml = '';
     if (w.syllable || w.phonetics) {
-        hiddenDetailsHtml = '<div id="wordDetails" style="display:none; margin-top: 10px;">';
-        if (w.syllable) {
-            hiddenDetailsHtml += `<div class="syllable" style="font-size: 18px; color: #ff9a56; letter-spacing: 1px;">${w.syllable}</div>`;
+        if (w.syllable && w.syllable.trim() !== '') {
+            detailsHtml += `<div class="syllable" style="font-size: 20px; color: #ff9a56; letter-spacing: 1px; margin-top: 8px;">${w.syllable}</div>`;
         }
-        if (w.phonetics) {
-            hiddenDetailsHtml += `<div class="phonetics" style="font-size: 16px; color: #64748b; font-family: monospace;">${w.phonetics}</div>`;
+        if (w.phonetics && w.phonetics.trim() !== '') {
+            detailsHtml += `<div class="phonetics" style="font-size: 16px; color: #64748b; font-family: monospace; margin-top: 4px;">${w.phonetics}</div>`;
         }
-        hiddenDetailsHtml += '</div>';
     }
+    
+    // 完整的隐藏内容（单词 + 详细信息）
+    const hiddenContent = `
+        <div style="font-size: clamp(28px, 8vw, 52px); font-weight: bold; color: #dc2626;">${w.word.toUpperCase()}</div>
+        ${detailsHtml}
+    `;
     
     container.innerHTML = `
         <div class="meaning">💡 ${w.meaning}</div>
-        <div class="word" id="currentWordSpan" style="display:none;">
-            ${w.word.toUpperCase()}
-            ${hiddenDetailsHtml}
-        </div>
+        <div id="currentWordSpan" style="display: none;">${hiddenContent}</div>
         <div class="btn-group">
             <button class="btn-show" id="btnShowWord">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
@@ -509,10 +515,17 @@ function showWord() {
     
     updateInfoTip();
     
-    document.getElementById("btnShowWord")?.addEventListener("click", () => {
-        const span = document.getElementById("currentWordSpan");
-        if (span) span.style.display = "block";
-    });
+    // Show Word 按钮：显示单词和详细信息
+    const showBtn = document.getElementById("btnShowWord");
+    if (showBtn) {
+        showBtn.onclick = () => {
+            const span = document.getElementById("currentWordSpan");
+            if (span) {
+                span.style.display = "block";
+                console.log('显示单词区域'); // 调试
+            }
+        };
+    }
     
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
@@ -522,20 +535,26 @@ function showWord() {
         };
     }
     
-    document.getElementById("btnPrevWord")?.addEventListener("click", () => {
-        if (currentWordIdx > 0) {
-            currentWordIdx--;
-            showWord();
-        }
-    });
+    const prevBtn = document.getElementById("btnPrevWord");
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            if (currentWordIdx > 0) {
+                currentWordIdx--;
+                showWord();
+            }
+        };
+    }
     
-    document.getElementById("btnNextWord")?.addEventListener("click", () => {
-        if (currentWordIdx + 1 <= filteredWords.length) {
-            currentWordIdx++;
-            showWord();
-        }
-    });
-} 
+    const nextBtn = document.getElementById("btnNextWord");
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            if (currentWordIdx + 1 <= filteredWords.length) {
+                currentWordIdx++;
+                showWord();
+            }
+        };
+    }
+}
 
 function updateInfoTip() {
     const container = document.getElementById('infoTipContainer');
