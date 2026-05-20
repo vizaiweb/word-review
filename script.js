@@ -796,66 +796,137 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
+// ====================== 弹窗函数（与 IMG_3263 格式一致） ======================
+
 function showAllSentencesPopup() {
     if (!allSentences.length) return;
     
     const fileNice = removeFileExtension(currentFileNameForSentences);
-    const tableRows = allSentences.map((s, idx) => `
-        <tr>
-            <td style="padding: 12px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 12px;"><strong>${s.sentence_en}</strong></td>
-            <td style="padding: 12px;">${s.sentence_zh}</td>
-        </tr>
-    `).join('');
     
-    const winHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Sentences</title><style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
-        h2 { color: #ff9a56; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
-        th { background: #ff9a56; color: white; }
-        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<table><thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
-    
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (win) {
-        win.document.write(winHtml);
-        win.document.close();
-    } else {
-        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    let tableRows = '';
+    for (let i = 0; i < allSentences.length; i++) {
+        const s = allSentences[i];
+        tableRows += `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px; text-align: center; width: 60px; color: #64748b;">${i + 1}</td>
+                <td style="padding: 12px; font-weight: 500; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
+                <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
+            </tr>
+        `;
     }
+    
+    const sentencesHtml = `<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>All Sentences - ${currentLevel}</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
+            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
+            .header h2 { color: white; font-size: 20px; font-weight: 600; }
+            .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #fef9e8; padding: 14px 12px; text-align: left; font-weight: 600; color: #c2410c; border-bottom: 2px solid #ffd966; }
+            th:first-child { width: 60px; text-align: center; }
+            td { padding: 12px; vertical-align: top; }
+            .footer { padding: 16px 20px; background: #fef9e8; text-align: center; border-top: 1px solid #ffd966; }
+            .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
+            .close-btn:hover { opacity: 0.85; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>✏️ ${currentLevel} - ${escapeHtml(fileNice)}</h2>
+                <p>共 ${allSentences.length} 个句子</p>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>English</th><th>Chinese</th></tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div class="footer"><button class="close-btn" onclick="window.close()">Close</button></div>
+        </div>
+    </body>
+    </html>`;
+    
+    const win = window.open('', '_blank', 'width=950,height=700,scrollbars=yes');
+    if (win) { win.document.write(sentencesHtml); win.document.close(); }
+    else { alert("弹窗被浏览器阻止，请允许弹出窗口后重试。"); }
 }
 
 function showAllWords() {
     if (allWords.length === 0) return;
     
     const fileNice = removeFileExtension(currentFileName);
-    const tableRows = allWords.map(w => `
-        <tr>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94; text-align: center;">${w.day}</td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;"><strong>${w.word.toUpperCase()}</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid #ffcd94;">${w.meaning}</td>
-        </tr>
-    `).join('');
     
-    const allWordsHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Words</title><style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; }
-        h2 { color: #ff9a56; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-        th { background: #ff9a56; color: white; }
-        .close-btn { display: block; width: 120px; margin: 20px auto; padding: 10px; background: #ff6b35; color: white; border: none; border-radius: 30px; cursor: pointer; }
-    </style></head><body><div class="container"><h2>${currentLevel} - ${fileNice}</h2>${tableRows ? `<tr><thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}<button class="close-btn" onclick="window.close()">Close</button></div></body></html>`;
-    
-    const newWindow = window.open('', '_blank', 'width=900,height=700');
-    if (newWindow) {
-        newWindow.document.write(allWordsHtml);
-        newWindow.document.close();
-    } else {
-        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    let tableRows = '';
+    for (let i = 0; i < allWords.length; i++) {
+        const w = allWords[i];
+        tableRows += `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px; text-align: center; width: 80px;">${w.day}</td>
+                <td style="padding: 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
+                <td style="padding: 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
+            </tr>
+        `;
     }
+    
+    const allWordsHtml = `<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>All Words - ${currentLevel}</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
+            .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
+            .header h2 { color: white; font-size: 20px; font-weight: 600; }
+            .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #f8fafc; padding: 14px 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+            th:first-child { width: 80px; text-align: center; }
+            td { padding: 12px; vertical-align: top; }
+            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; }
+            .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
+            .close-btn:hover { opacity: 0.85; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
+                <p>共 ${allWords.length} 个单词</p>
+            </div>
+            <table>
+                <thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div class="footer"><button class="close-btn" onclick="window.close()">Close</button></div>
+        </div>
+    </body>
+    </html>`;
+    
+    const newWindow = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
+    if (newWindow) { newWindow.document.write(allWordsHtml); newWindow.document.close(); }
+    else { alert("弹窗被浏览器阻止，请允许弹出窗口后重试。"); }
+}
+
+// 辅助函数：防止 HTML 注入
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+        return c;
+    });
 }
 
 // 停止所有朗读
