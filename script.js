@@ -288,7 +288,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 粤语语音模块 ======================
+// ====================== 粤语语音模块（复用主页逻辑） ======================
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -824,7 +824,76 @@ function stopAllReading() {
     }
 }
 
-// ====================== Show All Words 弹窗（带自动播放功能） ======================
+// ====================== Speak Word/Sequence with Cantonese (复用粤语引擎) ======================
+function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
+    let step = 0;
+    let repeatCount = 0;
+    
+    function speakNext() {
+        if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
+            if (onComplete) onComplete();
+            return;
+        }
+        
+        if (step === 0) {
+            // Read English 3 times
+            speakOnce(word, () => {
+                repeatCount++;
+                if (repeatCount < 3) {
+                    setTimeout(speakNext, 500);
+                } else {
+                    step = 1;
+                    repeatCount = 0;
+                    setTimeout(speakNext, 500);
+                }
+            });
+        } else if (step === 1) {
+            // Read Cantonese meaning using the same engine as main page
+            speakCantoneseOnce(meaning, () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 500);
+            });
+        }
+    }
+    
+    speakNext();
+}
+
+function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete) {
+    let step = 0;
+    let repeatCount = 0;
+    
+    function speakNext() {
+        if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
+            if (onComplete) onComplete();
+            return;
+        }
+        
+        if (step === 0) {
+            speakOnce(sentenceEn, () => {
+                repeatCount++;
+                if (repeatCount < 3) {
+                    setTimeout(speakNext, 600);
+                } else {
+                    step = 1;
+                    repeatCount = 0;
+                    setTimeout(speakNext, 600);
+                }
+            });
+        } else if (step === 1) {
+            speakCantoneseOnce(sentenceZh, () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 600);
+            });
+        }
+    }
+    
+    speakNext();
+}
+
+// ====================== Show All Words 弹窗（带自动播放功能，全英文界面） ======================
 
 let wordsAutoPlayState = {
     isPlaying: false,
@@ -851,14 +920,14 @@ function resetWordsAutoPlay() {
     if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
         try {
             const doc = wordsAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('wordsStartBtn');
-            const pauseBtn = doc.getElementById('wordsPauseBtn');
-            const modeSequential = doc.getElementById('wordsModeSequential');
-            const modeRandom = doc.getElementById('wordsModeRandom');
-            if (startBtn) startBtn.disabled = false;
-            if (pauseBtn) pauseBtn.disabled = true;
-            if (modeSequential) modeSequential.disabled = false;
-            if (modeRandom) modeRandom.disabled = false;
+            const playBtn = doc.getElementById('wordsPlayBtn');
+            const modeSwitch = doc.getElementById('wordsModeSwitch');
+            if (playBtn) {
+                playBtn.textContent = '▶️ Play All';
+                playBtn.disabled = false;
+                playBtn.style.background = '#22c55e';
+            }
+            if (modeSwitch) modeSwitch.disabled = false;
             const progressSpan = doc.getElementById('wordsProgress');
             if (progressSpan) progressSpan.textContent = `0 / ${wordsAutoPlayState.totalCount}`;
         } catch(e) {}
@@ -917,66 +986,11 @@ function markWordAsPlayed(index) {
     } catch(e) {}
 }
 
-function speakWordWithEnglishAndChinese(word, meaning, onComplete) {
-    let step = 0;
-    let repeatCount = 0;
-    
-    function speakNext() {
-        if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
-            if (onComplete) onComplete();
-            return;
-        }
-        
-        if (step === 0) {
-            // 读英文（第1-3遍）
-            speakOnce(word, () => {
-                repeatCount++;
-                if (repeatCount < 3) {
-                    setTimeout(speakNext, 500);
-                } else {
-                    step = 1;
-                    repeatCount = 0;
-                    setTimeout(speakNext, 500);
-                }
-            });
-        } else if (step === 1) {
-            // 读中文
-            const chineseUtterance = new SpeechSynthesisUtterance(meaning);
-            chineseUtterance.lang = "zh-CN";
-            chineseUtterance.rate = 0.8;
-            chineseUtterance.pitch = 1.0;
-            chineseUtterance.volume = 1;
-            
-            let voice = null;
-            const voices = synth.getVoices();
-            if (voices.length > 0) {
-                voice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting') ||
-                        voices.find(v => v.lang === 'zh-CN');
-                if (voice) chineseUtterance.voice = voice;
-            }
-            
-            chineseUtterance.onend = () => {
-                setTimeout(() => {
-                    if (onComplete) onComplete();
-                }, 500);
-            };
-            chineseUtterance.onerror = () => {
-                setTimeout(() => {
-                    if (onComplete) onComplete();
-                }, 500);
-            };
-            synth.speak(chineseUtterance);
-        }
-    }
-    
-    speakNext();
-}
-
 function playNextWord() {
     if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) return;
     
     if (wordsAutoPlayState.playedIndices.length >= wordsAutoPlayState.totalCount) {
-        // 播放完成
+        // Playback complete - silent reset
         wordsAutoPlayState.isPlaying = false;
         wordsAutoPlayState.isPaused = false;
         if (wordsAutoPlayState.timeoutId) clearTimeout(wordsAutoPlayState.timeoutId);
@@ -984,18 +998,17 @@ function playNextWord() {
         if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
             try {
                 const doc = wordsAutoPlayState.playWindow.document;
-                const startBtn = doc.getElementById('wordsStartBtn');
-                const pauseBtn = doc.getElementById('wordsPauseBtn');
-                const modeSequential = doc.getElementById('wordsModeSequential');
-                const modeRandom = doc.getElementById('wordsModeRandom');
-                if (startBtn) startBtn.disabled = false;
-                if (pauseBtn) pauseBtn.disabled = true;
-                if (modeSequential) modeSequential.disabled = false;
-                if (modeRandom) modeRandom.disabled = false;
-                
-                alert('🎉 播放完成！已全部播放完毕。');
+                const playBtn = doc.getElementById('wordsPlayBtn');
+                const modeSwitch = doc.getElementById('wordsModeSwitch');
+                if (playBtn) {
+                    playBtn.textContent = '▶️ Play All';
+                    playBtn.disabled = false;
+                    playBtn.style.background = '#22c55e';
+                }
+                if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
         }
+        resetWordsAutoPlay();
         return;
     }
     
@@ -1016,7 +1029,7 @@ function playNextWord() {
     updateWordsProgress();
     
     const word = allWords[nextIndex];
-    speakWordWithEnglishAndChinese(word.word, word.meaning, () => {
+    speakWordWithEnglishAndCantonese(word.word, word.meaning, () => {
         wordsAutoPlayState.playedIndices.push(nextIndex);
         markWordAsPlayed(nextIndex);
         updateWordsProgress();
@@ -1027,111 +1040,113 @@ function playNextWord() {
     });
 }
 
-function startWordsAutoPlay() {
-    if (wordsAutoPlayState.isPlaying && !wordsAutoPlayState.isPaused) return;
+function toggleWordsAutoPlay() {
+    const playBtn = wordsAutoPlayState.playWindow ? wordsAutoPlayState.playWindow.document.getElementById('wordsPlayBtn') : null;
     
-    if (wordsAutoPlayState.isPaused) {
-        wordsAutoPlayState.isPaused = false;
+    if (!wordsAutoPlayState.isPlaying && !wordsAutoPlayState.isPaused) {
+        // Start playing
+        resetWordsAutoPlay();
         wordsAutoPlayState.isPlaying = true;
+        wordsAutoPlayState.isPaused = false;
+        wordsAutoPlayState.playedIndices = [];
+        wordsAutoPlayState.remainingIndices = [];
+        wordsAutoPlayState.totalCount = allWords.length;
+        
+        if (wordsAutoPlayState.mode === 'random') {
+            wordsAutoPlayState.remainingIndices = Array.from({length: allWords.length}, (_, i) => i);
+        }
+        
         if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
             try {
                 const doc = wordsAutoPlayState.playWindow.document;
-                const startBtn = doc.getElementById('wordsStartBtn');
-                const pauseBtn = doc.getElementById('wordsPauseBtn');
-                const modeSequential = doc.getElementById('wordsModeSequential');
-                const modeRandom = doc.getElementById('wordsModeRandom');
-                if (startBtn) startBtn.disabled = true;
-                if (pauseBtn) pauseBtn.disabled = false;
-                if (modeSequential) modeSequential.disabled = true;
-                if (modeRandom) modeRandom.disabled = true;
+                const modeSwitch = doc.getElementById('wordsModeSwitch');
+                if (playBtn) {
+                    playBtn.textContent = '⏸️ Pause';
+                    playBtn.style.background = '#f59e0b';
+                }
+                if (modeSwitch) modeSwitch.disabled = true;
+                
+                // Reset all rows visual
+                for (let i = 0; i < allWords.length; i++) {
+                    const row = doc.getElementById(`word_row_${i}`);
+                    if (row) {
+                        row.style.backgroundColor = '';
+                        row.style.color = '';
+                        const firstCell = row.cells[0];
+                        if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                        const meaningCell = row.cells[2];
+                        if (meaningCell) {
+                            meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                            meaningCell.style.color = '';
+                        }
+                        const wordCell = row.cells[1];
+                        if (wordCell) wordCell.style.color = '';
+                    }
+                }
+                const progressSpan = doc.getElementById('wordsProgress');
+                if (progressSpan) progressSpan.textContent = `0 / ${allWords.length}`;
             } catch(e) {}
         }
+        
         playNextWord();
-        return;
-    }
-    
-    resetWordsAutoPlay();
-    wordsAutoPlayState.isPlaying = true;
-    wordsAutoPlayState.isPaused = false;
-    wordsAutoPlayState.playedIndices = [];
-    wordsAutoPlayState.remainingIndices = [];
-    wordsAutoPlayState.totalCount = allWords.length;
-    
-    if (wordsAutoPlayState.mode === 'random') {
-        wordsAutoPlayState.remainingIndices = Array.from({length: allWords.length}, (_, i) => i);
-    }
-    
-    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
-        try {
-            const doc = wordsAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('wordsStartBtn');
-            const pauseBtn = doc.getElementById('wordsPauseBtn');
-            const modeSequential = doc.getElementById('wordsModeSequential');
-            const modeRandom = doc.getElementById('wordsModeRandom');
-            if (startBtn) startBtn.disabled = true;
-            if (pauseBtn) pauseBtn.disabled = false;
-            if (modeSequential) modeSequential.disabled = true;
-            if (modeRandom) modeRandom.disabled = true;
-            
-            for (let i = 0; i < allWords.length; i++) {
-                const row = doc.getElementById(`word_row_${i}`);
-                if (row) {
-                    row.style.backgroundColor = '';
-                    row.style.color = '';
-                    const firstCell = row.cells[0];
-                    if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
-                    const meaningCell = row.cells[2];
-                    if (meaningCell) {
-                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
-                        meaningCell.style.color = '';
-                    }
-                    const wordCell = row.cells[1];
-                    if (wordCell) wordCell.style.color = '';
-                }
-            }
-            const progressSpan = doc.getElementById('wordsProgress');
-            if (progressSpan) progressSpan.textContent = `0 / ${allWords.length}`;
-        } catch(e) {}
-    }
-    
-    playNextWord();
-}
-
-function pauseWordsAutoPlay() {
-    if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) return;
-    wordsAutoPlayState.isPaused = true;
-    wordsAutoPlayState.isPlaying = false;
-    if (wordsAutoPlayState.timeoutId) {
-        clearTimeout(wordsAutoPlayState.timeoutId);
-        wordsAutoPlayState.timeoutId = null;
-    }
-    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
-        try {
-            const doc = wordsAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('wordsStartBtn');
-            const pauseBtn = doc.getElementById('wordsPauseBtn');
-            if (startBtn) startBtn.disabled = false;
-            if (pauseBtn) pauseBtn.disabled = true;
-            startBtn.textContent = '▶️ 继续播放';
-        } catch(e) {}
+    } else if (wordsAutoPlayState.isPlaying && !wordsAutoPlayState.isPaused) {
+        // Pause
+        wordsAutoPlayState.isPaused = true;
+        wordsAutoPlayState.isPlaying = false;
+        if (wordsAutoPlayState.timeoutId) {
+            clearTimeout(wordsAutoPlayState.timeoutId);
+            wordsAutoPlayState.timeoutId = null;
+        }
+        if (playBtn) {
+            playBtn.textContent = '▶️ Resume';
+            playBtn.style.background = '#22c55e';
+        }
+    } else if (wordsAutoPlayState.isPaused) {
+        // Resume
+        wordsAutoPlayState.isPaused = false;
+        wordsAutoPlayState.isPlaying = true;
+        if (playBtn) {
+            playBtn.textContent = '⏸️ Pause';
+            playBtn.style.background = '#f59e0b';
+        }
+        playNextWord();
     }
 }
 
-function switchWordsPlayMode(mode) {
+function switchWordsPlayMode() {
+    const modeSwitch = wordsAutoPlayState.playWindow ? wordsAutoPlayState.playWindow.document.getElementById('wordsModeSwitch') : null;
+    const newMode = wordsAutoPlayState.mode === 'sequential' ? 'random' : 'sequential';
+    
+    // Stop playback if active
     if (wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
-        const confirmMsg = confirm(`切换模式将重置播放进度。\n当前进度 (${wordsAutoPlayState.playedIndices.length} / ${wordsAutoPlayState.totalCount}) 将会丢失。\n\n确定切换吗？`);
-        if (!confirmMsg) return;
+        if (wordsAutoPlayState.timeoutId) {
+            clearTimeout(wordsAutoPlayState.timeoutId);
+            wordsAutoPlayState.timeoutId = null;
+        }
+        wordsAutoPlayState.isPlaying = false;
+        wordsAutoPlayState.isPaused = false;
+        
+        if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+            try {
+                const playBtn = wordsAutoPlayState.playWindow.document.getElementById('wordsPlayBtn');
+                if (playBtn) {
+                    playBtn.textContent = '▶️ Play All';
+                    playBtn.style.background = '#22c55e';
+                }
+                if (modeSwitch) modeSwitch.disabled = false;
+            } catch(e) {}
+        }
     }
     
-    wordsAutoPlayState.mode = mode;
+    wordsAutoPlayState.mode = newMode;
     resetWordsAutoPlay();
     
-    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
-        try {
-            const doc = wordsAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('wordsStartBtn');
-            if (startBtn) startBtn.textContent = '▶️ 开始播放';
-        } catch(e) {}
+    if (modeSwitch) {
+        if (newMode === 'sequential') {
+            modeSwitch.textContent = 'Sequential ○──● Random';
+        } else {
+            modeSwitch.textContent = 'Sequential ●──○ Random';
+        }
     }
 }
 
@@ -1140,7 +1155,7 @@ function showAllWords() {
     
     const fileNice = removeFileExtension(currentFileName);
     
-    // 构建表格行
+    // Build table rows
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
@@ -1165,13 +1180,12 @@ function showAllWords() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
-            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-            .control-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .control-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .control-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .mode-btn { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .mode-btn.active { background: #ff6b35; }
-            .mode-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+            .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
+            .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
             table { width: 100%; border-collapse: collapse; }
             th { background: #f8fafc; padding: 14px 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
@@ -1186,13 +1200,11 @@ function showAllWords() {
         <div class="container">
             <div class="header">
                 <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
-                <p>共 ${allWords.length} 个单词</p>
+                <p>Total ${allWords.length} words</p>
             </div>
             <div class="control-bar">
-                <button id="wordsStartBtn" class="control-btn" style="background: #22c55e;">▶️ 开始播放</button>
-                <button id="wordsPauseBtn" class="control-btn" style="background: #f59e0b;" disabled>⏸️ 暂停</button>
-                <button id="wordsModeSequential" class="mode-btn active">顺序</button>
-                <button id="wordsModeRandom" class="mode-btn">随机</button>
+                <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
+                <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
                 <span id="wordsProgress" class="progress">0 / ${allWords.length}</span>
             </div>
             <table>
@@ -1209,11 +1221,6 @@ function showAllWords() {
         </div>
         <script>
             window.wordData = ${JSON.stringify(allWords)};
-            window.wordsAutoPlayState = {
-                isPlaying: false, isPaused: false, currentIndex: 0,
-                mode: 'sequential', playedIndices: [], remainingIndices: [],
-                totalCount: ${allWords.length}, timeoutId: null
-            };
         </script>
     </body>
     </html>`;
@@ -1223,41 +1230,27 @@ function showAllWords() {
         wordsAutoPlayState.playWindow = newWindow;
         wordsAutoPlayState.totalCount = allWords.length;
         wordsAutoPlayState.mode = 'sequential';
+        wordsAutoPlayState.isPlaying = false;
+        wordsAutoPlayState.isPaused = false;
+        wordsAutoPlayState.playedIndices = [];
+        wordsAutoPlayState.remainingIndices = [];
         
         newWindow.document.write(allWordsHtml);
         newWindow.document.close();
         
         setTimeout(() => {
             try {
-                const startBtn = newWindow.document.getElementById('wordsStartBtn');
-                const pauseBtn = newWindow.document.getElementById('wordsPauseBtn');
-                const modeSequential = newWindow.document.getElementById('wordsModeSequential');
-                const modeRandom = newWindow.document.getElementById('wordsModeRandom');
+                const playBtn = newWindow.document.getElementById('wordsPlayBtn');
+                const modeSwitch = newWindow.document.getElementById('wordsModeSwitch');
                 
-                if (startBtn) {
-                    startBtn.onclick = () => {
-                        window.wordsAutoPlayState = wordsAutoPlayState;
-                        startWordsAutoPlay();
+                if (playBtn) {
+                    playBtn.onclick = () => {
+                        toggleWordsAutoPlay();
                     };
                 }
-                if (pauseBtn) {
-                    pauseBtn.onclick = () => {
-                        window.wordsAutoPlayState = wordsAutoPlayState;
-                        pauseWordsAutoPlay();
-                    };
-                }
-                if (modeSequential) {
-                    modeSequential.onclick = () => {
-                        switchWordsPlayMode('sequential');
-                        modeSequential.classList.add('active');
-                        if (modeRandom) modeRandom.classList.remove('active');
-                    };
-                }
-                if (modeRandom) {
-                    modeRandom.onclick = () => {
-                        switchWordsPlayMode('random');
-                        modeRandom.classList.add('active');
-                        if (modeSequential) modeSequential.classList.remove('active');
+                if (modeSwitch) {
+                    modeSwitch.onclick = () => {
+                        switchWordsPlayMode();
                     };
                 }
                 
@@ -1269,11 +1262,11 @@ function showAllWords() {
             } catch(e) {}
         }, 100);
     } else {
-        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+        alert("Popup blocked. Please allow popups for this site.");
     }
 }
 
-// ====================== Show All Sentences 弹窗（带自动播放功能） ======================
+// ====================== Show All Sentences 弹窗（带自动播放功能，全英文界面） ======================
 
 let sentencesAutoPlayState = {
     isPlaying: false,
@@ -1300,14 +1293,14 @@ function resetSentencesAutoPlay() {
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             const doc = sentencesAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('sentencesStartBtn');
-            const pauseBtn = doc.getElementById('sentencesPauseBtn');
-            const modeSequential = doc.getElementById('sentencesModeSequential');
-            const modeRandom = doc.getElementById('sentencesModeRandom');
-            if (startBtn) startBtn.disabled = false;
-            if (pauseBtn) pauseBtn.disabled = true;
-            if (modeSequential) modeSequential.disabled = false;
-            if (modeRandom) modeRandom.disabled = false;
+            const playBtn = doc.getElementById('sentencesPlayBtn');
+            const modeSwitch = doc.getElementById('sentencesModeSwitch');
+            if (playBtn) {
+                playBtn.textContent = '▶️ Play All';
+                playBtn.disabled = false;
+                playBtn.style.background = '#22c55e';
+            }
+            if (modeSwitch) modeSwitch.disabled = false;
             const progressSpan = doc.getElementById('sentencesProgress');
             if (progressSpan) progressSpan.textContent = `0 / ${sentencesAutoPlayState.totalCount}`;
         } catch(e) {}
@@ -1366,63 +1359,11 @@ function markSentenceAsPlayed(index) {
     } catch(e) {}
 }
 
-function speakSentenceWithEnglishAndChinese(sentenceEn, sentenceZh, onComplete) {
-    let step = 0;
-    let repeatCount = 0;
-    
-    function speakNext() {
-        if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
-            if (onComplete) onComplete();
-            return;
-        }
-        
-        if (step === 0) {
-            speakOnce(sentenceEn, () => {
-                repeatCount++;
-                if (repeatCount < 3) {
-                    setTimeout(speakNext, 600);
-                } else {
-                    step = 1;
-                    repeatCount = 0;
-                    setTimeout(speakNext, 600);
-                }
-            });
-        } else if (step === 1) {
-            const chineseUtterance = new SpeechSynthesisUtterance(sentenceZh);
-            chineseUtterance.lang = "zh-CN";
-            chineseUtterance.rate = 0.8;
-            chineseUtterance.pitch = 1.0;
-            chineseUtterance.volume = 1;
-            
-            let voice = null;
-            const voices = synth.getVoices();
-            if (voices.length > 0) {
-                voice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting') ||
-                        voices.find(v => v.lang === 'zh-CN');
-                if (voice) chineseUtterance.voice = voice;
-            }
-            
-            chineseUtterance.onend = () => {
-                setTimeout(() => {
-                    if (onComplete) onComplete();
-                }, 600);
-            };
-            chineseUtterance.onerror = () => {
-                setTimeout(() => {
-                    if (onComplete) onComplete();
-                }, 600);
-            };
-            synth.speak(chineseUtterance);
-        }
-    }
-    
-    speakNext();
-}
-
 function playNextSentence() {
     if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) return;
     
     if (sentencesAutoPlayState.playedIndices.length >= sentencesAutoPlayState.totalCount) {
+        // Playback complete - silent reset
         sentencesAutoPlayState.isPlaying = false;
         sentencesAutoPlayState.isPaused = false;
         if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
@@ -1430,18 +1371,17 @@ function playNextSentence() {
         if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
             try {
                 const doc = sentencesAutoPlayState.playWindow.document;
-                const startBtn = doc.getElementById('sentencesStartBtn');
-                const pauseBtn = doc.getElementById('sentencesPauseBtn');
-                const modeSequential = doc.getElementById('sentencesModeSequential');
-                const modeRandom = doc.getElementById('sentencesModeRandom');
-                if (startBtn) startBtn.disabled = false;
-                if (pauseBtn) pauseBtn.disabled = true;
-                if (modeSequential) modeSequential.disabled = false;
-                if (modeRandom) modeRandom.disabled = false;
-                
-                alert('🎉 播放完成！已全部播放完毕。');
+                const playBtn = doc.getElementById('sentencesPlayBtn');
+                const modeSwitch = doc.getElementById('sentencesModeSwitch');
+                if (playBtn) {
+                    playBtn.textContent = '▶️ Play All';
+                    playBtn.disabled = false;
+                    playBtn.style.background = '#22c55e';
+                }
+                if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
         }
+        resetSentencesAutoPlay();
         return;
     }
     
@@ -1462,7 +1402,7 @@ function playNextSentence() {
     updateSentencesProgress();
     
     const sentence = allSentences[nextIndex];
-    speakSentenceWithEnglishAndChinese(sentence.sentence_en, sentence.sentence_zh, () => {
+    speakSentenceWithEnglishAndCantonese(sentence.sentence_en, sentence.sentence_zh, () => {
         sentencesAutoPlayState.playedIndices.push(nextIndex);
         markSentenceAsPlayed(nextIndex);
         updateSentencesProgress();
@@ -1473,111 +1413,113 @@ function playNextSentence() {
     });
 }
 
-function startSentencesAutoPlay() {
-    if (sentencesAutoPlayState.isPlaying && !sentencesAutoPlayState.isPaused) return;
+function toggleSentencesAutoPlay() {
+    const playBtn = sentencesAutoPlayState.playWindow ? sentencesAutoPlayState.playWindow.document.getElementById('sentencesPlayBtn') : null;
     
-    if (sentencesAutoPlayState.isPaused) {
-        sentencesAutoPlayState.isPaused = false;
+    if (!sentencesAutoPlayState.isPlaying && !sentencesAutoPlayState.isPaused) {
+        // Start playing
+        resetSentencesAutoPlay();
         sentencesAutoPlayState.isPlaying = true;
+        sentencesAutoPlayState.isPaused = false;
+        sentencesAutoPlayState.playedIndices = [];
+        sentencesAutoPlayState.remainingIndices = [];
+        sentencesAutoPlayState.totalCount = allSentences.length;
+        
+        if (sentencesAutoPlayState.mode === 'random') {
+            sentencesAutoPlayState.remainingIndices = Array.from({length: allSentences.length}, (_, i) => i);
+        }
+        
         if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
             try {
                 const doc = sentencesAutoPlayState.playWindow.document;
-                const startBtn = doc.getElementById('sentencesStartBtn');
-                const pauseBtn = doc.getElementById('sentencesPauseBtn');
-                const modeSequential = doc.getElementById('sentencesModeSequential');
-                const modeRandom = doc.getElementById('sentencesModeRandom');
-                if (startBtn) startBtn.disabled = true;
-                if (pauseBtn) pauseBtn.disabled = false;
-                if (modeSequential) modeSequential.disabled = true;
-                if (modeRandom) modeRandom.disabled = true;
+                const modeSwitch = doc.getElementById('sentencesModeSwitch');
+                if (playBtn) {
+                    playBtn.textContent = '⏸️ Pause';
+                    playBtn.style.background = '#f59e0b';
+                }
+                if (modeSwitch) modeSwitch.disabled = true;
+                
+                // Reset all rows visual
+                for (let i = 0; i < allSentences.length; i++) {
+                    const row = doc.getElementById(`sentence_row_${i}`);
+                    if (row) {
+                        row.style.backgroundColor = '';
+                        row.style.color = '';
+                        const firstCell = row.cells[0];
+                        if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                        const meaningCell = row.cells[2];
+                        if (meaningCell) {
+                            meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                            meaningCell.style.color = '';
+                        }
+                        const enCell = row.cells[1];
+                        if (enCell) enCell.style.color = '';
+                    }
+                }
+                const progressSpan = doc.getElementById('sentencesProgress');
+                if (progressSpan) progressSpan.textContent = `0 / ${allSentences.length}`;
             } catch(e) {}
         }
+        
         playNextSentence();
-        return;
-    }
-    
-    resetSentencesAutoPlay();
-    sentencesAutoPlayState.isPlaying = true;
-    sentencesAutoPlayState.isPaused = false;
-    sentencesAutoPlayState.playedIndices = [];
-    sentencesAutoPlayState.remainingIndices = [];
-    sentencesAutoPlayState.totalCount = allSentences.length;
-    
-    if (sentencesAutoPlayState.mode === 'random') {
-        sentencesAutoPlayState.remainingIndices = Array.from({length: allSentences.length}, (_, i) => i);
-    }
-    
-    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
-        try {
-            const doc = sentencesAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('sentencesStartBtn');
-            const pauseBtn = doc.getElementById('sentencesPauseBtn');
-            const modeSequential = doc.getElementById('sentencesModeSequential');
-            const modeRandom = doc.getElementById('sentencesModeRandom');
-            if (startBtn) startBtn.disabled = true;
-            if (pauseBtn) pauseBtn.disabled = false;
-            if (modeSequential) modeSequential.disabled = true;
-            if (modeRandom) modeRandom.disabled = true;
-            
-            for (let i = 0; i < allSentences.length; i++) {
-                const row = doc.getElementById(`sentence_row_${i}`);
-                if (row) {
-                    row.style.backgroundColor = '';
-                    row.style.color = '';
-                    const firstCell = row.cells[0];
-                    if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
-                    const meaningCell = row.cells[2];
-                    if (meaningCell) {
-                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
-                        meaningCell.style.color = '';
-                    }
-                    const enCell = row.cells[1];
-                    if (enCell) enCell.style.color = '';
-                }
-            }
-            const progressSpan = doc.getElementById('sentencesProgress');
-            if (progressSpan) progressSpan.textContent = `0 / ${allSentences.length}`;
-        } catch(e) {}
-    }
-    
-    playNextSentence();
-}
-
-function pauseSentencesAutoPlay() {
-    if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) return;
-    sentencesAutoPlayState.isPaused = true;
-    sentencesAutoPlayState.isPlaying = false;
-    if (sentencesAutoPlayState.timeoutId) {
-        clearTimeout(sentencesAutoPlayState.timeoutId);
-        sentencesAutoPlayState.timeoutId = null;
-    }
-    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
-        try {
-            const doc = sentencesAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('sentencesStartBtn');
-            const pauseBtn = doc.getElementById('sentencesPauseBtn');
-            if (startBtn) startBtn.disabled = false;
-            if (pauseBtn) pauseBtn.disabled = true;
-            startBtn.textContent = '▶️ 继续播放';
-        } catch(e) {}
+    } else if (sentencesAutoPlayState.isPlaying && !sentencesAutoPlayState.isPaused) {
+        // Pause
+        sentencesAutoPlayState.isPaused = true;
+        sentencesAutoPlayState.isPlaying = false;
+        if (sentencesAutoPlayState.timeoutId) {
+            clearTimeout(sentencesAutoPlayState.timeoutId);
+            sentencesAutoPlayState.timeoutId = null;
+        }
+        if (playBtn) {
+            playBtn.textContent = '▶️ Resume';
+            playBtn.style.background = '#22c55e';
+        }
+    } else if (sentencesAutoPlayState.isPaused) {
+        // Resume
+        sentencesAutoPlayState.isPaused = false;
+        sentencesAutoPlayState.isPlaying = true;
+        if (playBtn) {
+            playBtn.textContent = '⏸️ Pause';
+            playBtn.style.background = '#f59e0b';
+        }
+        playNextSentence();
     }
 }
 
-function switchSentencesPlayMode(mode) {
+function switchSentencesPlayMode() {
+    const modeSwitch = sentencesAutoPlayState.playWindow ? sentencesAutoPlayState.playWindow.document.getElementById('sentencesModeSwitch') : null;
+    const newMode = sentencesAutoPlayState.mode === 'sequential' ? 'random' : 'sequential';
+    
+    // Stop playback if active
     if (sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
-        const confirmMsg = confirm(`切换模式将重置播放进度。\n当前进度 (${sentencesAutoPlayState.playedIndices.length} / ${sentencesAutoPlayState.totalCount}) 将会丢失。\n\n确定切换吗？`);
-        if (!confirmMsg) return;
+        if (sentencesAutoPlayState.timeoutId) {
+            clearTimeout(sentencesAutoPlayState.timeoutId);
+            sentencesAutoPlayState.timeoutId = null;
+        }
+        sentencesAutoPlayState.isPlaying = false;
+        sentencesAutoPlayState.isPaused = false;
+        
+        if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+            try {
+                const playBtn = sentencesAutoPlayState.playWindow.document.getElementById('sentencesPlayBtn');
+                if (playBtn) {
+                    playBtn.textContent = '▶️ Play All';
+                    playBtn.style.background = '#22c55e';
+                }
+                if (modeSwitch) modeSwitch.disabled = false;
+            } catch(e) {}
+        }
     }
     
-    sentencesAutoPlayState.mode = mode;
+    sentencesAutoPlayState.mode = newMode;
     resetSentencesAutoPlay();
     
-    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
-        try {
-            const doc = sentencesAutoPlayState.playWindow.document;
-            const startBtn = doc.getElementById('sentencesStartBtn');
-            if (startBtn) startBtn.textContent = '▶️ 开始播放';
-        } catch(e) {}
+    if (modeSwitch) {
+        if (newMode === 'sequential') {
+            modeSwitch.textContent = 'Sequential ○──● Random';
+        } else {
+            modeSwitch.textContent = 'Sequential ●──○ Random';
+        }
     }
 }
 
@@ -1594,7 +1536,7 @@ function showAllSentencesPopup() {
                 <td style="padding: 12px; text-align: center; width: 60px; color: #64748b;">${i + 1}</td>
                 <td style="padding: 12px; font-weight: 500; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
                 <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
-             </tr>
+              </tr>
         `;
     }
     
@@ -1610,13 +1552,12 @@ function showAllSentencesPopup() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
-            .control-bar { background: #fef9e8; padding: 12px 20px; border-bottom: 1px solid #ffd966; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-            .control-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .control-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .control-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .mode-btn { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .mode-btn.active { background: #ff6b35; }
-            .mode-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .control-bar { background: #fef9e8; padding: 12px 20px; border-bottom: 1px solid #ffd966; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+            .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
+            .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
             table { width: 100%; border-collapse: collapse; }
             th { background: #fef9e8; padding: 14px 12px; text-align: left; font-weight: 600; color: #c2410c; border-bottom: 2px solid #ffd966; }
@@ -1631,13 +1572,11 @@ function showAllSentencesPopup() {
         <div class="container">
             <div class="header">
                 <h2>✏️ ${currentLevel} - ${escapeHtml(fileNice)}</h2>
-                <p>共 ${allSentences.length} 个句子</p>
+                <p>Total ${allSentences.length} sentences</p>
             </div>
             <div class="control-bar">
-                <button id="sentencesStartBtn" class="control-btn" style="background: #22c55e;">▶️ 开始播放</button>
-                <button id="sentencesPauseBtn" class="control-btn" style="background: #f59e0b;" disabled>⏸️ 暂停</button>
-                <button id="sentencesModeSequential" class="mode-btn active">顺序</button>
-                <button id="sentencesModeRandom" class="mode-btn">随机</button>
+                <button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>
+                <button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>
                 <span id="sentencesProgress" class="progress">0 / ${allSentences.length}</span>
             </div>
             <table>
@@ -1654,11 +1593,6 @@ function showAllSentencesPopup() {
         </div>
         <script>
             window.sentenceData = ${JSON.stringify(allSentences)};
-            window.sentencesAutoPlayState = {
-                isPlaying: false, isPaused: false, currentIndex: 0,
-                mode: 'sequential', playedIndices: [], remainingIndices: [],
-                totalCount: ${allSentences.length}, timeoutId: null
-            };
         </script>
     </body>
     </html>`;
@@ -1668,41 +1602,27 @@ function showAllSentencesPopup() {
         sentencesAutoPlayState.playWindow = win;
         sentencesAutoPlayState.totalCount = allSentences.length;
         sentencesAutoPlayState.mode = 'sequential';
+        sentencesAutoPlayState.isPlaying = false;
+        sentencesAutoPlayState.isPaused = false;
+        sentencesAutoPlayState.playedIndices = [];
+        sentencesAutoPlayState.remainingIndices = [];
         
         win.document.write(sentencesHtml);
         win.document.close();
         
         setTimeout(() => {
             try {
-                const startBtn = win.document.getElementById('sentencesStartBtn');
-                const pauseBtn = win.document.getElementById('sentencesPauseBtn');
-                const modeSequential = win.document.getElementById('sentencesModeSequential');
-                const modeRandom = win.document.getElementById('sentencesModeRandom');
+                const playBtn = win.document.getElementById('sentencesPlayBtn');
+                const modeSwitch = win.document.getElementById('sentencesModeSwitch');
                 
-                if (startBtn) {
-                    startBtn.onclick = () => {
-                        window.sentencesAutoPlayState = sentencesAutoPlayState;
-                        startSentencesAutoPlay();
+                if (playBtn) {
+                    playBtn.onclick = () => {
+                        toggleSentencesAutoPlay();
                     };
                 }
-                if (pauseBtn) {
-                    pauseBtn.onclick = () => {
-                        window.sentencesAutoPlayState = sentencesAutoPlayState;
-                        pauseSentencesAutoPlay();
-                    };
-                }
-                if (modeSequential) {
-                    modeSequential.onclick = () => {
-                        switchSentencesPlayMode('sequential');
-                        modeSequential.classList.add('active');
-                        if (modeRandom) modeRandom.classList.remove('active');
-                    };
-                }
-                if (modeRandom) {
-                    modeRandom.onclick = () => {
-                        switchSentencesPlayMode('random');
-                        modeRandom.classList.add('active');
-                        if (modeSequential) modeSequential.classList.remove('active');
+                if (modeSwitch) {
+                    modeSwitch.onclick = () => {
+                        switchSentencesPlayMode();
                     };
                 }
                 
@@ -1714,7 +1634,7 @@ function showAllSentencesPopup() {
             } catch(e) {}
         }, 100);
     } else {
-        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+        alert("Popup blocked. Please allow popups for this site.");
     }
 }
 
