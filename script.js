@@ -796,66 +796,343 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
-// ====================== 弹窗函数（与 IMG_3263 格式一致） ======================
+// ====================== 辅助函数 ======================
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
 
-function showAllSentencesPopup() {
-    if (!allSentences.length) return;
+// 停止所有朗读
+function stopAllReading() {
+    stopWordReading();
+    stopSentenceReading();
+    stopCantoneseReading();
     
-    const fileNice = removeFileExtension(currentFileNameForSentences);
+    // 停止弹窗内的自动播放
+    if (window.wordsAutoPlayInterval) {
+        clearTimeout(window.wordsAutoPlayInterval);
+        window.wordsAutoPlayInterval = null;
+    }
+    if (window.sentencesAutoPlayInterval) {
+        clearTimeout(window.sentencesAutoPlayInterval);
+        window.sentencesAutoPlayInterval = null;
+    }
+}
+
+// ====================== Show All Words 弹窗（带自动播放功能） ======================
+
+let wordsAutoPlayState = {
+    isPlaying: false,
+    isPaused: false,
+    currentIndex: 0,
+    mode: 'sequential',  // 'sequential' or 'random'
+    playedIndices: [],
+    remainingIndices: [],
+    totalCount: 0,
+    playWindow: null,
+    timeoutId: null
+};
+
+function resetWordsAutoPlay() {
+    if (wordsAutoPlayState.timeoutId) {
+        clearTimeout(wordsAutoPlayState.timeoutId);
+        wordsAutoPlayState.timeoutId = null;
+    }
+    wordsAutoPlayState.isPlaying = false;
+    wordsAutoPlayState.isPaused = false;
+    wordsAutoPlayState.currentIndex = 0;
+    wordsAutoPlayState.playedIndices = [];
+    wordsAutoPlayState.remainingIndices = [];
+    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+        try {
+            const doc = wordsAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('wordsStartBtn');
+            const pauseBtn = doc.getElementById('wordsPauseBtn');
+            const modeSequential = doc.getElementById('wordsModeSequential');
+            const modeRandom = doc.getElementById('wordsModeRandom');
+            if (startBtn) startBtn.disabled = false;
+            if (pauseBtn) pauseBtn.disabled = true;
+            if (modeSequential) modeSequential.disabled = false;
+            if (modeRandom) modeRandom.disabled = false;
+            const progressSpan = doc.getElementById('wordsProgress');
+            if (progressSpan) progressSpan.textContent = `0 / ${wordsAutoPlayState.totalCount}`;
+        } catch(e) {}
+    }
+}
+
+function updateWordsProgress() {
+    if (!wordsAutoPlayState.playWindow || wordsAutoPlayState.playWindow.closed) return;
+    try {
+        const progressSpan = wordsAutoPlayState.playWindow.document.getElementById('wordsProgress');
+        if (progressSpan) {
+            progressSpan.textContent = `${wordsAutoPlayState.playedIndices.length} / ${wordsAutoPlayState.totalCount}`;
+        }
+    } catch(e) {}
+}
+
+function highlightWordRow(index) {
+    if (!wordsAutoPlayState.playWindow || wordsAutoPlayState.playWindow.closed) return;
+    try {
+        const doc = wordsAutoPlayState.playWindow.document;
+        for (let i = 0; i < wordsAutoPlayState.totalCount; i++) {
+            const row = doc.getElementById(`word_row_${i}`);
+            if (row) {
+                if (i === index) {
+                    row.style.backgroundColor = '#fff3cd';
+                    const firstCell = row.cells[0];
+                    if (firstCell && !firstCell.innerHTML.includes('🎵')) {
+                        firstCell.innerHTML = '🎵 ' + firstCell.innerHTML;
+                    }
+                } else {
+                    row.style.backgroundColor = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) {
+                        firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    }
+                }
+            }
+        }
+    } catch(e) {}
+}
+
+function markWordAsPlayed(index) {
+    if (!wordsAutoPlayState.playWindow || wordsAutoPlayState.playWindow.closed) return;
+    try {
+        const doc = wordsAutoPlayState.playWindow.document;
+        const row = doc.getElementById(`word_row_${index}`);
+        if (row) {
+            const meaningCell = row.cells[2];
+            if (meaningCell && !meaningCell.innerHTML.includes('✓')) {
+                meaningCell.innerHTML = meaningCell.innerHTML + ' ✓';
+                meaningCell.style.color = '#999';
+            }
+            const wordCell = row.cells[1];
+            if (wordCell) wordCell.style.color = '#999';
+        }
+    } catch(e) {}
+}
+
+function speakWordWithEnglishAndChinese(word, meaning, onComplete) {
+    let step = 0;
+    let repeatCount = 0;
     
-    let tableRows = '';
-    for (let i = 0; i < allSentences.length; i++) {
-        const s = allSentences[i];
-        tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 12px; text-align: center; width: 60px; color: #64748b;">${i + 1}</td>
-                <td style="padding: 12px; font-weight: 500; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
-                <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
-            </tr>
-        `;
+    function speakNext() {
+        if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
+            if (onComplete) onComplete();
+            return;
+        }
+        
+        if (step === 0) {
+            // 读英文（第1-3遍）
+            speakOnce(word, () => {
+                repeatCount++;
+                if (repeatCount < 3) {
+                    setTimeout(speakNext, 500);
+                } else {
+                    step = 1;
+                    repeatCount = 0;
+                    setTimeout(speakNext, 500);
+                }
+            });
+        } else if (step === 1) {
+            // 读中文
+            const chineseUtterance = new SpeechSynthesisUtterance(meaning);
+            chineseUtterance.lang = "zh-CN";
+            chineseUtterance.rate = 0.8;
+            chineseUtterance.pitch = 1.0;
+            chineseUtterance.volume = 1;
+            
+            let voice = null;
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                voice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting') ||
+                        voices.find(v => v.lang === 'zh-CN');
+                if (voice) chineseUtterance.voice = voice;
+            }
+            
+            chineseUtterance.onend = () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 500);
+            };
+            chineseUtterance.onerror = () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 500);
+            };
+            synth.speak(chineseUtterance);
+        }
     }
     
-    const sentencesHtml = `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>All Sentences - ${currentLevel}</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
-            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
-            .header h2 { color: white; font-size: 20px; font-weight: 600; }
-            .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; }
-            th { background: #fef9e8; padding: 14px 12px; text-align: left; font-weight: 600; color: #c2410c; border-bottom: 2px solid #ffd966; }
-            th:first-child { width: 60px; text-align: center; }
-            td { padding: 12px; vertical-align: top; }
-            .footer { padding: 16px 20px; background: #fef9e8; text-align: center; border-top: 1px solid #ffd966; }
-            .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
-            .close-btn:hover { opacity: 0.85; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h2>✏️ ${currentLevel} - ${escapeHtml(fileNice)}</h2>
-                <p>共 ${allSentences.length} 个句子</p>
-            </div>
-            <table>
-                <thead>
-                    <tr><th>#</th><th>English</th><th>Chinese</th></tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            <div class="footer"><button class="close-btn" onclick="window.close()">Close</button></div>
-        </div>
-    </body>
-    </html>`;
+    speakNext();
+}
+
+function playNextWord() {
+    if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) return;
     
-    const win = window.open('', '_blank', 'width=950,height=700,scrollbars=yes');
-    if (win) { win.document.write(sentencesHtml); win.document.close(); }
-    else { alert("弹窗被浏览器阻止，请允许弹出窗口后重试。"); }
+    if (wordsAutoPlayState.playedIndices.length >= wordsAutoPlayState.totalCount) {
+        // 播放完成
+        wordsAutoPlayState.isPlaying = false;
+        wordsAutoPlayState.isPaused = false;
+        if (wordsAutoPlayState.timeoutId) clearTimeout(wordsAutoPlayState.timeoutId);
+        
+        if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+            try {
+                const doc = wordsAutoPlayState.playWindow.document;
+                const startBtn = doc.getElementById('wordsStartBtn');
+                const pauseBtn = doc.getElementById('wordsPauseBtn');
+                const modeSequential = doc.getElementById('wordsModeSequential');
+                const modeRandom = doc.getElementById('wordsModeRandom');
+                if (startBtn) startBtn.disabled = false;
+                if (pauseBtn) pauseBtn.disabled = true;
+                if (modeSequential) modeSequential.disabled = false;
+                if (modeRandom) modeRandom.disabled = false;
+                
+                alert('🎉 播放完成！已全部播放完毕。');
+            } catch(e) {}
+        }
+        return;
+    }
+    
+    let nextIndex;
+    if (wordsAutoPlayState.mode === 'sequential') {
+        nextIndex = wordsAutoPlayState.playedIndices.length;
+    } else {
+        if (wordsAutoPlayState.remainingIndices.length === 0) {
+            wordsAutoPlayState.remainingIndices = Array.from({length: wordsAutoPlayState.totalCount}, (_, i) => i);
+        }
+        const randomPos = Math.floor(Math.random() * wordsAutoPlayState.remainingIndices.length);
+        nextIndex = wordsAutoPlayState.remainingIndices[randomPos];
+        wordsAutoPlayState.remainingIndices.splice(randomPos, 1);
+    }
+    
+    wordsAutoPlayState.currentIndex = nextIndex;
+    highlightWordRow(nextIndex);
+    updateWordsProgress();
+    
+    const word = allWords[nextIndex];
+    speakWordWithEnglishAndChinese(word.word, word.meaning, () => {
+        wordsAutoPlayState.playedIndices.push(nextIndex);
+        markWordAsPlayed(nextIndex);
+        updateWordsProgress();
+        
+        wordsAutoPlayState.timeoutId = setTimeout(() => {
+            playNextWord();
+        }, 500);
+    });
+}
+
+function startWordsAutoPlay() {
+    if (wordsAutoPlayState.isPlaying && !wordsAutoPlayState.isPaused) return;
+    
+    if (wordsAutoPlayState.isPaused) {
+        wordsAutoPlayState.isPaused = false;
+        wordsAutoPlayState.isPlaying = true;
+        if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+            try {
+                const doc = wordsAutoPlayState.playWindow.document;
+                const startBtn = doc.getElementById('wordsStartBtn');
+                const pauseBtn = doc.getElementById('wordsPauseBtn');
+                const modeSequential = doc.getElementById('wordsModeSequential');
+                const modeRandom = doc.getElementById('wordsModeRandom');
+                if (startBtn) startBtn.disabled = true;
+                if (pauseBtn) pauseBtn.disabled = false;
+                if (modeSequential) modeSequential.disabled = true;
+                if (modeRandom) modeRandom.disabled = true;
+            } catch(e) {}
+        }
+        playNextWord();
+        return;
+    }
+    
+    resetWordsAutoPlay();
+    wordsAutoPlayState.isPlaying = true;
+    wordsAutoPlayState.isPaused = false;
+    wordsAutoPlayState.playedIndices = [];
+    wordsAutoPlayState.remainingIndices = [];
+    wordsAutoPlayState.totalCount = allWords.length;
+    
+    if (wordsAutoPlayState.mode === 'random') {
+        wordsAutoPlayState.remainingIndices = Array.from({length: allWords.length}, (_, i) => i);
+    }
+    
+    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+        try {
+            const doc = wordsAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('wordsStartBtn');
+            const pauseBtn = doc.getElementById('wordsPauseBtn');
+            const modeSequential = doc.getElementById('wordsModeSequential');
+            const modeRandom = doc.getElementById('wordsModeRandom');
+            if (startBtn) startBtn.disabled = true;
+            if (pauseBtn) pauseBtn.disabled = false;
+            if (modeSequential) modeSequential.disabled = true;
+            if (modeRandom) modeRandom.disabled = true;
+            
+            for (let i = 0; i < allWords.length; i++) {
+                const row = doc.getElementById(`word_row_${i}`);
+                if (row) {
+                    row.style.backgroundColor = '';
+                    row.style.color = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    const meaningCell = row.cells[2];
+                    if (meaningCell) {
+                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                        meaningCell.style.color = '';
+                    }
+                    const wordCell = row.cells[1];
+                    if (wordCell) wordCell.style.color = '';
+                }
+            }
+            const progressSpan = doc.getElementById('wordsProgress');
+            if (progressSpan) progressSpan.textContent = `0 / ${allWords.length}`;
+        } catch(e) {}
+    }
+    
+    playNextWord();
+}
+
+function pauseWordsAutoPlay() {
+    if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) return;
+    wordsAutoPlayState.isPaused = true;
+    wordsAutoPlayState.isPlaying = false;
+    if (wordsAutoPlayState.timeoutId) {
+        clearTimeout(wordsAutoPlayState.timeoutId);
+        wordsAutoPlayState.timeoutId = null;
+    }
+    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+        try {
+            const doc = wordsAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('wordsStartBtn');
+            const pauseBtn = doc.getElementById('wordsPauseBtn');
+            if (startBtn) startBtn.disabled = false;
+            if (pauseBtn) pauseBtn.disabled = true;
+            startBtn.textContent = '▶️ 继续播放';
+        } catch(e) {}
+    }
+}
+
+function switchWordsPlayMode(mode) {
+    if (wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
+        const confirmMsg = confirm(`切换模式将重置播放进度。\n当前进度 (${wordsAutoPlayState.playedIndices.length} / ${wordsAutoPlayState.totalCount}) 将会丢失。\n\n确定切换吗？`);
+        if (!confirmMsg) return;
+    }
+    
+    wordsAutoPlayState.mode = mode;
+    resetWordsAutoPlay();
+    
+    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+        try {
+            const doc = wordsAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('wordsStartBtn');
+            if (startBtn) startBtn.textContent = '▶️ 开始播放';
+        } catch(e) {}
+    }
 }
 
 function showAllWords() {
@@ -863,11 +1140,12 @@ function showAllWords() {
     
     const fileNice = removeFileExtension(currentFileName);
     
+    // 构建表格行
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
         tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
+            <tr id="word_row_${i}" style="border-bottom: 1px solid #e2e8f0;">
                 <td style="padding: 12px; text-align: center; width: 80px;">${w.day}</td>
                 <td style="padding: 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
                 <td style="padding: 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
@@ -887,6 +1165,14 @@ function showAllWords() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
+            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+            .control-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .control-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .control-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .mode-btn { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .mode-btn.active { background: #ff6b35; }
+            .mode-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
             table { width: 100%; border-collapse: collapse; }
             th { background: #f8fafc; padding: 14px 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
             th:first-child { width: 80px; text-align: center; }
@@ -902,38 +1188,534 @@ function showAllWords() {
                 <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>共 ${allWords.length} 个单词</p>
             </div>
+            <div class="control-bar">
+                <button id="wordsStartBtn" class="control-btn" style="background: #22c55e;">▶️ 开始播放</button>
+                <button id="wordsPauseBtn" class="control-btn" style="background: #f59e0b;" disabled>⏸️ 暂停</button>
+                <button id="wordsModeSequential" class="mode-btn active">顺序</button>
+                <button id="wordsModeRandom" class="mode-btn">随机</button>
+                <span id="wordsProgress" class="progress">0 / ${allWords.length}</span>
+            </div>
             <table>
-                <thead><tr><th>Day</th><th>Word</th><th>Meaning</th></tr></thead>
-                <tbody>${tableRows}</tbody>
+                <thead>
+                    <tr><th>Day</th><th>Word</th><th>Meaning</th></tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
             </table>
-            <div class="footer"><button class="close-btn" onclick="window.close()">Close</button></div>
+            <div class="footer">
+                <button class="close-btn" onclick="window.close()">Close</button>
+            </div>
         </div>
+        <script>
+            window.wordData = ${JSON.stringify(allWords)};
+            window.wordsAutoPlayState = {
+                isPlaying: false, isPaused: false, currentIndex: 0,
+                mode: 'sequential', playedIndices: [], remainingIndices: [],
+                totalCount: ${allWords.length}, timeoutId: null
+            };
+        </script>
     </body>
     </html>`;
     
     const newWindow = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
-    if (newWindow) { newWindow.document.write(allWordsHtml); newWindow.document.close(); }
-    else { alert("弹窗被浏览器阻止，请允许弹出窗口后重试。"); }
+    if (newWindow) {
+        wordsAutoPlayState.playWindow = newWindow;
+        wordsAutoPlayState.totalCount = allWords.length;
+        wordsAutoPlayState.mode = 'sequential';
+        
+        newWindow.document.write(allWordsHtml);
+        newWindow.document.close();
+        
+        setTimeout(() => {
+            try {
+                const startBtn = newWindow.document.getElementById('wordsStartBtn');
+                const pauseBtn = newWindow.document.getElementById('wordsPauseBtn');
+                const modeSequential = newWindow.document.getElementById('wordsModeSequential');
+                const modeRandom = newWindow.document.getElementById('wordsModeRandom');
+                
+                if (startBtn) {
+                    startBtn.onclick = () => {
+                        window.wordsAutoPlayState = wordsAutoPlayState;
+                        startWordsAutoPlay();
+                    };
+                }
+                if (pauseBtn) {
+                    pauseBtn.onclick = () => {
+                        window.wordsAutoPlayState = wordsAutoPlayState;
+                        pauseWordsAutoPlay();
+                    };
+                }
+                if (modeSequential) {
+                    modeSequential.onclick = () => {
+                        switchWordsPlayMode('sequential');
+                        modeSequential.classList.add('active');
+                        if (modeRandom) modeRandom.classList.remove('active');
+                    };
+                }
+                if (modeRandom) {
+                    modeRandom.onclick = () => {
+                        switchWordsPlayMode('random');
+                        modeRandom.classList.add('active');
+                        if (modeSequential) modeSequential.classList.remove('active');
+                    };
+                }
+                
+                newWindow.onbeforeunload = () => {
+                    if (wordsAutoPlayState.timeoutId) clearTimeout(wordsAutoPlayState.timeoutId);
+                    wordsAutoPlayState.isPlaying = false;
+                    wordsAutoPlayState.isPaused = false;
+                };
+            } catch(e) {}
+        }, 100);
+    } else {
+        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    }
 }
 
-// 辅助函数：防止 HTML 注入
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-        return c;
+// ====================== Show All Sentences 弹窗（带自动播放功能） ======================
+
+let sentencesAutoPlayState = {
+    isPlaying: false,
+    isPaused: false,
+    currentIndex: 0,
+    mode: 'sequential',
+    playedIndices: [],
+    remainingIndices: [],
+    totalCount: 0,
+    playWindow: null,
+    timeoutId: null
+};
+
+function resetSentencesAutoPlay() {
+    if (sentencesAutoPlayState.timeoutId) {
+        clearTimeout(sentencesAutoPlayState.timeoutId);
+        sentencesAutoPlayState.timeoutId = null;
+    }
+    sentencesAutoPlayState.isPlaying = false;
+    sentencesAutoPlayState.isPaused = false;
+    sentencesAutoPlayState.currentIndex = 0;
+    sentencesAutoPlayState.playedIndices = [];
+    sentencesAutoPlayState.remainingIndices = [];
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            const doc = sentencesAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('sentencesStartBtn');
+            const pauseBtn = doc.getElementById('sentencesPauseBtn');
+            const modeSequential = doc.getElementById('sentencesModeSequential');
+            const modeRandom = doc.getElementById('sentencesModeRandom');
+            if (startBtn) startBtn.disabled = false;
+            if (pauseBtn) pauseBtn.disabled = true;
+            if (modeSequential) modeSequential.disabled = false;
+            if (modeRandom) modeRandom.disabled = false;
+            const progressSpan = doc.getElementById('sentencesProgress');
+            if (progressSpan) progressSpan.textContent = `0 / ${sentencesAutoPlayState.totalCount}`;
+        } catch(e) {}
+    }
+}
+
+function updateSentencesProgress() {
+    if (!sentencesAutoPlayState.playWindow || sentencesAutoPlayState.playWindow.closed) return;
+    try {
+        const progressSpan = sentencesAutoPlayState.playWindow.document.getElementById('sentencesProgress');
+        if (progressSpan) {
+            progressSpan.textContent = `${sentencesAutoPlayState.playedIndices.length} / ${sentencesAutoPlayState.totalCount}`;
+        }
+    } catch(e) {}
+}
+
+function highlightSentenceRow(index) {
+    if (!sentencesAutoPlayState.playWindow || sentencesAutoPlayState.playWindow.closed) return;
+    try {
+        const doc = sentencesAutoPlayState.playWindow.document;
+        for (let i = 0; i < sentencesAutoPlayState.totalCount; i++) {
+            const row = doc.getElementById(`sentence_row_${i}`);
+            if (row) {
+                if (i === index) {
+                    row.style.backgroundColor = '#fff3cd';
+                    const firstCell = row.cells[0];
+                    if (firstCell && !firstCell.innerHTML.includes('🎵')) {
+                        firstCell.innerHTML = '🎵 ' + firstCell.innerHTML;
+                    }
+                } else {
+                    row.style.backgroundColor = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) {
+                        firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    }
+                }
+            }
+        }
+    } catch(e) {}
+}
+
+function markSentenceAsPlayed(index) {
+    if (!sentencesAutoPlayState.playWindow || sentencesAutoPlayState.playWindow.closed) return;
+    try {
+        const doc = sentencesAutoPlayState.playWindow.document;
+        const row = doc.getElementById(`sentence_row_${index}`);
+        if (row) {
+            const meaningCell = row.cells[2];
+            if (meaningCell && !meaningCell.innerHTML.includes('✓')) {
+                meaningCell.innerHTML = meaningCell.innerHTML + ' ✓';
+                meaningCell.style.color = '#999';
+            }
+            const enCell = row.cells[1];
+            if (enCell) enCell.style.color = '#999';
+        }
+    } catch(e) {}
+}
+
+function speakSentenceWithEnglishAndChinese(sentenceEn, sentenceZh, onComplete) {
+    let step = 0;
+    let repeatCount = 0;
+    
+    function speakNext() {
+        if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
+            if (onComplete) onComplete();
+            return;
+        }
+        
+        if (step === 0) {
+            speakOnce(sentenceEn, () => {
+                repeatCount++;
+                if (repeatCount < 3) {
+                    setTimeout(speakNext, 600);
+                } else {
+                    step = 1;
+                    repeatCount = 0;
+                    setTimeout(speakNext, 600);
+                }
+            });
+        } else if (step === 1) {
+            const chineseUtterance = new SpeechSynthesisUtterance(sentenceZh);
+            chineseUtterance.lang = "zh-CN";
+            chineseUtterance.rate = 0.8;
+            chineseUtterance.pitch = 1.0;
+            chineseUtterance.volume = 1;
+            
+            let voice = null;
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                voice = voices.find(v => v.name === 'Tingting' || v.name === 'Ting-Ting') ||
+                        voices.find(v => v.lang === 'zh-CN');
+                if (voice) chineseUtterance.voice = voice;
+            }
+            
+            chineseUtterance.onend = () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 600);
+            };
+            chineseUtterance.onerror = () => {
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 600);
+            };
+            synth.speak(chineseUtterance);
+        }
+    }
+    
+    speakNext();
+}
+
+function playNextSentence() {
+    if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) return;
+    
+    if (sentencesAutoPlayState.playedIndices.length >= sentencesAutoPlayState.totalCount) {
+        sentencesAutoPlayState.isPlaying = false;
+        sentencesAutoPlayState.isPaused = false;
+        if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
+        
+        if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+            try {
+                const doc = sentencesAutoPlayState.playWindow.document;
+                const startBtn = doc.getElementById('sentencesStartBtn');
+                const pauseBtn = doc.getElementById('sentencesPauseBtn');
+                const modeSequential = doc.getElementById('sentencesModeSequential');
+                const modeRandom = doc.getElementById('sentencesModeRandom');
+                if (startBtn) startBtn.disabled = false;
+                if (pauseBtn) pauseBtn.disabled = true;
+                if (modeSequential) modeSequential.disabled = false;
+                if (modeRandom) modeRandom.disabled = false;
+                
+                alert('🎉 播放完成！已全部播放完毕。');
+            } catch(e) {}
+        }
+        return;
+    }
+    
+    let nextIndex;
+    if (sentencesAutoPlayState.mode === 'sequential') {
+        nextIndex = sentencesAutoPlayState.playedIndices.length;
+    } else {
+        if (sentencesAutoPlayState.remainingIndices.length === 0) {
+            sentencesAutoPlayState.remainingIndices = Array.from({length: sentencesAutoPlayState.totalCount}, (_, i) => i);
+        }
+        const randomPos = Math.floor(Math.random() * sentencesAutoPlayState.remainingIndices.length);
+        nextIndex = sentencesAutoPlayState.remainingIndices[randomPos];
+        sentencesAutoPlayState.remainingIndices.splice(randomPos, 1);
+    }
+    
+    sentencesAutoPlayState.currentIndex = nextIndex;
+    highlightSentenceRow(nextIndex);
+    updateSentencesProgress();
+    
+    const sentence = allSentences[nextIndex];
+    speakSentenceWithEnglishAndChinese(sentence.sentence_en, sentence.sentence_zh, () => {
+        sentencesAutoPlayState.playedIndices.push(nextIndex);
+        markSentenceAsPlayed(nextIndex);
+        updateSentencesProgress();
+        
+        sentencesAutoPlayState.timeoutId = setTimeout(() => {
+            playNextSentence();
+        }, 600);
     });
 }
 
-// 停止所有朗读
-function stopAllReading() {
-    stopWordReading();
-    stopSentenceReading();
-    stopCantoneseReading();
+function startSentencesAutoPlay() {
+    if (sentencesAutoPlayState.isPlaying && !sentencesAutoPlayState.isPaused) return;
+    
+    if (sentencesAutoPlayState.isPaused) {
+        sentencesAutoPlayState.isPaused = false;
+        sentencesAutoPlayState.isPlaying = true;
+        if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+            try {
+                const doc = sentencesAutoPlayState.playWindow.document;
+                const startBtn = doc.getElementById('sentencesStartBtn');
+                const pauseBtn = doc.getElementById('sentencesPauseBtn');
+                const modeSequential = doc.getElementById('sentencesModeSequential');
+                const modeRandom = doc.getElementById('sentencesModeRandom');
+                if (startBtn) startBtn.disabled = true;
+                if (pauseBtn) pauseBtn.disabled = false;
+                if (modeSequential) modeSequential.disabled = true;
+                if (modeRandom) modeRandom.disabled = true;
+            } catch(e) {}
+        }
+        playNextSentence();
+        return;
+    }
+    
+    resetSentencesAutoPlay();
+    sentencesAutoPlayState.isPlaying = true;
+    sentencesAutoPlayState.isPaused = false;
+    sentencesAutoPlayState.playedIndices = [];
+    sentencesAutoPlayState.remainingIndices = [];
+    sentencesAutoPlayState.totalCount = allSentences.length;
+    
+    if (sentencesAutoPlayState.mode === 'random') {
+        sentencesAutoPlayState.remainingIndices = Array.from({length: allSentences.length}, (_, i) => i);
+    }
+    
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            const doc = sentencesAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('sentencesStartBtn');
+            const pauseBtn = doc.getElementById('sentencesPauseBtn');
+            const modeSequential = doc.getElementById('sentencesModeSequential');
+            const modeRandom = doc.getElementById('sentencesModeRandom');
+            if (startBtn) startBtn.disabled = true;
+            if (pauseBtn) pauseBtn.disabled = false;
+            if (modeSequential) modeSequential.disabled = true;
+            if (modeRandom) modeRandom.disabled = true;
+            
+            for (let i = 0; i < allSentences.length; i++) {
+                const row = doc.getElementById(`sentence_row_${i}`);
+                if (row) {
+                    row.style.backgroundColor = '';
+                    row.style.color = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    const meaningCell = row.cells[2];
+                    if (meaningCell) {
+                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                        meaningCell.style.color = '';
+                    }
+                    const enCell = row.cells[1];
+                    if (enCell) enCell.style.color = '';
+                }
+            }
+            const progressSpan = doc.getElementById('sentencesProgress');
+            if (progressSpan) progressSpan.textContent = `0 / ${allSentences.length}`;
+        } catch(e) {}
+    }
+    
+    playNextSentence();
+}
+
+function pauseSentencesAutoPlay() {
+    if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) return;
+    sentencesAutoPlayState.isPaused = true;
+    sentencesAutoPlayState.isPlaying = false;
+    if (sentencesAutoPlayState.timeoutId) {
+        clearTimeout(sentencesAutoPlayState.timeoutId);
+        sentencesAutoPlayState.timeoutId = null;
+    }
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            const doc = sentencesAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('sentencesStartBtn');
+            const pauseBtn = doc.getElementById('sentencesPauseBtn');
+            if (startBtn) startBtn.disabled = false;
+            if (pauseBtn) pauseBtn.disabled = true;
+            startBtn.textContent = '▶️ 继续播放';
+        } catch(e) {}
+    }
+}
+
+function switchSentencesPlayMode(mode) {
+    if (sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
+        const confirmMsg = confirm(`切换模式将重置播放进度。\n当前进度 (${sentencesAutoPlayState.playedIndices.length} / ${sentencesAutoPlayState.totalCount}) 将会丢失。\n\n确定切换吗？`);
+        if (!confirmMsg) return;
+    }
+    
+    sentencesAutoPlayState.mode = mode;
+    resetSentencesAutoPlay();
+    
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            const doc = sentencesAutoPlayState.playWindow.document;
+            const startBtn = doc.getElementById('sentencesStartBtn');
+            if (startBtn) startBtn.textContent = '▶️ 开始播放';
+        } catch(e) {}
+    }
+}
+
+function showAllSentencesPopup() {
+    if (!allSentences.length) return;
+    
+    const fileNice = removeFileExtension(currentFileNameForSentences);
+    
+    let tableRows = '';
+    for (let i = 0; i < allSentences.length; i++) {
+        const s = allSentences[i];
+        tableRows += `
+            <tr id="sentence_row_${i}" style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px; text-align: center; width: 60px; color: #64748b;">${i + 1}</td>
+                <td style="padding: 12px; font-weight: 500; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
+                <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
+             </tr>
+        `;
+    }
+    
+    const sentencesHtml = `<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>All Sentences - ${currentLevel}</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
+            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
+            .header h2 { color: white; font-size: 20px; font-weight: 600; }
+            .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
+            .control-bar { background: #fef9e8; padding: 12px 20px; border-bottom: 1px solid #ffd966; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+            .control-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .control-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .control-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .mode-btn { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .mode-btn.active { background: #ff6b35; }
+            .mode-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #fef9e8; padding: 14px 12px; text-align: left; font-weight: 600; color: #c2410c; border-bottom: 2px solid #ffd966; }
+            th:first-child { width: 60px; text-align: center; }
+            td { padding: 12px; vertical-align: top; }
+            .footer { padding: 16px 20px; background: #fef9e8; text-align: center; border-top: 1px solid #ffd966; }
+            .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
+            .close-btn:hover { opacity: 0.85; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>✏️ ${currentLevel} - ${escapeHtml(fileNice)}</h2>
+                <p>共 ${allSentences.length} 个句子</p>
+            </div>
+            <div class="control-bar">
+                <button id="sentencesStartBtn" class="control-btn" style="background: #22c55e;">▶️ 开始播放</button>
+                <button id="sentencesPauseBtn" class="control-btn" style="background: #f59e0b;" disabled>⏸️ 暂停</button>
+                <button id="sentencesModeSequential" class="mode-btn active">顺序</button>
+                <button id="sentencesModeRandom" class="mode-btn">随机</button>
+                <span id="sentencesProgress" class="progress">0 / ${allSentences.length}</span>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>English</th><th>Chinese</th></tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+            <div class="footer">
+                <button class="close-btn" onclick="window.close()">Close</button>
+            </div>
+        </div>
+        <script>
+            window.sentenceData = ${JSON.stringify(allSentences)};
+            window.sentencesAutoPlayState = {
+                isPlaying: false, isPaused: false, currentIndex: 0,
+                mode: 'sequential', playedIndices: [], remainingIndices: [],
+                totalCount: ${allSentences.length}, timeoutId: null
+            };
+        </script>
+    </body>
+    </html>`;
+    
+    const win = window.open('', '_blank', 'width=950,height=700,scrollbars=yes');
+    if (win) {
+        sentencesAutoPlayState.playWindow = win;
+        sentencesAutoPlayState.totalCount = allSentences.length;
+        sentencesAutoPlayState.mode = 'sequential';
+        
+        win.document.write(sentencesHtml);
+        win.document.close();
+        
+        setTimeout(() => {
+            try {
+                const startBtn = win.document.getElementById('sentencesStartBtn');
+                const pauseBtn = win.document.getElementById('sentencesPauseBtn');
+                const modeSequential = win.document.getElementById('sentencesModeSequential');
+                const modeRandom = win.document.getElementById('sentencesModeRandom');
+                
+                if (startBtn) {
+                    startBtn.onclick = () => {
+                        window.sentencesAutoPlayState = sentencesAutoPlayState;
+                        startSentencesAutoPlay();
+                    };
+                }
+                if (pauseBtn) {
+                    pauseBtn.onclick = () => {
+                        window.sentencesAutoPlayState = sentencesAutoPlayState;
+                        pauseSentencesAutoPlay();
+                    };
+                }
+                if (modeSequential) {
+                    modeSequential.onclick = () => {
+                        switchSentencesPlayMode('sequential');
+                        modeSequential.classList.add('active');
+                        if (modeRandom) modeRandom.classList.remove('active');
+                    };
+                }
+                if (modeRandom) {
+                    modeRandom.onclick = () => {
+                        switchSentencesPlayMode('random');
+                        modeRandom.classList.add('active');
+                        if (modeSequential) modeSequential.classList.remove('active');
+                    };
+                }
+                
+                win.onbeforeunload = () => {
+                    if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
+                    sentencesAutoPlayState.isPlaying = false;
+                    sentencesAutoPlayState.isPaused = false;
+                };
+            } catch(e) {}
+        }, 100);
+    } else {
+        alert("弹窗被浏览器阻止，请允许弹出窗口后重试。");
+    }
 }
 
 // ====================== 初始化与事件绑定 ======================
