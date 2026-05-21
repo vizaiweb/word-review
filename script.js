@@ -828,9 +828,15 @@ function stopAllReading() {
 function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
     let step = 0;
     let repeatCount = 0;
+    let isCancelled = false;
+    
+    function cancelPlayback() {
+        isCancelled = true;
+        try { synth.cancel(); } catch(e) {}
+    }
     
     function speakNext() {
-        if (!wordsAutoPlayState.isPlaying || wordsAutoPlayState.isPaused) {
+        if (isCancelled || (wordsAutoPlayState && (wordsAutoPlayState.isPaused || !wordsAutoPlayState.isPlaying))) {
             if (onComplete) onComplete();
             return;
         }
@@ -838,20 +844,21 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
         if (step === 0) {
             // Read English 3 times
             speakOnce(word, () => {
+                if (isCancelled) return;
                 repeatCount++;
                 if (repeatCount < 3) {
-                    setTimeout(speakNext, 500);
+                    setTimeout(speakNext, 450);
                 } else {
                     step = 1;
                     repeatCount = 0;
-                    setTimeout(speakNext, 500);
+                    setTimeout(speakNext, 450);
                 }
             });
         } else if (step === 1) {
-            // Read Cantonese meaning
+            // Read Cantonese meaning - must complete fully before next
             const utterance = new SpeechSynthesisUtterance(meaning);
             utterance.lang = "yue";
-            utterance.rate = 0.9;
+            utterance.rate = 0.85;
             utterance.pitch = 1.0;
             utterance.volume = 1;
             
@@ -860,39 +867,46 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
                 utterance.voice = voice;
             }
             
-            let ended = false;
+            let completed = false;
+            
+            // Calculate timeout based on text length
+            const estimatedDuration = Math.max(1500, meaning.length * 200);
             
             const safetyTimeout = setTimeout(() => {
-                if (!ended) {
-                    ended = true;
+                if (!completed) {
+                    completed = true;
                     console.warn('Cantonese speech timeout, continuing...');
-                    if (onComplete) onComplete();
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 300);
                 }
-            }, Math.max(2000, meaning.length * 150));
+            }, estimatedDuration + 1000);
             
             utterance.onend = () => {
+                if (completed) return;
+                completed = true;
                 clearTimeout(safetyTimeout);
-                if (!ended) {
-                    ended = true;
-                    setTimeout(() => {
-                        if (onComplete) onComplete();
-                    }, 500);
-                }
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 400);
             };
             
-            utterance.onerror = () => {
+            utterance.onerror = (err) => {
+                console.error('Cantonese speech error:', err);
+                if (completed) return;
+                completed = true;
                 clearTimeout(safetyTimeout);
-                if (!ended) {
-                    ended = true;
-                    setTimeout(() => {
-                        if (onComplete) onComplete();
-                    }, 500);
-                }
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 300);
             };
             
             try {
                 synth.speak(utterance);
             } catch(e) {
+                console.error('Failed to speak Cantonese:', e);
+                if (completed) return;
+                completed = true;
                 clearTimeout(safetyTimeout);
                 if (onComplete) onComplete();
             }
@@ -905,9 +919,15 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
 function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete) {
     let step = 0;
     let repeatCount = 0;
+    let isCancelled = false;
+    
+    function cancelPlayback() {
+        isCancelled = true;
+        try { synth.cancel(); } catch(e) {}
+    }
     
     function speakNext() {
-        if (!sentencesAutoPlayState.isPlaying || sentencesAutoPlayState.isPaused) {
+        if (isCancelled || (sentencesAutoPlayState && (sentencesAutoPlayState.isPaused || !sentencesAutoPlayState.isPlaying))) {
             if (onComplete) onComplete();
             return;
         }
@@ -915,6 +935,7 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
         if (step === 0) {
             // Read English 3 times
             speakOnce(sentenceEn, () => {
+                if (isCancelled) return;
                 repeatCount++;
                 if (repeatCount < 3) {
                     setTimeout(speakNext, 600);
@@ -925,10 +946,10 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
                 }
             });
         } else if (step === 1) {
-            // Read Cantonese meaning with reliable completion detection
+            // Read Cantonese meaning - must complete fully before next
             const utterance = new SpeechSynthesisUtterance(sentenceZh);
             utterance.lang = "yue";
-            utterance.rate = 0.9;
+            utterance.rate = 0.85;
             utterance.pitch = 1.0;
             utterance.volume = 1;
             
@@ -938,59 +959,48 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
                 utterance.voice = voice;
             }
             
-            let ended = false;
+            let completed = false;
             
-            utterance.onend = () => {
-                if (!ended) {
-                    ended = true;
+            // Calculate a generous timeout based on text length
+            // Chinese takes about 0.3-0.5 seconds per character
+            const estimatedDuration = Math.max(2000, sentenceZh.length * 200);
+            
+            const safetyTimeout = setTimeout(() => {
+                if (!completed) {
+                    completed = true;
+                    console.warn('Cantonese speech timeout after', estimatedDuration, 'ms, continuing...');
                     setTimeout(() => {
                         if (onComplete) onComplete();
-                    }, 600);
+                    }, 300);
                 }
+            }, estimatedDuration + 1000);
+            
+            utterance.onend = () => {
+                if (completed) return;
+                completed = true;
+                clearTimeout(safetyTimeout);
+                // Wait extra 500ms to ensure playback fully ended
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 500);
             };
             
             utterance.onerror = (err) => {
                 console.error('Cantonese speech error:', err);
-                if (!ended) {
-                    ended = true;
-                    setTimeout(() => {
-                        if (onComplete) onComplete();
-                    }, 600);
-                }
-            };
-            
-            // Safety timeout: if speech takes too long, still complete
-            const safetyTimeout = setTimeout(() => {
-                if (!ended) {
-                    ended = true;
-                    console.warn('Cantonese speech timeout, continuing...');
+                if (completed) return;
+                completed = true;
+                clearTimeout(safetyTimeout);
+                setTimeout(() => {
                     if (onComplete) onComplete();
-                }
-            }, Math.max(3000, sentenceZh.length * 150));
-            
-            utterance.onend = () => {
-                clearTimeout(safetyTimeout);
-                if (!ended) {
-                    ended = true;
-                    setTimeout(() => {
-                        if (onComplete) onComplete();
-                    }, 600);
-                }
-            };
-            
-            utterance.onerror = () => {
-                clearTimeout(safetyTimeout);
-                if (!ended) {
-                    ended = true;
-                    setTimeout(() => {
-                        if (onComplete) onComplete();
-                    }, 600);
-                }
+                }, 300);
             };
             
             try {
                 synth.speak(utterance);
             } catch(e) {
+                console.error('Failed to speak Cantonese:', e);
+                if (completed) return;
+                completed = true;
                 clearTimeout(safetyTimeout);
                 if (onComplete) onComplete();
             }
