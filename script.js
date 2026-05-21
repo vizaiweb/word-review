@@ -848,12 +848,54 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
                 }
             });
         } else if (step === 1) {
-            // Read Cantonese meaning using the same engine as main page
-            speakCantoneseOnce(meaning, () => {
-                setTimeout(() => {
+            // Read Cantonese meaning
+            const utterance = new SpeechSynthesisUtterance(meaning);
+            utterance.lang = "yue";
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1;
+            
+            const voice = getCantoneseVoice();
+            if (voice) {
+                utterance.voice = voice;
+            }
+            
+            let ended = false;
+            
+            const safetyTimeout = setTimeout(() => {
+                if (!ended) {
+                    ended = true;
+                    console.warn('Cantonese speech timeout, continuing...');
                     if (onComplete) onComplete();
-                }, 500);
-            });
+                }
+            }, Math.max(2000, meaning.length * 150));
+            
+            utterance.onend = () => {
+                clearTimeout(safetyTimeout);
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 500);
+                }
+            };
+            
+            utterance.onerror = () => {
+                clearTimeout(safetyTimeout);
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 500);
+                }
+            };
+            
+            try {
+                synth.speak(utterance);
+            } catch(e) {
+                clearTimeout(safetyTimeout);
+                if (onComplete) onComplete();
+            }
         }
     }
     
@@ -871,6 +913,7 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
         }
         
         if (step === 0) {
+            // Read English 3 times
             speakOnce(sentenceEn, () => {
                 repeatCount++;
                 if (repeatCount < 3) {
@@ -882,11 +925,75 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
                 }
             });
         } else if (step === 1) {
-            speakCantoneseOnce(sentenceZh, () => {
-                setTimeout(() => {
+            // Read Cantonese meaning with reliable completion detection
+            const utterance = new SpeechSynthesisUtterance(sentenceZh);
+            utterance.lang = "yue";
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1;
+            
+            // Get the best Cantonese voice
+            const voice = getCantoneseVoice();
+            if (voice) {
+                utterance.voice = voice;
+            }
+            
+            let ended = false;
+            
+            utterance.onend = () => {
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 600);
+                }
+            };
+            
+            utterance.onerror = (err) => {
+                console.error('Cantonese speech error:', err);
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 600);
+                }
+            };
+            
+            // Safety timeout: if speech takes too long, still complete
+            const safetyTimeout = setTimeout(() => {
+                if (!ended) {
+                    ended = true;
+                    console.warn('Cantonese speech timeout, continuing...');
                     if (onComplete) onComplete();
-                }, 600);
-            });
+                }
+            }, Math.max(3000, sentenceZh.length * 150));
+            
+            utterance.onend = () => {
+                clearTimeout(safetyTimeout);
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 600);
+                }
+            };
+            
+            utterance.onerror = () => {
+                clearTimeout(safetyTimeout);
+                if (!ended) {
+                    ended = true;
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 600);
+                }
+            };
+            
+            try {
+                synth.speak(utterance);
+            } catch(e) {
+                clearTimeout(safetyTimeout);
+                if (onComplete) onComplete();
+            }
         }
     }
     
