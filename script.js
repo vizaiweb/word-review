@@ -288,7 +288,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 粤语语音模块（复用主页逻辑） ======================
+// ====================== 粤语语音模块 ======================
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -824,7 +824,7 @@ function stopAllReading() {
     }
 }
 
-// ====================== Speak Word/Sequence with Cantonese (复用粤语引擎) ======================
+// ====================== Speak Word/Sequence with Cantonese ======================
 function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
     let step = 0;
     let repeatCount = 0;
@@ -855,7 +855,7 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
                 }
             });
         } else if (step === 1) {
-            // Read Cantonese meaning - rely solely on onend
+            // Read Cantonese meaning
             const utterance = new SpeechSynthesisUtterance(meaning);
             utterance.lang = "yue";
             utterance.rate = 0.85;
@@ -902,11 +902,9 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
     let step = 0;
     let repeatCount = 0;
     let isCancelled = false;
-    let isPlaying = true;
     
     function cancelPlayback() {
         isCancelled = true;
-        isPlaying = false;
         try { synth.cancel(); } catch(e) {}
     }
     
@@ -930,7 +928,7 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
                 }
             });
         } else if (step === 1) {
-            // Read Cantonese meaning - rely solely on onend, no safety timeout
+            // Read Cantonese meaning
             const utterance = new SpeechSynthesisUtterance(sentenceZh);
             utterance.lang = "yue";
             utterance.rate = 0.85;
@@ -944,11 +942,9 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
             
             let completed = false;
             
-            // ONLY rely on onend - no guessing timeout
             utterance.onend = () => {
                 if (completed) return;
                 completed = true;
-                // Wait a bit to ensure clean transition
                 setTimeout(() => {
                     if (onComplete) onComplete();
                 }, 400);
@@ -958,7 +954,6 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
                 console.error('Cantonese speech error:', err);
                 if (completed) return;
                 completed = true;
-                // Fallback: continue after error
                 setTimeout(() => {
                     if (onComplete) onComplete();
                 }, 300);
@@ -976,13 +971,13 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
     speakNext();
 }
 
-// ====================== Show All Words 弹窗（带自动播放功能，全英文界面） ======================
+// ====================== Show All Words 弹窗（带自动播放功能） ======================
 
 let wordsAutoPlayState = {
     isPlaying: false,
     isPaused: false,
     currentIndex: 0,
-    mode: 'sequential',  // 'sequential' or 'random'
+    mode: 'sequential',
     playedIndices: [],
     remainingIndices: [],
     totalCount: 0,
@@ -1004,11 +999,15 @@ function resetWordsAutoPlay() {
         try {
             const doc = wordsAutoPlayState.playWindow.document;
             const playBtn = doc.getElementById('wordsPlayBtn');
+            const stopBtn = doc.getElementById('wordsStopBtn');
             const modeSwitch = doc.getElementById('wordsModeSwitch');
             if (playBtn) {
                 playBtn.textContent = '▶️ Play All';
                 playBtn.disabled = false;
                 playBtn.style.background = '#22c55e';
+            }
+            if (stopBtn) {
+                stopBtn.disabled = true;
             }
             if (modeSwitch) modeSwitch.disabled = false;
             const progressSpan = doc.getElementById('wordsProgress');
@@ -1082,11 +1081,15 @@ function playNextWord() {
             try {
                 const doc = wordsAutoPlayState.playWindow.document;
                 const playBtn = doc.getElementById('wordsPlayBtn');
+                const stopBtn = doc.getElementById('wordsStopBtn');
                 const modeSwitch = doc.getElementById('wordsModeSwitch');
                 if (playBtn) {
                     playBtn.textContent = '▶️ Play All';
                     playBtn.disabled = false;
                     playBtn.style.background = '#22c55e';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = true;
                 }
                 if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
@@ -1125,6 +1128,7 @@ function playNextWord() {
 
 function toggleWordsAutoPlay() {
     const playBtn = wordsAutoPlayState.playWindow ? wordsAutoPlayState.playWindow.document.getElementById('wordsPlayBtn') : null;
+    const stopBtn = wordsAutoPlayState.playWindow ? wordsAutoPlayState.playWindow.document.getElementById('wordsStopBtn') : null;
     
     if (!wordsAutoPlayState.isPlaying && !wordsAutoPlayState.isPaused) {
         // Start playing
@@ -1146,6 +1150,9 @@ function toggleWordsAutoPlay() {
                 if (playBtn) {
                     playBtn.textContent = '⏸️ Pause';
                     playBtn.style.background = '#f59e0b';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = false;
                 }
                 if (modeSwitch) modeSwitch.disabled = true;
                 
@@ -1196,6 +1203,68 @@ function toggleWordsAutoPlay() {
     }
 }
 
+function stopWordsAutoPlay() {
+    // Stop any ongoing speech
+    try { synth.cancel(); } catch(e) {}
+    
+    // Clear timeout
+    if (wordsAutoPlayState.timeoutId) {
+        clearTimeout(wordsAutoPlayState.timeoutId);
+        wordsAutoPlayState.timeoutId = null;
+    }
+    
+    // Reset state
+    wordsAutoPlayState.isPlaying = false;
+    wordsAutoPlayState.isPaused = false;
+    wordsAutoPlayState.playedIndices = [];
+    wordsAutoPlayState.remainingIndices = [];
+    wordsAutoPlayState.currentIndex = 0;
+    
+    if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
+        try {
+            const doc = wordsAutoPlayState.playWindow.document;
+            const playBtn = doc.getElementById('wordsPlayBtn');
+            const stopBtn = doc.getElementById('wordsStopBtn');
+            const modeSwitch = doc.getElementById('wordsModeSwitch');
+            const progressSpan = doc.getElementById('wordsProgress');
+            
+            if (playBtn) {
+                playBtn.textContent = '▶️ Play All';
+                playBtn.disabled = false;
+                playBtn.style.background = '#22c55e';
+            }
+            if (stopBtn) {
+                stopBtn.disabled = true;
+            }
+            if (modeSwitch) {
+                modeSwitch.disabled = false;
+            }
+            if (progressSpan) {
+                progressSpan.textContent = `0 / ${wordsAutoPlayState.totalCount}`;
+            }
+            
+            // Clear all highlights and checkmarks
+            for (let i = 0; i < wordsAutoPlayState.totalCount; i++) {
+                const row = doc.getElementById(`word_row_${i}`);
+                if (row) {
+                    row.style.backgroundColor = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) {
+                        firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    }
+                    const meaningCell = row.cells[2];
+                    if (meaningCell) {
+                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                        meaningCell.style.color = '';
+                    }
+                    const wordCell = row.cells[1];
+                    if (wordCell) wordCell.style.color = '';
+                }
+            }
+        } catch(e) {}
+    }
+}
+
 function switchWordsPlayMode() {
     const modeSwitch = wordsAutoPlayState.playWindow ? wordsAutoPlayState.playWindow.document.getElementById('wordsModeSwitch') : null;
     const newMode = wordsAutoPlayState.mode === 'sequential' ? 'random' : 'sequential';
@@ -1212,9 +1281,13 @@ function switchWordsPlayMode() {
         if (wordsAutoPlayState.playWindow && !wordsAutoPlayState.playWindow.closed) {
             try {
                 const playBtn = wordsAutoPlayState.playWindow.document.getElementById('wordsPlayBtn');
+                const stopBtn = wordsAutoPlayState.playWindow.document.getElementById('wordsStopBtn');
                 if (playBtn) {
                     playBtn.textContent = '▶️ Play All';
                     playBtn.style.background = '#22c55e';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = true;
                 }
                 if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
@@ -1263,10 +1336,13 @@ function showAllWords() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
-            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
             .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
             .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
+            .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
             .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
             .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
@@ -1287,6 +1363,7 @@ function showAllWords() {
             </div>
             <div class="control-bar">
                 <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
+                <button id="wordsStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
                 <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
                 <span id="wordsProgress" class="progress">0 / ${allWords.length}</span>
             </div>
@@ -1324,11 +1401,17 @@ function showAllWords() {
         setTimeout(() => {
             try {
                 const playBtn = newWindow.document.getElementById('wordsPlayBtn');
+                const stopBtn = newWindow.document.getElementById('wordsStopBtn');
                 const modeSwitch = newWindow.document.getElementById('wordsModeSwitch');
                 
                 if (playBtn) {
                     playBtn.onclick = () => {
                         toggleWordsAutoPlay();
+                    };
+                }
+                if (stopBtn) {
+                    stopBtn.onclick = () => {
+                        stopWordsAutoPlay();
                     };
                 }
                 if (modeSwitch) {
@@ -1349,7 +1432,7 @@ function showAllWords() {
     }
 }
 
-// ====================== Show All Sentences 弹窗（带自动播放功能，全英文界面） ======================
+// ====================== Show All Sentences 弹窗（带自动播放功能） ======================
 
 let sentencesAutoPlayState = {
     isPlaying: false,
@@ -1377,11 +1460,15 @@ function resetSentencesAutoPlay() {
         try {
             const doc = sentencesAutoPlayState.playWindow.document;
             const playBtn = doc.getElementById('sentencesPlayBtn');
+            const stopBtn = doc.getElementById('sentencesStopBtn');
             const modeSwitch = doc.getElementById('sentencesModeSwitch');
             if (playBtn) {
                 playBtn.textContent = '▶️ Play All';
                 playBtn.disabled = false;
                 playBtn.style.background = '#22c55e';
+            }
+            if (stopBtn) {
+                stopBtn.disabled = true;
             }
             if (modeSwitch) modeSwitch.disabled = false;
             const progressSpan = doc.getElementById('sentencesProgress');
@@ -1455,11 +1542,15 @@ function playNextSentence() {
             try {
                 const doc = sentencesAutoPlayState.playWindow.document;
                 const playBtn = doc.getElementById('sentencesPlayBtn');
+                const stopBtn = doc.getElementById('sentencesStopBtn');
                 const modeSwitch = doc.getElementById('sentencesModeSwitch');
                 if (playBtn) {
                     playBtn.textContent = '▶️ Play All';
                     playBtn.disabled = false;
                     playBtn.style.background = '#22c55e';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = true;
                 }
                 if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
@@ -1498,6 +1589,7 @@ function playNextSentence() {
 
 function toggleSentencesAutoPlay() {
     const playBtn = sentencesAutoPlayState.playWindow ? sentencesAutoPlayState.playWindow.document.getElementById('sentencesPlayBtn') : null;
+    const stopBtn = sentencesAutoPlayState.playWindow ? sentencesAutoPlayState.playWindow.document.getElementById('sentencesStopBtn') : null;
     
     if (!sentencesAutoPlayState.isPlaying && !sentencesAutoPlayState.isPaused) {
         // Start playing
@@ -1519,6 +1611,9 @@ function toggleSentencesAutoPlay() {
                 if (playBtn) {
                     playBtn.textContent = '⏸️ Pause';
                     playBtn.style.background = '#f59e0b';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = false;
                 }
                 if (modeSwitch) modeSwitch.disabled = true;
                 
@@ -1569,6 +1664,68 @@ function toggleSentencesAutoPlay() {
     }
 }
 
+function stopSentencesAutoPlay() {
+    // Stop any ongoing speech
+    try { synth.cancel(); } catch(e) {}
+    
+    // Clear timeout
+    if (sentencesAutoPlayState.timeoutId) {
+        clearTimeout(sentencesAutoPlayState.timeoutId);
+        sentencesAutoPlayState.timeoutId = null;
+    }
+    
+    // Reset state
+    sentencesAutoPlayState.isPlaying = false;
+    sentencesAutoPlayState.isPaused = false;
+    sentencesAutoPlayState.playedIndices = [];
+    sentencesAutoPlayState.remainingIndices = [];
+    sentencesAutoPlayState.currentIndex = 0;
+    
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            const doc = sentencesAutoPlayState.playWindow.document;
+            const playBtn = doc.getElementById('sentencesPlayBtn');
+            const stopBtn = doc.getElementById('sentencesStopBtn');
+            const modeSwitch = doc.getElementById('sentencesModeSwitch');
+            const progressSpan = doc.getElementById('sentencesProgress');
+            
+            if (playBtn) {
+                playBtn.textContent = '▶️ Play All';
+                playBtn.disabled = false;
+                playBtn.style.background = '#22c55e';
+            }
+            if (stopBtn) {
+                stopBtn.disabled = true;
+            }
+            if (modeSwitch) {
+                modeSwitch.disabled = false;
+            }
+            if (progressSpan) {
+                progressSpan.textContent = `0 / ${sentencesAutoPlayState.totalCount}`;
+            }
+            
+            // Clear all highlights and checkmarks
+            for (let i = 0; i < sentencesAutoPlayState.totalCount; i++) {
+                const row = doc.getElementById(`sentence_row_${i}`);
+                if (row) {
+                    row.style.backgroundColor = '';
+                    const firstCell = row.cells[0];
+                    if (firstCell) {
+                        firstCell.innerHTML = firstCell.innerHTML.replace(/^🎵 /, '');
+                    }
+                    const meaningCell = row.cells[2];
+                    if (meaningCell) {
+                        meaningCell.innerHTML = meaningCell.innerHTML.replace(/ ✓$/, '');
+                        meaningCell.style.color = '';
+                    }
+                    const enCell = row.cells[1];
+                    if (enCell) enCell.style.color = '';
+                }
+            }
+        } catch(e) {}
+    }
+}
+
 function switchSentencesPlayMode() {
     const modeSwitch = sentencesAutoPlayState.playWindow ? sentencesAutoPlayState.playWindow.document.getElementById('sentencesModeSwitch') : null;
     const newMode = sentencesAutoPlayState.mode === 'sequential' ? 'random' : 'sequential';
@@ -1585,9 +1742,13 @@ function switchSentencesPlayMode() {
         if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
             try {
                 const playBtn = sentencesAutoPlayState.playWindow.document.getElementById('sentencesPlayBtn');
+                const stopBtn = sentencesAutoPlayState.playWindow.document.getElementById('sentencesStopBtn');
                 if (playBtn) {
                     playBtn.textContent = '▶️ Play All';
                     playBtn.style.background = '#22c55e';
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = true;
                 }
                 if (modeSwitch) modeSwitch.disabled = false;
             } catch(e) {}
@@ -1619,7 +1780,7 @@ function showAllSentencesPopup() {
                 <td style="padding: 12px; text-align: center; width: 60px; color: #64748b;">${i + 1}</td>
                 <td style="padding: 12px; font-weight: 500; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
                 <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
-              </tr>
+            </tr>
         `;
     }
     
@@ -1635,10 +1796,13 @@ function showAllSentencesPopup() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 20px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px; }
-            .control-bar { background: #fef9e8; padding: 12px 20px; border-bottom: 1px solid #ffd966; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+            .control-bar { background: #fef9e8; padding: 12px 20px; border-bottom: 1px solid #ffd966; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
             .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
             .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
+            .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
             .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
             .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
@@ -1659,6 +1823,7 @@ function showAllSentencesPopup() {
             </div>
             <div class="control-bar">
                 <button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>
+                <button id="sentencesStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
                 <button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>
                 <span id="sentencesProgress" class="progress">0 / ${allSentences.length}</span>
             </div>
@@ -1696,11 +1861,17 @@ function showAllSentencesPopup() {
         setTimeout(() => {
             try {
                 const playBtn = win.document.getElementById('sentencesPlayBtn');
+                const stopBtn = win.document.getElementById('sentencesStopBtn');
                 const modeSwitch = win.document.getElementById('sentencesModeSwitch');
                 
                 if (playBtn) {
                     playBtn.onclick = () => {
                         toggleSentencesAutoPlay();
+                    };
+                }
+                if (stopBtn) {
+                    stopBtn.onclick = () => {
+                        stopSentencesAutoPlay();
                     };
                 }
                 if (modeSwitch) {
