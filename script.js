@@ -75,6 +75,16 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
+// 重置 Day 区域的函数
+function resetDayArea() {
+    const daySelect = document.getElementById('daySelect');
+    const dayNum = document.getElementById('dayNum');
+    if (daySelect) {
+        daySelect.value = 'all';
+        daySelect.dispatchEvent(new Event('change'));
+    }
+}
+
 // ====================== 英文语音模块 ======================
 function getAvailableVoice() {
     const voices = synth.getVoices();
@@ -1904,8 +1914,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterBtn = document.getElementById('filterBtn');
     
     // Level 下拉菜单：选择后立即生效
-    levelSelect.addEventListener('change', function() {
+    levelSelect.addEventListener('change', async function() {
         stopAllReading();
+        
+        // 重置 Day 区域
+        resetDayArea();
         
         const level = levelSelect.value;
         if (!level) {
@@ -1926,7 +1939,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         currentLevel = level;
-        loadFileListByLevel(level);
+        await loadFileListByLevel(level);
         
         document.getElementById("sentenceArea").style.display = 'none';
         document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
@@ -1950,6 +1963,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentLevel) {
             await loadSelectedFile(selected);
+            // 文件加载成功后，重置 Day 区域并显示
+            resetDayArea();
+            document.getElementById("dayRow").style.display = 'flex';
         }
     });
     
@@ -1961,113 +1977,96 @@ document.addEventListener('DOMContentLoaded', () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-   const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-if (saveSettingsBtn) {
-    saveSettingsBtn.addEventListener('click', () => {
-        // 获取当前 dayNum 的值（Custom Day 模式下是数字，All Words 模式下是 '--'）
-        let savedDayNum = dayNum.value;
-        
-        // 如果当前是 All Words 模式，保存 'all' 标记
-        if (daySelect.value === 'all') {
-            savedDayNum = 'all';
-        }
-        
-        const config = {
-            level: levelSelect.value,
-            file: fileSelect.value,
-            daySelect: daySelect.value,
-            dayNum: savedDayNum,
-            wordIdx: currentWordIdx,
-            sentenceIdx: currentSentenceIdx
-        };
-        localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
-        alert("Progress and settings have been saved!");
-    });
-}
-    
-    async function autoRestore() {
-    const saved = localStorage.getItem('kidsEnglish_Config_V2');
-    if (!saved) return;
-    
-    let config;
-    try {
-        config = JSON.parse(saved);
-    } catch(e) {
-        console.error("Failed to parse saved config", e);
-        return;
-    }
-    
-    // 恢复 Level
-    if (config.level) {
-        levelSelect.value = config.level;
-        currentLevel = config.level;
-        await loadFileListByLevel(config.level);
-        
-        // 恢复 File
-        if (config.file && config.file !== "" && config.file !== "Please Select") {
-            await new Promise(r => setTimeout(r, 300));
-            let optionExists = false;
-            for (let i = 0; i < fileSelect.options.length; i++) {
-                if (fileSelect.options[i].value === config.file) {
-                    optionExists = true;
-                    break;
-                }
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', () => {
+            // 获取当前 dayNum 的值
+            let savedDayNum = dayNum.value;
+            if (daySelect.value === 'all') {
+                savedDayNum = 'all';
             }
             
-            if (optionExists) {
-                fileSelect.value = config.file;
-                await loadSelectedFile(config.file);
+            const config = {
+                level: levelSelect.value,
+                file: fileSelect.value,
+                daySelect: daySelect.value,
+                dayNum: savedDayNum,
+                wordIdx: currentWordIdx,
+                sentenceIdx: currentSentenceIdx
+            };
+            localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
+            alert("Progress and settings have been saved!");
+        });
+    }
+    
+    async function autoRestore() {
+        const saved = localStorage.getItem('kidsEnglish_Config_V2');
+        if (!saved) return;
+        
+        let config;
+        try {
+            config = JSON.parse(saved);
+        } catch(e) {
+            console.error("Failed to parse saved config", e);
+            return;
+        }
+        
+        if (config.level) {
+            levelSelect.value = config.level;
+            currentLevel = config.level;
+            await loadFileListByLevel(config.level);
+            
+            if (config.file && config.file !== "" && config.file !== "Please Select") {
+                await new Promise(r => setTimeout(r, 300));
+                let optionExists = false;
+                for (let i = 0; i < fileSelect.options.length; i++) {
+                    if (fileSelect.options[i].value === config.file) {
+                        optionExists = true;
+                        break;
+                    }
+                }
                 
-                // 等待数据加载完成
-                await new Promise(r => setTimeout(r, 500));
-                
-                // 恢复 Day 筛选
-                if (config.daySelect && allWords.length > 0) {
-                    // 设置下拉菜单状态
-                    daySelect.value = config.daySelect;
+                if (optionExists) {
+                    fileSelect.value = config.file;
+                    await loadSelectedFile(config.file);
                     
-                    // 触发 change 事件来更新输入框状态
-                    daySelect.dispatchEvent(new Event('change'));
+                    await new Promise(r => setTimeout(r, 500));
                     
-                    // 设置 dayNum 的值
-                    if (config.daySelect === 'custom') {
-                        // Custom Day 模式：需要恢复数字
-                        if (config.dayNum && config.dayNum !== 'all' && config.dayNum !== '--') {
-                            dayNum.value = config.dayNum;
+                    if (config.daySelect && allWords.length > 0) {
+                        daySelect.value = config.daySelect;
+                        daySelect.dispatchEvent(new Event('change'));
+                        
+                        if (config.daySelect === 'custom') {
+                            if (config.dayNum && config.dayNum !== 'all' && config.dayNum !== '--') {
+                                dayNum.value = config.dayNum;
+                            } else {
+                                dayNum.value = '1';
+                            }
                         } else {
-                            dayNum.value = '1';
+                            dayNum.value = '--';
                         }
-                    } else {
-                        // All Words 模式
-                        dayNum.value = '--';
-                    }
-                    
-                    // 执行筛选
-                    filterByDay();
-                    
-                    // 等待筛选完成后再恢复索引
-                    await new Promise(r => setTimeout(r, 200));
-                    
-                    // 恢复单词索引
-                    if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
-                        currentWordIdx = config.wordIdx;
-                        showWord();
-                    } else if (filteredWords.length > 0) {
-                        // 如果保存的索引无效，从第一个开始
-                        currentWordIdx = 0;
-                        showWord();
-                    }
-                    
-                    // 恢复句子索引
-                    if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
-                        currentSentenceIdx = config.sentenceIdx;
-                        updateSentenceUI();
+                        
+                        filterByDay();
+                        
+                        await new Promise(r => setTimeout(r, 200));
+                        
+                        if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
+                            currentWordIdx = config.wordIdx;
+                            showWord();
+                        } else if (filteredWords.length > 0) {
+                            currentWordIdx = 0;
+                            showWord();
+                        }
+                        
+                        if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
+                            currentSentenceIdx = config.sentenceIdx;
+                            updateSentenceUI();
+                        }
                     }
                 }
             }
         }
     }
-}
     
     setTimeout(autoRestore, 800);
 });
