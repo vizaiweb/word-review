@@ -67,21 +67,6 @@
             background: white;
             height: 42px;
         }
-        .select-row button {
-            padding: 8px 18px;
-            font-size: 15px;
-            border: none;
-            border-radius: 30px;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
-            background: #3b82f6;
-        }
-        .btn-level { background: #ff4500; }
-        .btn-file { background: #0f67b3; }
-        .btn-filter { background: #2b7e3a; }
-        .select-row button:hover { opacity: 0.85; transform: scale(0.97); }
         
         /* Save 按钮样式 */
         .save-row {
@@ -94,6 +79,9 @@
             color: #ff6b35 !important;
             border: 2px solid #ff9a56 !important;
             padding: 6px 15px !important;
+            border-radius: 30px !important;
+            font-weight: bold !important;
+            cursor: pointer !important;
         }
 
         #dayRow {
@@ -117,6 +105,13 @@
         #filterBtn {
             flex-shrink: 0;
             min-width: 70px;
+            background: #2b7e3a;
+            border: none;
+            border-radius: 30px;
+            color: white;
+            padding: 8px 18px;
+            font-weight: bold;
+            cursor: pointer;
         }
         
         @media (max-width: 550px) {
@@ -336,17 +331,17 @@
         <div class="select-row" id="levelRow">
             <label>Level:</label>
             <select id="levelSelect">
-                <option value="">Select P1/P2</option>
+                <option value="">Please Select</option>
                 <option value="P1">P1</option>
                 <option value="P2">P2</option>
             </select>
-            <button class="btn-level" id="levelConfirm">Confirm</button>
         </div>
         
         <div class="select-row" id="fileRow">
             <label>File:</label>
-            <select id="fileSelect"><option>Loading...</option></select>
-            <button class="btn-file" id="fileConfirm">Confirm</button>
+            <select id="fileSelect">
+                <option value="">Please Select</option>
+            </select>
         </div>
         
         <div class="select-row" id="dayRow" style="display:none;">
