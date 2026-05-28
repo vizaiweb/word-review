@@ -1898,21 +1898,30 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const showAllBtn = document.getElementById('showAllBtn');
     const levelSelect = document.getElementById('levelSelect');
-    const levelConfirm = document.getElementById('levelConfirm');
     const fileSelect = document.getElementById('fileSelect');
-    const fileConfirm = document.getElementById('fileConfirm');
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
     const filterBtn = document.getElementById('filterBtn');
     
-    levelConfirm.addEventListener('click', function() {
-        this.style.opacity = '0.7';
-        setTimeout(() => this.style.opacity = '1', 200);
+    // Level 下拉菜单：选择后立即生效
+    levelSelect.addEventListener('change', function() {
         stopAllReading();
         
         const level = levelSelect.value;
         if (!level) {
-            alert('Please select P1 or P2 first!');
+            // 清空文件下拉菜单
+            fileSelect.innerHTML = '<option value="">Please Select</option>';
+            // 清空显示区域
+            document.getElementById("sentenceArea").style.display = 'none';
+            document.getElementById("wordContent").innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
+            document.getElementById("showAllBtn").style.display = 'none';
+            document.getElementById("infoTipContainer").innerHTML = '';
+            document.getElementById("dayRow").style.display = 'none';
+            allWords = [];
+            filteredWords = [];
+            allSentences = [];
+            currentLevel = "";
+            currentFileName = "";
             return;
         }
         
@@ -1923,25 +1932,25 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("wordContent").innerHTML = '<p>✅ Level selected, choose a file.</p>';
         document.getElementById("showAllBtn").style.display = 'none';
         document.getElementById("infoTipContainer").innerHTML = '';
+        document.getElementById("dayRow").style.display = 'none';
         
         allWords = [];
         filteredWords = [];
         allSentences = [];
     });
     
-    fileConfirm.addEventListener('click', async function() {
-        this.style.opacity = '0.7';
-        setTimeout(() => this.style.opacity = '1', 200);
-        
+    // File 下拉菜单：选择后立即生效
+    fileSelect.addEventListener('change', async function() {
         const selected = fileSelect.value;
-        const invalid = ["", "Loading...", "No files available", "Load failed"];
+        const invalid = ["", "Please Select", "Loading...", "No files available", "Load failed"];
         
         if (invalid.includes(selected)) {
-            alert('Please select a valid file!');
             return;
         }
         
-        await loadSelectedFile(selected);
+        if (currentLevel) {
+            await loadSelectedFile(selected);
+        }
     });
     
     filterBtn.addEventListener('click', function() {
@@ -1985,7 +1994,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentLevel = config.level;
             await loadFileListByLevel(config.level);
             
-            if (config.file) {
+            if (config.file && config.file !== "Please Select") {
                 await new Promise(r => setTimeout(r, 300));
                 let optionExists = false;
                 for (let i = 0; i < fileSelect.options.length; i++) {
