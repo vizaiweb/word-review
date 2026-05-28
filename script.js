@@ -1961,73 +1961,113 @@ document.addEventListener('DOMContentLoaded', () => {
     
     showAllBtn.addEventListener('click', showAllWords);
     
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', () => {
-            const config = {
-                level: levelSelect.value,
-                file: fileSelect.value,
-                daySelect: daySelect.value,
-                dayNum: dayNum.value,
-                wordIdx: currentWordIdx,
-                sentenceIdx: currentSentenceIdx
-            };
-            localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
-            alert("Progress and settings have been saved!");
-        });
-    }
-    
-    async function autoRestore() {
-        const saved = localStorage.getItem('kidsEnglish_Config_V2');
-        if (!saved) return;
+   const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', () => {
+        // 获取当前 dayNum 的值（Custom Day 模式下是数字，All Words 模式下是 '--'）
+        let savedDayNum = dayNum.value;
         
-        let config;
-        try {
-            config = JSON.parse(saved);
-        } catch(e) {
-            console.error("Failed to parse saved config", e);
-            return;
+        // 如果当前是 All Words 模式，保存 'all' 标记
+        if (daySelect.value === 'all') {
+            savedDayNum = 'all';
         }
         
-        if (config.level) {
-            levelSelect.value = config.level;
-            currentLevel = config.level;
-            await loadFileListByLevel(config.level);
-            
-            if (config.file && config.file !== "Please Select") {
-                await new Promise(r => setTimeout(r, 300));
-                let optionExists = false;
-                for (let i = 0; i < fileSelect.options.length; i++) {
-                    if (fileSelect.options[i].value === config.file) {
-                        optionExists = true;
-                        break;
-                    }
+        const config = {
+            level: levelSelect.value,
+            file: fileSelect.value,
+            daySelect: daySelect.value,
+            dayNum: savedDayNum,
+            wordIdx: currentWordIdx,
+            sentenceIdx: currentSentenceIdx
+        };
+        localStorage.setItem('kidsEnglish_Config_V2', JSON.stringify(config));
+        alert("Progress and settings have been saved!");
+    });
+}
+    
+    async function autoRestore() {
+    const saved = localStorage.getItem('kidsEnglish_Config_V2');
+    if (!saved) return;
+    
+    let config;
+    try {
+        config = JSON.parse(saved);
+    } catch(e) {
+        console.error("Failed to parse saved config", e);
+        return;
+    }
+    
+    // 恢复 Level
+    if (config.level) {
+        levelSelect.value = config.level;
+        currentLevel = config.level;
+        await loadFileListByLevel(config.level);
+        
+        // 恢复 File
+        if (config.file && config.file !== "" && config.file !== "Please Select") {
+            await new Promise(r => setTimeout(r, 300));
+            let optionExists = false;
+            for (let i = 0; i < fileSelect.options.length; i++) {
+                if (fileSelect.options[i].value === config.file) {
+                    optionExists = true;
+                    break;
                 }
+            }
+            
+            if (optionExists) {
+                fileSelect.value = config.file;
+                await loadSelectedFile(config.file);
                 
-                if (optionExists) {
-                    fileSelect.value = config.file;
-                    await loadSelectedFile(config.file);
+                // 等待数据加载完成
+                await new Promise(r => setTimeout(r, 500));
+                
+                // 恢复 Day 筛选
+                if (config.daySelect && allWords.length > 0) {
+                    // 设置下拉菜单状态
+                    daySelect.value = config.daySelect;
                     
-                    if (config.daySelect) {
-                        daySelect.value = config.daySelect;
-                        dayNum.value = config.dayNum;
-                        daySelect.dispatchEvent(new Event('change'));
-                        filterByDay();
-                        
-                        if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
-                            currentWordIdx = config.wordIdx;
-                            showWord();
+                    // 触发 change 事件来更新输入框状态
+                    daySelect.dispatchEvent(new Event('change'));
+                    
+                    // 设置 dayNum 的值
+                    if (config.daySelect === 'custom') {
+                        // Custom Day 模式：需要恢复数字
+                        if (config.dayNum && config.dayNum !== 'all' && config.dayNum !== '--') {
+                            dayNum.value = config.dayNum;
+                        } else {
+                            dayNum.value = '1';
                         }
-                        
-                        if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
-                            currentSentenceIdx = config.sentenceIdx;
-                            updateSentenceUI();
-                        }
+                    } else {
+                        // All Words 模式
+                        dayNum.value = '--';
+                    }
+                    
+                    // 执行筛选
+                    filterByDay();
+                    
+                    // 等待筛选完成后再恢复索引
+                    await new Promise(r => setTimeout(r, 200));
+                    
+                    // 恢复单词索引
+                    if (config.wordIdx !== undefined && filteredWords[config.wordIdx]) {
+                        currentWordIdx = config.wordIdx;
+                        showWord();
+                    } else if (filteredWords.length > 0) {
+                        // 如果保存的索引无效，从第一个开始
+                        currentWordIdx = 0;
+                        showWord();
+                    }
+                    
+                    // 恢复句子索引
+                    if (config.sentenceIdx !== undefined && allSentences[config.sentenceIdx]) {
+                        currentSentenceIdx = config.sentenceIdx;
+                        updateSentenceUI();
                     }
                 }
             }
         }
     }
+}
     
     setTimeout(autoRestore, 800);
 });
