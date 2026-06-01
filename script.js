@@ -674,13 +674,23 @@ function showWord() {
         };
     }
     
+    // 单词显示/隐藏切换状态
+    let isWordVisible = false;
+    const wordSpan = document.getElementById("currentWordSpan");
+    
     const showBtn = document.getElementById("btnShowWord");
     if (showBtn) {
         showBtn.onclick = () => {
-            const span = document.getElementById("currentWordSpan");
-            if (span) {
-                span.style.display = "block";
-                console.log('显示单词区域');
+            if (isWordVisible) {
+                // 隐藏单词
+                wordSpan.style.display = "none";
+                showBtn.textContent = "👀 Show Word";
+                isWordVisible = false;
+            } else {
+                // 显示单词
+                wordSpan.style.display = "block";
+                showBtn.textContent = "🙈 Hide Word";
+                isWordVisible = true;
             }
         };
     }
@@ -763,7 +773,17 @@ function updateSentenceStats() {
 
 function showCurrentSentence() {
     const hiddenSpan = document.getElementById("sentenceEnHidden");
-    if (hiddenSpan) hiddenSpan.style.display = "block";
+    if (hiddenSpan) {
+        if (hiddenSpan.style.display === "none" || hiddenSpan.style.display === "") {
+            hiddenSpan.style.display = "block";
+            const showBtn = document.getElementById("showSentenceBtn");
+            if (showBtn) showBtn.textContent = "🙈 Hide Sentence";
+        } else {
+            hiddenSpan.style.display = "none";
+            const showBtn = document.getElementById("showSentenceBtn");
+            if (showBtn) showBtn.textContent = "📖 Show Sentence";
+        }
+    }
 }
 
 function prevSentence() {
@@ -771,6 +791,11 @@ function prevSentence() {
         currentSentenceIdx--;
         updateSentenceUI();
         stopAllReading();
+        // 重置句子显示状态为隐藏
+        const hiddenSpan = document.getElementById("sentenceEnHidden");
+        const showBtn = document.getElementById("showSentenceBtn");
+        if (hiddenSpan) hiddenSpan.style.display = "none";
+        if (showBtn) showBtn.textContent = "📖 Show Sentence";
     }
 }
 
@@ -779,6 +804,11 @@ function nextSentence() {
         currentSentenceIdx++;
         updateSentenceUI();
         stopAllReading();
+        // 重置句子显示状态为隐藏
+        const hiddenSpan = document.getElementById("sentenceEnHidden");
+        const showBtn = document.getElementById("showSentenceBtn");
+        if (hiddenSpan) hiddenSpan.style.display = "none";
+        if (showBtn) showBtn.textContent = "📖 Show Sentence";
     } else if (allSentences.length) {
         alert("🎉 You've completed all sentences!");
     }
@@ -791,7 +821,11 @@ function attachSentenceEvents() {
     const nextBtn = document.getElementById("nextSentenceBtn");
     const allBtn = document.getElementById("showAllSentencesBtn");
     
-    if (showBtn) showBtn.onclick = () => showCurrentSentence();
+    if (showBtn) {
+        showBtn.onclick = () => {
+            showCurrentSentence();
+        };
+    }
     if (readBtn) {
         readBtn.onclick = () => {
             const currentSent = allSentences[currentSentenceIdx];
