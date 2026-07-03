@@ -1,4 +1,4 @@
-// 全局状态变量
+// ====================== 全局狀態變量 ======================
 let allWords = [];          
 let filteredWords = [];     
 let currentWordIdx = 0;     
@@ -11,7 +11,7 @@ let currentFileNameForSentences = "";
 
 const synth = window.speechSynthesis;
 
-// 英文朗读相关变量
+// 英文朗讀相關變量
 let isWordReading = false;
 let isSentenceReading = false;
 let currentWordReadButton = null;
@@ -20,12 +20,12 @@ let currentWordText = "";
 let currentSentenceText = "";
 let currentReadCount = 0;
 
-// 粤语朗读相关变量
+// 粵語朗讀相關變量
 let isCantoneseReading = false;
 let currentCantoneseButton = null;
 let currentCantoneseText = "";
 
-// ====================== 动态分支路径工具 ======================
+// ====================== 動態分支路徑工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
         return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
@@ -38,7 +38,7 @@ function getRawBaseUrl() {
     return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
 }
 
-// ====================== 工具函数 ======================
+// ====================== 工具函數 ======================
 function removeFileExtension(filename) {
     return filename.replace(/\.xlsx$/i, '');
 }
@@ -75,7 +75,6 @@ function initDaySelectToggle() {
     updateDayInputState();
 }
 
-// 重置 Day 区域的函数
 function resetDayArea() {
     const daySelect = document.getElementById('daySelect');
     const dayNum = document.getElementById('dayNum');
@@ -85,7 +84,7 @@ function resetDayArea() {
     }
 }
 
-// ====================== 英文语音模块 ======================
+// ====================== 英文語音模塊 ======================
 function getAvailableVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -298,7 +297,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 粤语语音模块 ======================
+// ====================== 粵語語音模塊 ======================
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -438,7 +437,7 @@ function toggleCantoneseReading(text, buttonElement) {
     startCantoneseReading(text, buttonElement);
 }
 
-// 预热语音引擎
+// 預熱語音引擎
 function preheatVoice() {
     ensureVoiceEngine(function() {
         console.log('English voice engine ready');
@@ -452,7 +451,7 @@ setTimeout(function() {
     preheatVoice();
 }, 1000);
 
-// ====================== 数据加载逻辑 ======================
+// ====================== 數據加載邏輯 ======================
 async function loadFileListByLevel(level) {
     const fileSelect = document.getElementById('fileSelect');
     const fileRow = document.getElementById('fileRow');
@@ -473,7 +472,6 @@ async function loadFileListByLevel(level) {
             return;
         }
         
-        // 添加默认的 "Please Select" 选项
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'Please Select';
@@ -486,10 +484,8 @@ async function loadFileListByLevel(level) {
             fileSelect.appendChild(option);
         });
         
-        // 强制将 File 下拉菜单的选中值设为空
         fileSelect.value = '';
         
-        // 清除已加载的数据（切换 Level 时重置所有内容）
         allWords = [];
         filteredWords = [];
         allSentences = [];
@@ -511,7 +507,7 @@ async function loadFileListByLevel(level) {
         
     } catch (e) {
         fileSelect.innerHTML = '<option value="">Load failed</option>';
-        console.error("文件列表加载失败:", e);
+        console.error("文件列表加載失敗:", e);
     }
 }
 
@@ -525,8 +521,8 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
             word: String(item.word).trim(),
             meaning: String(item.meaning).trim(),
             day: Number(item.day),
-            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音标 || null,
-            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音节 || item.音节划分 || null
+            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
+            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
         }));
         
         filteredWords = [...allWords];
@@ -605,7 +601,7 @@ async function loadSelectedFile(filename) {
     }
 }
 
-// ====================== 筛选与导航逻辑 ======================
+// ====================== 篩選與導航邏輯 ======================
 function filterByDay() {
     stopAllReading();
     const daySelect = document.getElementById('daySelect');
@@ -765,7 +761,7 @@ function updateInfoTip() {
     }
 }
 
-// ====================== 句子相关功能 ======================
+// ====================== 句子相關功能 ======================
 function updateSentenceUI() {
     if (!allSentences.length) return;
     
@@ -862,7 +858,7 @@ function attachSentenceEvents() {
     if (allBtn) allBtn.onclick = () => showAllSentencesPopup();
 }
 
-// ====================== 辅助函数 ======================
+// ====================== 輔助函數 ======================
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, function(m) {
@@ -888,7 +884,7 @@ function stopAllReading() {
     }
 }
 
-// ====================== Show All Words 弹窗（修复版） ======================
+// ====================== Show All Words 彈窗 ======================
 let wordsAutoPlayState = {
     isPlaying: false,
     isPaused: false,
@@ -1284,7 +1280,10 @@ function switchWordsPlayMode() {
 }
 
 function showAllWords() {
-    if (allWords.length === 0) return;
+    if (allWords.length === 0) {
+        alert('No words loaded. Please select a file first.');
+        return;
+    }
     
     const fileNice = removeFileExtension(currentFileName);
     let tableRows = '';
@@ -1407,7 +1406,7 @@ function showAllWords() {
     }
 }
 
-// ====================== Show All Sentences 弹窗 ======================
+// ====================== Show All Sentences 彈窗 ======================
 let sentencesAutoPlayState = {
     isPlaying: false,
     isPaused: false,
@@ -1803,7 +1802,10 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
-    if (!allSentences.length) return;
+    if (!allSentences.length) {
+        alert('No sentences loaded. Please select a file first.');
+        return;
+    }
     
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
@@ -1926,27 +1928,40 @@ function showAllSentencesPopup() {
     }
 }
 
-// ====================== 事件绑定与初始化 ======================
+// ====================== 事件綁定與初始化 ======================
 function bindEvents() {
     const levelSelect = document.getElementById('levelSelect');
     const fileSelect = document.getElementById('fileSelect');
     const filterBtn = document.getElementById('filterBtn');
     const saveBtn = document.getElementById('saveSettingsBtn');
+    const showAllBtn = document.getElementById('showAllBtn');
+    const showAllSentencesBtn = document.getElementById('showAllSentencesBtn');
     
-    levelSelect.addEventListener('change', async (e) => {
-        const level = e.target.value;
-        if (!level) return;
-        currentLevel = level;
-        await loadFileListByLevel(level);
-    });
+    // Level 選擇事件
+    if (levelSelect) {
+        levelSelect.addEventListener('change', async (e) => {
+            const level = e.target.value;
+            if (!level) return;
+            currentLevel = level;
+            await loadFileListByLevel(level);
+        });
+    }
     
-    fileSelect.addEventListener('change', async (e) => {
-        const filename = e.target.value;
-        if (!filename || !currentLevel) return;
-        await loadSelectedFile(filename);
-    });
+    // File 選擇事件
+    if (fileSelect) {
+        fileSelect.addEventListener('change', async (e) => {
+            const filename = e.target.value;
+            if (!filename || !currentLevel) return;
+            await loadSelectedFile(filename);
+        });
+    }
     
-    if (filterBtn) filterBtn.addEventListener('click', filterByDay);
+    // Filter 按鈕
+    if (filterBtn) {
+        filterBtn.addEventListener('click', filterByDay);
+    }
+    
+    // Save 按鈕
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             localStorage.setItem('savedLevel', currentLevel);
@@ -1955,6 +1970,23 @@ function bindEvents() {
         });
     }
     
+    // Show All Words 按鈕（主要修復點）
+    if (showAllBtn) {
+        showAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            showAllWords();
+        });
+    }
+    
+    // Show All Sentences 按鈕
+    if (showAllSentencesBtn) {
+        showAllSentencesBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            showAllSentencesPopup();
+        });
+    }
+    
+    // 加載保存的設定
     const savedLevel = localStorage.getItem('savedLevel');
     const savedFile = localStorage.getItem('savedFile');
     if (savedLevel && savedFile) {
@@ -1967,9 +1999,13 @@ function bindEvents() {
     }
 }
 
+// ====================== 初始化 ======================
 function init() {
     initDaySelectToggle();
     bindEvents();
+    console.log('✅ App initialized successfully');
+    console.log('✅ showAllWords function available:', typeof showAllWords === 'function');
 }
 
+// 啟動
 init();
