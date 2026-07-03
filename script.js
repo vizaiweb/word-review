@@ -519,6 +519,7 @@ async function loadFileListByLevel(level) {
             return;
         }
         
+        // 添加默認的 "Please Select" 選項
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'Please Select';
@@ -531,8 +532,10 @@ async function loadFileListByLevel(level) {
             fileSelect.appendChild(option);
         });
         
+        // 強制將 File 下拉菜單的選中值設為空
         fileSelect.value = '';
         
+        // 清除已加載的數據（切換 Level 時重置所有內容）
         allWords = [];
         filteredWords = [];
         allSentences = [];
