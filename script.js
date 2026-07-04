@@ -17,11 +17,6 @@ let currentSentenceReadButton = null;
 let currentSentenceText = "";
 let currentReadCount = 0;
 
-// 粵語朗讀相關變量
-let isCantoneseReading = false;
-let currentCantoneseButton = null;
-let currentCantoneseText = "";
-
 // ====================== 動態分支路徑工具 ======================
 function getRawBaseUrl() {
     if (window.location.protocol === 'file:') {
@@ -96,13 +91,11 @@ function getAvailableVoice() {
 let voiceEngineReady = false;
 
 function ensureVoiceEngine(callback) {
-    // 如果引擎已就緒且空閒，直接執行
     if (voiceEngineReady && !synth.speaking) {
         if (callback) callback();
         return true;
     }
     
-    // 如果引擎忙，等待 100ms 後重試
     if (synth.speaking) {
         console.log('⏳ Speech engine busy, waiting...');
         setTimeout(() => {
@@ -111,7 +104,6 @@ function ensureVoiceEngine(callback) {
         return false;
     }
     
-    // 引擎未就緒，嘗試初始化
     try {
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0;
@@ -163,7 +155,6 @@ function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
         return;
     }
     
-    // 如果語音引擎正在播放其他內容，等待 100ms 後重試
     if (synth.speaking && retryCount < 3) {
         console.log('⏳ Speech engine busy, retrying...', retryCount + 1);
         setTimeout(() => {
@@ -172,7 +163,6 @@ function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
         return;
     }
     
-    // 超過重試次數，強制取消並繼續
     if (retryCount >= 3) {
         console.warn('⚠️ Max retries exceeded, forcing continue');
         try { synth.cancel(); } catch(e) {}
@@ -192,7 +182,6 @@ function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
     let ended = false;
     let timeoutId = null;
     
-    // 設置超時保護
     timeoutId = setTimeout(() => {
         if (!ended) {
             console.warn('⚠️ Speech timeout for:', text);
@@ -235,7 +224,6 @@ function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
 function readWordOnly(word) {
     if (!word) return;
     
-    // 停止所有其他朗讀（包括句子朗讀）
     stopAllReading();
     
     let readCount = 0;
@@ -322,7 +310,7 @@ function toggleSentenceReading(sentenceText, buttonElement) {
     startSentenceReading(sentenceText, buttonElement);
 }
 
-// ====================== 粵語語音模塊 ======================
+// ====================== 粵語語音模塊（已移除 Stop 功能） ======================
 function getCantoneseVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
@@ -421,45 +409,30 @@ function speakCantoneseOnce(text, onEnd) {
     }
 }
 
+// ===== 不可中斷的粵語朗讀函數 =====
+function playCantoneseOnly(text) {
+    if (!text) return;
+    
+    stopAllReading();
+    
+    console.log('🔊 Playing Cantonese:', text);
+    
+    speakCantoneseOnce(text, () => {
+        console.log('✅ Cantonese reading completed:', text);
+    });
+}
+
+// 保留舊函數名稱以維持相容性（但移除 Stop 功能）
 function startCantoneseReading(text, buttonElement) {
-    if (isCantoneseReading && currentCantoneseText === text && currentCantoneseButton === buttonElement) {
-        stopCantoneseReading();
-        return;
-    }
-    
-    stopCantoneseReading();
-    
-    currentCantoneseText = text;
-    currentCantoneseButton = buttonElement;
-    isCantoneseReading = true;
-    
-    buttonElement.textContent = "⏹️停";
-    buttonElement.style.opacity = "0.6";
-    
-    function beginReading() {
-        if (!isCantoneseReading) return;
-        speakCantoneseOnce(text, () => {
-            stopCantoneseReading();
-        });
-    }
-    
-    ensureCantoneseEngine(beginReading);
+    playCantoneseOnly(text);
 }
 
 function stopCantoneseReading() {
-    if (!isCantoneseReading) return;
-    isCantoneseReading = false;
-    
-    if (currentCantoneseButton) {
-        currentCantoneseButton.textContent = "🔊粵 1x";
-        currentCantoneseButton.style.opacity = "1";
-        currentCantoneseButton = null;
-    }
-    currentCantoneseText = "";
+    console.log('ℹ️ Cantonese reading is non-interruptible');
 }
 
 function toggleCantoneseReading(text, buttonElement) {
-    startCantoneseReading(text, buttonElement);
+    playCantoneseOnly(text);
 }
 
 // 預熱語音引擎
@@ -718,7 +691,8 @@ function showWord() {
     const cantoneseBtn = document.getElementById("readCantoneseBtn");
     if (cantoneseBtn) {
         cantoneseBtn.onclick = () => {
-            toggleCantoneseReading(w.meaning, cantoneseBtn);
+            preheatVoice();
+            playCantoneseOnly(w.meaning);
         };
     }
     
@@ -740,7 +714,6 @@ function showWord() {
         };
     }
     
-    // 單詞朗讀按鈕直接調用不可中斷的朗讀函數
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
         readBtn.onclick = () => {
@@ -898,13 +871,8 @@ function escapeHtml(str) {
 function stopAllReading() {
     console.log('⏹️ Stopping all reading');
     
-    // 停止句子朗讀（保留 Stop 功能）
     stopSentenceReading();
     
-    // 停止粵語朗讀
-    stopCantoneseReading();
-    
-    // 取消所有正在播放的語音
     try { 
         synth.cancel(); 
         console.log('✅ Speech synthesis cancelled');
@@ -912,7 +880,6 @@ function stopAllReading() {
         console.warn('Failed to cancel speech:', e);
     }
     
-    // 清理所有計時器
     if (window.wordsAutoPlayInterval) {
         clearTimeout(window.wordsAutoPlayInterval);
         window.wordsAutoPlayInterval = null;
@@ -1841,7 +1808,6 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
-    // ===== 1. 防止重复调用 =====
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.focus();
