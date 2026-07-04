@@ -1807,6 +1807,14 @@ function showAllSentencesPopup() {
         return;
     }
     
+    // 如果已經有彈窗開啟且未被關閉，先將其關閉
+    if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
+        try {
+            sentencesAutoPlayState.playWindow.close();
+        } catch(e) {}
+        sentencesAutoPlayState.playWindow = null;
+    }
+    
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -1883,6 +1891,7 @@ function showAllSentencesPopup() {
     
     const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
     if (newWindow) {
+        // 儲存彈窗參照
         sentencesAutoPlayState.playWindow = newWindow;
         sentencesAutoPlayState.totalCount = allSentences.length;
         sentencesAutoPlayState.mode = 'sequential';
@@ -1894,6 +1903,27 @@ function showAllSentencesPopup() {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
         
+        // ===== 關鍵修復：正確的 onbeforeunload =====
+        // 只做清理工作，絕對不呼叫 showAllSentencesPopup() 或其他會開啟視窗的函數
+        newWindow.onbeforeunload = function() {
+            // 清除計時器
+            if (sentencesAutoPlayState.timeoutId) {
+                clearTimeout(sentencesAutoPlayState.timeoutId);
+                sentencesAutoPlayState.timeoutId = null;
+            }
+            // 重置播放狀態
+            sentencesAutoPlayState.isPlaying = false;
+            sentencesAutoPlayState.isPaused = false;
+            sentencesAutoPlayState.playedIndices = [];
+            sentencesAutoPlayState.remainingIndices = [];
+            sentencesAutoPlayState.currentIndex = 0;
+            // 清除彈窗參照（重要！）
+            sentencesAutoPlayState.playWindow = null;
+            // 停止語音
+            try { synth.cancel(); } catch(e) {}
+        };
+        
+        // 綁定按鈕事件
         setTimeout(() => {
             try {
                 const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
@@ -1901,28 +1931,29 @@ function showAllSentencesPopup() {
                 const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
                 
                 if (playBtn) {
-                    playBtn.onclick = () => {
+                    playBtn.onclick = function() {
+                        // 確保在彈窗關閉時不會觸發額外行為
+                        if (newWindow.closed) return;
                         toggleSentencesAutoPlay();
                     };
                 }
                 if (stopBtn) {
-                    stopBtn.onclick = () => {
+                    stopBtn.onclick = function() {
+                        if (newWindow.closed) return;
                         stopSentencesAutoPlay();
                     };
                 }
                 if (modeSwitch) {
-                    modeSwitch.onclick = () => {
+                    modeSwitch.onclick = function() {
+                        if (newWindow.closed) return;
                         switchSentencesPlayMode();
                     };
                 }
-                
-                newWindow.onbeforeunload = () => {
-                    if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
-                    sentencesAutoPlayState.isPlaying = false;
-                    sentencesAutoPlayState.isPaused = false;
-                };
-            } catch(e) {}
+            } catch(e) {
+                console.warn('Error binding sentence popup events:', e);
+            }
         }, 100);
+        
     } else {
         alert("Popup blocked. Please allow popups for this site.");
     }
