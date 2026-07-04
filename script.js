@@ -1802,14 +1802,13 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
-    // ===== 1. 立即檢查數據 =====
+    // ===== 1. 数据检查 =====
     if (!allSentences.length) {
         alert('No sentences loaded. Please select a file first.');
         return;
     }
     
-    // ===== 2. 即時開啟彈窗（解決 Chrome 攔截問題） =====
-    // 如果已經有彈窗開啟，先關閉舊的
+    // ===== 2. 关闭已存在的弹窗 =====
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.close();
@@ -1817,13 +1816,14 @@ function showAllSentencesPopup() {
         sentencesAutoPlayState.playWindow = null;
     }
 
+    // ===== 3. 立即开启弹窗（解决 Chrome 拦截问题） =====
     const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
     if (!newWindow) {
         alert("Popup blocked. Please allow popups for this site.");
         return;
     }
 
-    // ===== 3. 準備數據（HTML 生成） =====
+    // ===== 4. 准备数据（生成 HTML 字符串） =====
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -1843,7 +1843,7 @@ function showAllSentencesPopup() {
         <meta charset="UTF-8">
         <title>All Sentences - ${currentLevel}</title>
         <style>
-            /* ===== 完整樣式（與您原版保持一致） ===== */
+            /* 样式与您的原版保持一致，此处省略，请复制您原有的完整样式 */
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
             .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -1899,7 +1899,7 @@ function showAllSentencesPopup() {
     </body>
     </html>`;
 
-    // ===== 4. 同步寫入內容（解決視覺閃爍問題） =====
+    // ===== 5. 写入 HTML 内容（此时窗口为空白，写入后立即显示完整内容） =====
     try {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
@@ -1910,57 +1910,61 @@ function showAllSentencesPopup() {
         return;
     }
 
-    // ===== 5. 儲存狀態並綁定事件（移除 setTimeout） =====
-    sentencesAutoPlayState.playWindow = newWindow;
-    sentencesAutoPlayState.totalCount = allSentences.length;
-    sentencesAutoPlayState.mode = 'sequential';
-    sentencesAutoPlayState.isPlaying = false;
-    sentencesAutoPlayState.isPaused = false;
-    sentencesAutoPlayState.playedIndices = [];
-    sentencesAutoPlayState.remainingIndices = [];
-
-    // 設置窗口關閉時的清理邏輯（解決 Safari 重複彈窗問題）
-    newWindow.onbeforeunload = function() {
-        if (sentencesAutoPlayState.timeoutId) {
-            clearTimeout(sentencesAutoPlayState.timeoutId);
-            sentencesAutoPlayState.timeoutId = null;
-        }
+    // ===== 6. 关键优化：将所有状态更新和事件绑定统一放在 setTimeout 中 =====
+    // 模仿 showAllWords 的做法，确保所有后续操作在 DOM 完全渲染后执行，避免视觉闪烁
+    setTimeout(() => {
+        // --- 6a. 更新全局状态 ---
+        sentencesAutoPlayState.playWindow = newWindow;
+        sentencesAutoPlayState.totalCount = allSentences.length;
+        sentencesAutoPlayState.mode = 'sequential';
         sentencesAutoPlayState.isPlaying = false;
         sentencesAutoPlayState.isPaused = false;
         sentencesAutoPlayState.playedIndices = [];
         sentencesAutoPlayState.remainingIndices = [];
-        sentencesAutoPlayState.currentIndex = 0;
-        sentencesAutoPlayState.playWindow = null;
-        try { synth.cancel(); } catch(e) {}
-    };
 
-    // 同步綁定按鈕事件
-    try {
-        const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
-        const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
-        const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
-        
-        if (playBtn) {
-            playBtn.onclick = function() {
-                if (newWindow.closed) return;
-                toggleSentencesAutoPlay();
-            };
+        // --- 6b. 设置窗口关闭时的清理逻辑（解决 Safari 重复弹窗问题） ---
+        newWindow.onbeforeunload = function() {
+            if (sentencesAutoPlayState.timeoutId) {
+                clearTimeout(sentencesAutoPlayState.timeoutId);
+                sentencesAutoPlayState.timeoutId = null;
+            }
+            sentencesAutoPlayState.isPlaying = false;
+            sentencesAutoPlayState.isPaused = false;
+            sentencesAutoPlayState.playedIndices = [];
+            sentencesAutoPlayState.remainingIndices = [];
+            sentencesAutoPlayState.currentIndex = 0;
+            sentencesAutoPlayState.playWindow = null;
+            try { synth.cancel(); } catch(e) {}
+        };
+
+        // --- 6c. 绑定按钮事件 ---
+        try {
+            const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
+            const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
+            const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
+            
+            if (playBtn) {
+                playBtn.onclick = function() {
+                    if (newWindow.closed) return;
+                    toggleSentencesAutoPlay();
+                };
+            }
+            if (stopBtn) {
+                stopBtn.onclick = function() {
+                    if (newWindow.closed) return;
+                    stopSentencesAutoPlay();
+                };
+            }
+            if (modeSwitch) {
+                modeSwitch.onclick = function() {
+                    if (newWindow.closed) return;
+                    switchSentencesPlayMode();
+                };
+            }
+        } catch(e) {
+            console.warn('Error binding sentence popup events:', e);
         }
-        if (stopBtn) {
-            stopBtn.onclick = function() {
-                if (newWindow.closed) return;
-                stopSentencesAutoPlay();
-            };
-        }
-        if (modeSwitch) {
-            modeSwitch.onclick = function() {
-                if (newWindow.closed) return;
-                switchSentencesPlayMode();
-            };
-        }
-    } catch(e) {
-        console.warn('Error binding sentence popup events:', e);
-    }
+    }, 100); // 使用与 showAllWords 相同的延迟时间
 }
 
 // ====================== 事件綁定與初始化 ======================
