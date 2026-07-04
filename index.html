@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Kids Word & Sentence Practice</title>
-    <!-- Excel 解析库 -->
+    <!-- Excel 解析庫 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* ====================== 全局基础样式 ====================== */
+        /* ====================== 全局基礎樣式 ====================== */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -68,7 +68,6 @@
             height: 42px;
         }
         
-        /* Save 按钮样式 */
         .save-row {
             display: flex;
             justify-content: flex-end;
@@ -82,6 +81,10 @@
             border-radius: 30px !important;
             font-weight: bold !important;
             cursor: pointer !important;
+            transition: transform 0.1s !important;
+        }
+        .save-btn:active {
+            transform: scale(0.96) !important;
         }
 
         #dayRow {
@@ -112,6 +115,10 @@
             padding: 8px 18px;
             font-weight: bold;
             cursor: pointer;
+            transition: transform 0.1s;
+        }
+        #filterBtn:active {
+            transform: scale(0.96);
         }
         
         @media (max-width: 550px) {
