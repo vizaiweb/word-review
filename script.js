@@ -11,12 +11,9 @@ let currentFileNameForSentences = "";
 
 const synth = window.speechSynthesis;
 
-// 英文朗讀相關變量
-let isWordReading = false;
+// 英文朗讀相關變量（僅用於句子朗讀，保留 Stop 功能）
 let isSentenceReading = false;
-let currentWordReadButton = null;
 let currentSentenceReadButton = null;
-let currentWordText = "";
 let currentSentenceText = "";
 let currentReadCount = 0;
 
@@ -97,44 +94,91 @@ function getAvailableVoice() {
 }
 
 let voiceEngineReady = false;
+
 function ensureVoiceEngine(callback) {
-    if (voiceEngineReady) {
+    // 如果引擎已就緒且空閒，直接執行
+    if (voiceEngineReady && !synth.speaking) {
         if (callback) callback();
         return true;
     }
     
+    // 如果引擎忙，等待 100ms 後重試
+    if (synth.speaking) {
+        console.log('⏳ Speech engine busy, waiting...');
+        setTimeout(() => {
+            ensureVoiceEngine(callback);
+        }, 200);
+        return false;
+    }
+    
+    // 引擎未就緒，嘗試初始化
     try {
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0;
         const voice = getAvailableVoice();
         if (voice) silent.voice = voice;
         
+        let initialized = false;
+        
         silent.onend = () => {
-            voiceEngineReady = true;
-            if (callback) callback();
+            if (!initialized) {
+                initialized = true;
+                voiceEngineReady = true;
+                console.log('✅ Voice engine ready');
+                if (callback) callback();
+            }
         };
         
-        synth.speak(silent);
-        setTimeout(() => {
-            if (!voiceEngineReady) {
+        silent.onerror = (err) => {
+            console.warn('Voice engine init error:', err);
+            if (!initialized) {
+                initialized = true;
                 voiceEngineReady = true;
                 if (callback) callback();
             }
-        }, 500);
+        };
+        
+        synth.speak(silent);
+        
+        setTimeout(() => {
+            if (!initialized) {
+                initialized = true;
+                voiceEngineReady = true;
+                console.log('✅ Voice engine ready (timeout)');
+                if (callback) callback();
+            }
+        }, 1000);
+        
     } catch(e) {
+        console.warn('Failed to init voice engine:', e);
         voiceEngineReady = true;
         if (callback) callback();
     }
     return false;
 }
 
-function speakOnce(text, onEnd, rate = 0.85) {
+function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
     if (!text) {
         if (onEnd) onEnd();
         return;
     }
     
-    try { synth.cancel(); } catch(e) {}
+    // 如果語音引擎正在播放其他內容，等待 100ms 後重試
+    if (synth.speaking && retryCount < 3) {
+        console.log('⏳ Speech engine busy, retrying...', retryCount + 1);
+        setTimeout(() => {
+            speakOnce(text, onEnd, rate, retryCount + 1);
+        }, 200);
+        return;
+    }
+    
+    // 超過重試次數，強制取消並繼續
+    if (retryCount >= 3) {
+        console.warn('⚠️ Max retries exceeded, forcing continue');
+        try { synth.cancel(); } catch(e) {}
+        if (onEnd) onEnd();
+        return;
+    }
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
@@ -146,92 +190,77 @@ function speakOnce(text, onEnd, rate = 0.85) {
     if (voice) utterance.voice = voice;
     
     let ended = false;
+    let timeoutId = null;
+    
+    // 設置超時保護
+    timeoutId = setTimeout(() => {
+        if (!ended) {
+            console.warn('⚠️ Speech timeout for:', text);
+            ended = true;
+            try { synth.cancel(); } catch(e) {}
+            if (onEnd) onEnd();
+        }
+    }, Math.max(3000, text.length * 120));
     
     utterance.onend = () => {
         if (!ended) {
             ended = true;
+            clearTimeout(timeoutId);
             if (onEnd) onEnd();
         }
     };
     
     utterance.onerror = (err) => {
-        console.error('Speech error:', err);
+        console.error('Speech error:', err, 'for text:', text);
         if (!ended) {
             ended = true;
+            clearTimeout(timeoutId);
             if (onEnd) onEnd();
         }
     };
     
     try { 
         synth.speak(utterance);
-        setTimeout(() => {
-            if (!ended) {
-                ended = true;
-                if (onEnd) onEnd();
-            }
-        }, Math.max(1000, text.length * 80));
     } catch(e) { 
-        if (onEnd) onEnd(); 
+        console.error('Failed to speak:', e);
+        if (!ended) {
+            ended = true;
+            clearTimeout(timeoutId);
+            if (onEnd) onEnd();
+        }
     }
 }
 
-function startWordReading(word, buttonElement) {
-    if (isWordReading && currentWordText === word && currentWordReadButton === buttonElement) {
-        stopWordReading();
-        return;
-    }
+// ===== 不可中斷的單詞朗讀函數 =====
+function readWordOnly(word) {
+    if (!word) return;
     
+    // 停止所有其他朗讀（包括句子朗讀）
     stopAllReading();
     
-    currentWordText = word;
-    currentWordReadButton = buttonElement;
-    currentReadCount = 0;
-    isWordReading = true;
-    
-    buttonElement.textContent = "⏹️ Stop";
-    buttonElement.classList.add('reading-disabled');
-    
-    function beginReading() {
-        if (!isWordReading) return;
-        speakNext();
-    }
+    let readCount = 0;
+    const maxReads = 3;
     
     function speakNext() {
-        if (!isWordReading) return;
-        if (currentReadCount >= 3) {
-            stopWordReading();
+        if (readCount >= maxReads) {
+            console.log('✅ Word reading completed:', word);
             return;
         }
         
-        currentReadCount++;
+        readCount++;
+        console.log(`🔊 Reading word ${readCount}/${maxReads}:`, word);
         
         speakOnce(word, () => {
-            if (isWordReading && currentReadCount < 3) {
-                setTimeout(speakNext, 450);
-            } else if (currentReadCount >= 3) {
-                stopWordReading();
+            if (readCount < maxReads) {
+                setTimeout(speakNext, 550);
             }
-        });
+        }, 0.85);
     }
     
-    ensureVoiceEngine(beginReading);
+    ensureVoiceEngine(speakNext);
 }
 
-function stopWordReading() {
-    if (!isWordReading) return;
-    isWordReading = false;
-    
-    try { synth.cancel(); } catch(e) {}
-    
-    if (currentWordReadButton) {
-        currentWordReadButton.textContent = "🔊 Read 3x";
-        currentWordReadButton.classList.remove('reading-disabled');
-        currentWordReadButton = null;
-    }
-    currentWordText = "";
-    currentReadCount = 0;
-}
-
+// ===== 句子朗讀（保留 Stop 功能） =====
 function startSentenceReading(sentenceText, buttonElement) {
     if (isSentenceReading && currentSentenceText === sentenceText && currentSentenceReadButton === buttonElement) {
         stopSentenceReading();
@@ -287,10 +316,6 @@ function stopSentenceReading() {
     }
     currentSentenceText = "";
     currentReadCount = 0;
-}
-
-function toggleWordReading(word, buttonElement) {
-    startWordReading(word, buttonElement);
 }
 
 function toggleSentenceReading(sentenceText, buttonElement) {
@@ -715,11 +740,12 @@ function showWord() {
         };
     }
     
+    // 單詞朗讀按鈕直接調用不可中斷的朗讀函數
     const readBtn = document.getElementById("btnReadWord");
     if (readBtn) {
         readBtn.onclick = () => {
             preheatVoice();
-            toggleWordReading(w.word, readBtn);
+            readWordOnly(w.word);
         };
     }
     
@@ -870,10 +896,23 @@ function escapeHtml(str) {
 }
 
 function stopAllReading() {
-    stopWordReading();
+    console.log('⏹️ Stopping all reading');
+    
+    // 停止句子朗讀（保留 Stop 功能）
     stopSentenceReading();
+    
+    // 停止粵語朗讀
     stopCantoneseReading();
     
+    // 取消所有正在播放的語音
+    try { 
+        synth.cancel(); 
+        console.log('✅ Speech synthesis cancelled');
+    } catch(e) {
+        console.warn('Failed to cancel speech:', e);
+    }
+    
+    // 清理所有計時器
     if (window.wordsAutoPlayInterval) {
         clearTimeout(window.wordsAutoPlayInterval);
         window.wordsAutoPlayInterval = null;
@@ -1803,34 +1842,28 @@ function switchSentencesPlayMode() {
 
 function showAllSentencesPopup() {
     // ===== 1. 防止重复调用 =====
-    // 如果已经有一个弹窗存在且未关闭，直接将其聚焦，不创建新窗口
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.focus();
-            return; // 直接返回，不再创建新窗口
+            return;
         } catch(e) {
-            // 如果无法聚焦，说明窗口已失效，继续创建新窗口
             sentencesAutoPlayState.playWindow = null;
         }
     }
     
-    // ===== 2. 数据检查 =====
     if (!allSentences.length) {
         alert('No sentences loaded. Please select a file first.');
         return;
     }
 
-    // ===== 3. 只执行一次 window.open() =====
     const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
     if (!newWindow) {
         alert("Popup blocked. Please allow popups for this site.");
         return;
     }
 
-    // ===== 4. 立即将新窗口引用存入全局状态，防止重复 =====
     sentencesAutoPlayState.playWindow = newWindow;
 
-    // ===== 5. 准备数据（生成 HTML 字符串） =====
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -1844,7 +1877,6 @@ function showAllSentencesPopup() {
         `;
     }
     
-    // ===== 6. 构建完整的 HTML =====
     const sentencesHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1901,75 +1933,11 @@ function showAllSentencesPopup() {
             </div>
         </div>
         <script>
-            // ===== 在弹窗内部完成所有初始化 =====
-            (function() {
-                // 从父窗口获取必要的数据
-                var parent = window.opener || window.parent;
-                var sentencesAutoPlayState = parent.sentencesAutoPlayState;
-                
-                // 更新状态（确保只更新一次）
-                sentencesAutoPlayState.totalCount = ${allSentences.length};
-                sentencesAutoPlayState.mode = 'sequential';
-                sentencesAutoPlayState.isPlaying = false;
-                sentencesAutoPlayState.isPaused = false;
-                sentencesAutoPlayState.playedIndices = [];
-                sentencesAutoPlayState.remainingIndices = [];
-                // 确保 playWindow 指向当前窗口
-                if (sentencesAutoPlayState.playWindow !== window) {
-                    sentencesAutoPlayState.playWindow = window;
-                }
-                
-                // 窗口关闭时的清理（只清理，不创建新窗口）
-                window.onbeforeunload = function() {
-                    // 清除计时器
-                    if (sentencesAutoPlayState.timeoutId) {
-                        clearTimeout(sentencesAutoPlayState.timeoutId);
-                        sentencesAutoPlayState.timeoutId = null;
-                    }
-                    // 重置播放状态
-                    sentencesAutoPlayState.isPlaying = false;
-                    sentencesAutoPlayState.isPaused = false;
-                    sentencesAutoPlayState.playedIndices = [];
-                    sentencesAutoPlayState.remainingIndices = [];
-                    sentencesAutoPlayState.currentIndex = 0;
-                    // 只有当 playWindow 指向当前窗口时才清除引用
-                    if (sentencesAutoPlayState.playWindow === window) {
-                        sentencesAutoPlayState.playWindow = null;
-                    }
-                    // 停止语音
-                    try { parent.synth.cancel(); } catch(e) {}
-                };
-                
-                // 获取按钮
-                var playBtn = document.getElementById('sentencesPlayBtn');
-                var stopBtn = document.getElementById('sentencesStopBtn');
-                var modeSwitch = document.getElementById('sentencesModeSwitch');
-                
-                // 绑定事件（使用父窗口的函数）
-                if (playBtn) {
-                    playBtn.onclick = function() {
-                        if (window.closed) return;
-                        parent.toggleSentencesAutoPlay();
-                    };
-                }
-                if (stopBtn) {
-                    stopBtn.onclick = function() {
-                        if (window.closed) return;
-                        parent.stopSentencesAutoPlay();
-                    };
-                }
-                if (modeSwitch) {
-                    modeSwitch.onclick = function() {
-                        if (window.closed) return;
-                        parent.switchSentencesPlayMode();
-                    };
-                }
-            })();
+            window.sentenceData = ${JSON.stringify(allSentences)};
         </script>
     </body>
     </html>`;
 
-    // ===== 7. 写入 HTML 内容 =====
     try {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
@@ -1977,7 +1945,6 @@ function showAllSentencesPopup() {
         console.error('Failed to write to popup window:', e);
         alert('Failed to display sentences. Please try again.');
         newWindow.close();
-        // 清理状态
         if (sentencesAutoPlayState.playWindow === newWindow) {
             sentencesAutoPlayState.playWindow = null;
         }
@@ -1994,7 +1961,6 @@ function bindEvents() {
     const showAllBtn = document.getElementById('showAllBtn');
     const showAllSentencesBtn = document.getElementById('showAllSentencesBtn');
     
-    // Level 選擇事件
     if (levelSelect) {
         levelSelect.addEventListener('change', async (e) => {
             const level = e.target.value;
@@ -2004,7 +1970,6 @@ function bindEvents() {
         });
     }
     
-    // File 選擇事件
     if (fileSelect) {
         fileSelect.addEventListener('change', async (e) => {
             const filename = e.target.value;
@@ -2013,12 +1978,10 @@ function bindEvents() {
         });
     }
     
-    // Filter 按鈕
     if (filterBtn) {
         filterBtn.addEventListener('click', filterByDay);
     }
     
-    // Save 按鈕
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             localStorage.setItem('savedLevel', currentLevel);
@@ -2027,7 +1990,6 @@ function bindEvents() {
         });
     }
     
-    // Show All Words 按鈕（主要修復點）
     if (showAllBtn) {
         showAllBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -2035,7 +1997,6 @@ function bindEvents() {
         });
     }
     
-    // Show All Sentences 按鈕
     if (showAllSentencesBtn) {
         showAllSentencesBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -2043,7 +2004,6 @@ function bindEvents() {
         });
     }
     
-    // 加載保存的設定
     const savedLevel = localStorage.getItem('savedLevel');
     const savedFile = localStorage.getItem('savedFile');
     if (savedLevel && savedFile) {
@@ -2056,13 +2016,10 @@ function bindEvents() {
     }
 }
 
-// ====================== 初始化 ======================
 function init() {
     initDaySelectToggle();
     bindEvents();
     console.log('✅ App initialized successfully');
-    console.log('✅ showAllWords function available:', typeof showAllWords === 'function');
 }
 
-// 啟動
 init();
