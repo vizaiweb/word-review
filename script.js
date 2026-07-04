@@ -1802,8 +1802,14 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
-    // ===== 【关键修复】将 window.open() 移到最前面，立即执行 =====
-    // 如果已经有弹窗开启且未被关闭，先将其关闭
+    // ===== 1. 立即檢查數據 =====
+    if (!allSentences.length) {
+        alert('No sentences loaded. Please select a file first.');
+        return;
+    }
+    
+    // ===== 2. 即時開啟彈窗（解決 Chrome 攔截問題） =====
+    // 如果已經有彈窗開啟，先關閉舊的
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.close();
@@ -1811,23 +1817,13 @@ function showAllSentencesPopup() {
         sentencesAutoPlayState.playWindow = null;
     }
 
-    // 立即尝试打开新窗口
     const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-    
-    // 如果弹窗被拦截，立即提示用户并退出
     if (!newWindow) {
         alert("Popup blocked. Please allow popups for this site.");
         return;
     }
 
-    // ===== 弹窗成功打开后，再执行数据检查和 HTML 生成 =====
-    if (!allSentences.length) {
-        alert('No sentences loaded. Please select a file first.');
-        newWindow.close(); // 关闭刚打开的空窗口
-        return;
-    }
-
-    // --- 以下是原有的数据准备和 HTML 生成逻辑，保持不变 ---
+    // ===== 3. 準備數據（HTML 生成） =====
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -1847,7 +1843,7 @@ function showAllSentencesPopup() {
         <meta charset="UTF-8">
         <title>All Sentences - ${currentLevel}</title>
         <style>
-            /* ... 样式内容与您原来保持一致 ... */
+            /* ===== 完整樣式（與您原版保持一致） ===== */
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
             .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -1903,7 +1899,7 @@ function showAllSentencesPopup() {
     </body>
     </html>`;
 
-    // ===== 将准备好的 HTML 写入已打开的窗口 =====
+    // ===== 4. 同步寫入內容（解決視覺閃爍問題） =====
     try {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
@@ -1914,7 +1910,7 @@ function showAllSentencesPopup() {
         return;
     }
 
-    // ===== 存储窗口引用并绑定事件（逻辑不变） =====
+    // ===== 5. 儲存狀態並綁定事件（移除 setTimeout） =====
     sentencesAutoPlayState.playWindow = newWindow;
     sentencesAutoPlayState.totalCount = allSentences.length;
     sentencesAutoPlayState.mode = 'sequential';
@@ -1923,7 +1919,7 @@ function showAllSentencesPopup() {
     sentencesAutoPlayState.playedIndices = [];
     sentencesAutoPlayState.remainingIndices = [];
 
-    // 设置窗口关闭时的清理逻辑
+    // 設置窗口關閉時的清理邏輯（解決 Safari 重複彈窗問題）
     newWindow.onbeforeunload = function() {
         if (sentencesAutoPlayState.timeoutId) {
             clearTimeout(sentencesAutoPlayState.timeoutId);
@@ -1938,35 +1934,33 @@ function showAllSentencesPopup() {
         try { synth.cancel(); } catch(e) {}
     };
 
-    // 绑定按钮事件（使用 setTimeout 确保 DOM 已渲染）
-    setTimeout(() => {
-        try {
-            const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
-            const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
-            const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
-            
-            if (playBtn) {
-                playBtn.onclick = function() {
-                    if (newWindow.closed) return;
-                    toggleSentencesAutoPlay();
-                };
-            }
-            if (stopBtn) {
-                stopBtn.onclick = function() {
-                    if (newWindow.closed) return;
-                    stopSentencesAutoPlay();
-                };
-            }
-            if (modeSwitch) {
-                modeSwitch.onclick = function() {
-                    if (newWindow.closed) return;
-                    switchSentencesPlayMode();
-                };
-            }
-        } catch(e) {
-            console.warn('Error binding sentence popup events:', e);
+    // 同步綁定按鈕事件
+    try {
+        const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
+        const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
+        const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
+        
+        if (playBtn) {
+            playBtn.onclick = function() {
+                if (newWindow.closed) return;
+                toggleSentencesAutoPlay();
+            };
         }
-    }, 100);
+        if (stopBtn) {
+            stopBtn.onclick = function() {
+                if (newWindow.closed) return;
+                stopSentencesAutoPlay();
+            };
+        }
+        if (modeSwitch) {
+            modeSwitch.onclick = function() {
+                if (newWindow.closed) return;
+                switchSentencesPlayMode();
+            };
+        }
+    } catch(e) {
+        console.warn('Error binding sentence popup events:', e);
+    }
 }
 
 // ====================== 事件綁定與初始化 ======================
