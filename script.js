@@ -675,11 +675,11 @@ function showWord() {
     container.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
             <div class="meaning" style="margin-bottom: 0; flex: 1;">💡 ${w.meaning}</div>
-            <button id="readCantoneseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;">🔊粵 1x</button>
+            <button id="readCantoneseBtn" style="background: #333; color: white; border: none; border-radius: 40px; padding: 6px 12px; font-size: 13px; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s;">🔊粵 1x</button>
         </div>
         <div id="currentWordSpan" style="display: none;">${hiddenContent}</div>
         <div class="btn-group">
-            <button class="btn-show" id="btnShowWord">👀 Show Word</button>
+            <button class="btn-show" id="btnShowWord" style="transition: transform 0.1s;">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
             <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
             <button class="btn-next" id="btnNextWord">➡️ Next</button>
@@ -688,9 +688,16 @@ function showWord() {
     
     updateInfoTip();
     
+    // ===== 粵語按鈕（按下動態效果） =====
     const cantoneseBtn = document.getElementById("readCantoneseBtn");
     if (cantoneseBtn) {
         cantoneseBtn.onclick = () => {
+            // 按下縮放效果
+            cantoneseBtn.style.transform = 'scale(0.92)';
+            setTimeout(() => {
+                cantoneseBtn.style.transform = 'scale(1)';
+            }, 150);
+            
             preheatVoice();
             playCantoneseOnly(w.meaning);
         };
@@ -699,9 +706,16 @@ function showWord() {
     let isWordVisible = false;
     const wordSpan = document.getElementById("currentWordSpan");
     
+    // ===== Show Word 按鈕（按下動態效果） =====
     const showBtn = document.getElementById("btnShowWord");
     if (showBtn) {
         showBtn.onclick = () => {
+            // 按下縮放效果
+            showBtn.style.transform = 'scale(0.92)';
+            setTimeout(() => {
+                showBtn.style.transform = 'scale(1)';
+            }, 150);
+            
             if (isWordVisible) {
                 wordSpan.style.display = "none";
                 showBtn.textContent = "👀 Show Word";
