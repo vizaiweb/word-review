@@ -1837,13 +1837,14 @@ function showAllSentencesPopup() {
         `;
     }
     
+    // ===== 关键修改：在 HTML 中嵌入初始化脚本 =====
     const sentencesHtml = `<!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
         <title>All Sentences - ${currentLevel}</title>
         <style>
-            /* 样式与您的原版保持一致，此处省略，请复制您原有的完整样式 */
+            /* ===== 完整样式（与您的原版保持一致） ===== */
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
             .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -1894,12 +1895,70 @@ function showAllSentencesPopup() {
             </div>
         </div>
         <script>
-            window.sentenceData = ${JSON.stringify(allSentences)};
+            // ===== 使用 DOMContentLoaded 确保 DOM 完全加载后再执行 =====
+            document.addEventListener('DOMContentLoaded', function() {
+                // 获取父窗口的引用
+                var parent = window.opener || window.parent;
+                
+                // 从父窗口获取必要的函数和状态
+                var toggleSentencesAutoPlay = parent.toggleSentencesAutoPlay;
+                var stopSentencesAutoPlay = parent.stopSentencesAutoPlay;
+                var switchSentencesPlayMode = parent.switchSentencesPlayMode;
+                var sentencesAutoPlayState = parent.sentencesAutoPlayState;
+                
+                // 更新状态
+                sentencesAutoPlayState.playWindow = window;
+                sentencesAutoPlayState.totalCount = ${allSentences.length};
+                sentencesAutoPlayState.mode = 'sequential';
+                sentencesAutoPlayState.isPlaying = false;
+                sentencesAutoPlayState.isPaused = false;
+                sentencesAutoPlayState.playedIndices = [];
+                sentencesAutoPlayState.remainingIndices = [];
+                
+                // 设置窗口关闭时的清理逻辑
+                window.onbeforeunload = function() {
+                    if (sentencesAutoPlayState.timeoutId) {
+                        clearTimeout(sentencesAutoPlayState.timeoutId);
+                        sentencesAutoPlayState.timeoutId = null;
+                    }
+                    sentencesAutoPlayState.isPlaying = false;
+                    sentencesAutoPlayState.isPaused = false;
+                    sentencesAutoPlayState.playedIndices = [];
+                    sentencesAutoPlayState.remainingIndices = [];
+                    sentencesAutoPlayState.currentIndex = 0;
+                    sentencesAutoPlayState.playWindow = null;
+                    try { parent.synth.cancel(); } catch(e) {}
+                };
+                
+                // 绑定按钮事件
+                var playBtn = document.getElementById('sentencesPlayBtn');
+                var stopBtn = document.getElementById('sentencesStopBtn');
+                var modeSwitch = document.getElementById('sentencesModeSwitch');
+                
+                if (playBtn) {
+                    playBtn.onclick = function() {
+                        if (window.closed) return;
+                        toggleSentencesAutoPlay();
+                    };
+                }
+                if (stopBtn) {
+                    stopBtn.onclick = function() {
+                        if (window.closed) return;
+                        stopSentencesAutoPlay();
+                    };
+                }
+                if (modeSwitch) {
+                    modeSwitch.onclick = function() {
+                        if (window.closed) return;
+                        switchSentencesPlayMode();
+                    };
+                }
+            });
         </script>
     </body>
     </html>`;
 
-    // ===== 5. 写入 HTML 内容（此时窗口为空白，写入后立即显示完整内容） =====
+    // ===== 5. 写入 HTML 内容（一次性完整渲染） =====
     try {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
@@ -1909,62 +1968,6 @@ function showAllSentencesPopup() {
         newWindow.close();
         return;
     }
-
-    // ===== 6. 关键优化：将所有状态更新和事件绑定统一放在 setTimeout 中 =====
-    // 模仿 showAllWords 的做法，确保所有后续操作在 DOM 完全渲染后执行，避免视觉闪烁
-    setTimeout(() => {
-        // --- 6a. 更新全局状态 ---
-        sentencesAutoPlayState.playWindow = newWindow;
-        sentencesAutoPlayState.totalCount = allSentences.length;
-        sentencesAutoPlayState.mode = 'sequential';
-        sentencesAutoPlayState.isPlaying = false;
-        sentencesAutoPlayState.isPaused = false;
-        sentencesAutoPlayState.playedIndices = [];
-        sentencesAutoPlayState.remainingIndices = [];
-
-        // --- 6b. 设置窗口关闭时的清理逻辑（解决 Safari 重复弹窗问题） ---
-        newWindow.onbeforeunload = function() {
-            if (sentencesAutoPlayState.timeoutId) {
-                clearTimeout(sentencesAutoPlayState.timeoutId);
-                sentencesAutoPlayState.timeoutId = null;
-            }
-            sentencesAutoPlayState.isPlaying = false;
-            sentencesAutoPlayState.isPaused = false;
-            sentencesAutoPlayState.playedIndices = [];
-            sentencesAutoPlayState.remainingIndices = [];
-            sentencesAutoPlayState.currentIndex = 0;
-            sentencesAutoPlayState.playWindow = null;
-            try { synth.cancel(); } catch(e) {}
-        };
-
-        // --- 6c. 绑定按钮事件 ---
-        try {
-            const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
-            const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
-            const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
-            
-            if (playBtn) {
-                playBtn.onclick = function() {
-                    if (newWindow.closed) return;
-                    toggleSentencesAutoPlay();
-                };
-            }
-            if (stopBtn) {
-                stopBtn.onclick = function() {
-                    if (newWindow.closed) return;
-                    stopSentencesAutoPlay();
-                };
-            }
-            if (modeSwitch) {
-                modeSwitch.onclick = function() {
-                    if (newWindow.closed) return;
-                    switchSentencesPlayMode();
-                };
-            }
-        } catch(e) {
-            console.warn('Error binding sentence popup events:', e);
-        }
-    }, 100); // 使用与 showAllWords 相同的延迟时间
 }
 
 // ====================== 事件綁定與初始化 ======================
