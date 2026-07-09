@@ -516,12 +516,12 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         
         allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
-            word: String(item.word).trim(),
-            meaning: String(item.meaning).trim(),
-            day: Number(item.day),
-            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
-            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
-        }));
+    word: String(item.word).trim(),
+    meaning: String(item.meaning).trim(),
+    day: Number(item.day),
+    phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
+    syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
+}));
         
         filteredWords = [...allWords];
         currentWordIdx = 0;
@@ -1308,6 +1308,19 @@ let allWordsForQuiz = [];
 
 // ====================== Quiz 核心函數 ======================
 
+function speakFullQuestion(questionData, onComplete) {
+    const no = questionData.wordIndex + 1;
+    const explanation = questionData.explanation || '';
+    const optA = questionData.options[0] || '';
+    const optB = questionData.options[1] || '';
+    const optC = questionData.options[2] || '';
+
+    let text = `Question ${no}. ${explanation}. `;
+    text += `Option A: ${optA}. Option B: ${optB}. Option C: ${optC}.`;
+
+    speakOnce(text, onComplete, 0.85);
+}
+
 /**
  * 生成選擇題資料
  * 為每個單字生成三選一選項（1 正確 + 2 隨機錯誤）
@@ -1320,7 +1333,7 @@ function generateQuizData(words) {
     
     for (let i = 0; i < words.length; i++) {
         const correctWord = words[i].word.toUpperCase();
-        const explanation = words[i].meaning || '';
+        const explanation = words[i].englishExplanation || words[i].meaning || '';
         
         // 取得錯誤選項（從所有單字中隨機選取 2 個不同的）
         const wrongOptions = getRandomWrongOptions(words, i, 2);
@@ -1537,19 +1550,17 @@ function bindQuizEvents() {
     });
     
     // 點擊朗讀按鈕
-    document.querySelectorAll('.listen-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const index = parseInt(this.dataset.quizIndex);
-            if (!isNaN(index) && quizData[index]) {
-                const text = quizData[index].explanation;
-                if (text) {
-                    preheatVoice();
-                    speakOnce(text, null, 0.85);
-                }
-            }
-        });
+   document.querySelectorAll('.listen-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const index = parseInt(this.dataset.quizIndex);
+        if (!isNaN(index) && quizData[index]) {
+            const q = quizData[index];
+            preheatVoice();
+            speakFullQuestion(q);
+        }
     });
+});
 }
 
 /**
@@ -1853,13 +1864,39 @@ function showAllWords() {
                 }
                 return result;
             }
-            
+
+
+            function speakFullQuestionPopup(questionData) {
+    const no = questionData.wordIndex + 1;
+    const explanation = questionData.explanation || '';
+    const optA = questionData.options[0] || '';
+    const optB = questionData.options[1] || '';
+    const optC = questionData.options[2] || '';
+    
+    let text = 'Question ' + no + '. ' + explanation + '. ';
+    text += 'Option A: ' + optA + '. Option B: ' + optB + '. Option C: ' + optC + '.';
+    
+    if (window.opener && window.opener.speakOnce) {
+        window.opener.speakOnce(text, null, 0.85);
+    } else {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.85;
+        utterance.pitch = 1.0;
+        utterance.volume = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.name && v.name.includes('Google US English')) || voices.find(v => v.lang && v.lang === 'en-US') || voices[0];
+        if (voice) utterance.voice = voice;
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
             function generateQuizDataPopup(words) {
                 if (!words || words.length === 0) return [];
                 const data = [];
                 for (let i = 0; i < words.length; i++) {
                     const correctWord = words[i].word.toUpperCase();
-                    const explanation = words[i].meaning || '';
+                    const explanation = words[i].englishExplanation || words[i].meaning || '';
                     const wrongOptions = getRandomWrongOptionsPopup(words, i, 2);
                     let options = [correctWord, ...wrongOptions];
                     options = shuffleArrayPopup(options);
@@ -1987,24 +2024,15 @@ function showAllWords() {
                 });
                 
                 document.querySelectorAll('.listen-btn').forEach(btn => {
-                    btn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        const index = parseInt(this.dataset.quizIndex);
-                        if (!isNaN(index) && quizDataPopup[index]) {
-                            const text = quizDataPopup[index].explanation;
-                            if (text) {
-                                const utterance = new SpeechSynthesisUtterance(text);
-                                utterance.lang = 'en-US';
-                                utterance.rate = 0.85;
-                                utterance.pitch = 1.0;
-                                utterance.volume = 1;
-                                const voice = getAvailableVoice();
-                                if (voice) utterance.voice = voice;
-                                speechSynthesis.speak(utterance);
-                            }
-                        }
-                    });
-                });
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const index = parseInt(this.dataset.quizIndex);
+        if (!isNaN(index) && quizDataPopup[index]) {
+            const q = quizDataPopup[index];
+            speakFullQuestionPopup(q);
+        }
+    });
+});
             }
             
             function initQuizInPopup() {
