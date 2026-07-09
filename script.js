@@ -519,6 +519,7 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
     word: String(item.word).trim(),
     meaning: String(item.meaning).trim(),
     day: Number(item.day),
+    englishExplanation: String(item['English explanation'] || '').trim(),
     phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
     syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
 }));
