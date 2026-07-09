@@ -1299,6 +1299,320 @@ function switchWordsPlayMode() {
     }
 }
 
+// ====================== Quiz 相關全域變量 ======================
+let quizData = [];
+let userAnswers = {};
+let currentQuestionIdx = 0;
+let quizGenerated = false;
+let allWordsForQuiz = [];
+
+// ====================== Quiz 核心函數 ======================
+
+/**
+ * 生成選擇題資料
+ * 為每個單字生成三選一選項（1 正確 + 2 隨機錯誤）
+ */
+function generateQuizData(words) {
+    if (!words || words.length === 0) return [];
+    
+    allWordsForQuiz = words;
+    const data = [];
+    
+    for (let i = 0; i < words.length; i++) {
+        const correctWord = words[i].word.toUpperCase();
+        const explanation = words[i].meaning || '';
+        
+        // 取得錯誤選項（從所有單字中隨機選取 2 個不同的）
+        const wrongOptions = getRandomWrongOptions(words, i, 2);
+        
+        // 建立選項陣列：1 正確 + 2 錯誤
+        let options = [correctWord, ...wrongOptions];
+        
+        // 隨機打亂選項順序
+        options = shuffleArray(options);
+        
+        // 記錄正確答案的位置（A=0, B=1, C=2）
+        const correctIndex = options.indexOf(correctWord);
+        const correctLabel = String.fromCharCode(65 + correctIndex); // A, B, C
+        
+        data.push({
+            wordIndex: i,
+            word: words[i].word,
+            explanation: explanation,
+            options: options,           // ['GUDONG', 'RENAO', 'BATUIJIUPO']
+            correctLabel: correctLabel, // 'A', 'B', or 'C'
+            userAnswer: null,           // null 表示未作答
+            isCorrect: null             // null 表示未作答
+        });
+    }
+    
+    quizData = data;
+    userAnswers = {};
+    currentQuestionIdx = 0;
+    quizGenerated = true;
+    
+    return data;
+}
+
+/**
+ * 從 allWords 中隨機選取 n 個與正確答案不同的單字
+ */
+function getRandomWrongOptions(words, correctIndex, count) {
+    const correctWord = words[correctIndex].word.toUpperCase();
+    const candidates = words
+        .map((w, idx) => ({ word: w.word.toUpperCase(), idx }))
+        .filter(item => item.word !== correctWord);
+    
+    // 打亂候選清單
+    const shuffled = shuffleArray(candidates);
+    
+    // 取前 count 個，若不夠則補 '---' 佔位（實際不會發生，因為字庫通常夠大）
+    const result = shuffled.slice(0, count).map(item => item.word);
+    while (result.length < count) {
+        result.push('---');
+    }
+    return result;
+}
+
+/**
+ * 洗牌函數 (Fisher-Yates)
+ */
+function shuffleArray(arr) {
+    const shuffled = [...arr];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+/**
+ * 渲染 Quiz 表格
+ */
+function renderQuizTable() {
+    const container = document.getElementById('quizBody');
+    if (!container) return;
+    
+    if (!quizData || quizData.length === 0) {
+        container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No quiz data available. Please load a file first.</td></tr>`;
+        return;
+    }
+    
+    let html = '';
+    for (let i = 0; i < quizData.length; i++) {
+        const q = quizData[i];
+        const isCurrent = (i === currentQuestionIdx);
+        const isAnswered = (q.userAnswer !== null);
+        const answerDisplay = q.userAnswer !== null ? q.userAnswer : 'Please Select';
+        const resultDisplay = getResultDisplay(q);
+        
+        html += `
+            <tr id="quiz_row_${i}" class="${isCurrent ? 'current-row' : ''}" data-index="${i}">
+                <td class="col-no">
+                    ${isCurrent ? '<span class="current-marker">▶</span>' : ''}
+                    ${i + 1}
+                </td>
+                <td class="col-explanation">${escapeHtml(q.explanation)}</td>
+                ${q.options.map((opt, optIdx) => {
+                    const label = String.fromCharCode(65 + optIdx); // A, B, C
+                    let className = 'col-option';
+                    let extraAttr = '';
+                    
+                    if (isAnswered) {
+                        className += ' option-disabled';
+                        if (opt === q.options[q.correctLabel.charCodeAt(0) - 65]) {
+                            className += ' option-correct';
+                        }
+                        if (q.userAnswer === label && q.userAnswer !== q.correctLabel) {
+                            className += ' option-wrong';
+                        }
+                    }
+                    
+                    return `<td class="${className}" data-quiz-index="${i}" data-option-label="${label}" data-option-value="${escapeHtml(opt)}">
+                        ${escapeHtml(opt)}
+                    </td>`;
+                }).join('')}
+                <td class="col-your-answer">
+                    ${isAnswered ? escapeHtml(answerDisplay) : `<span class="not-answered">${escapeHtml(answerDisplay)}</span>`}
+                </td>
+                <td class="col-result">${resultDisplay}</td>
+                <td class="col-listen">
+                    <button class="listen-btn" data-quiz-index="${i}" title="Listen to explanation">🔊</button>
+                </td>
+            </tr>
+        `;
+    }
+    
+    container.innerHTML = html;
+    
+    // 更新統計
+    updateQuizStats();
+    
+    // 更新進度
+    updateQuizProgress();
+    
+    // 綁定事件
+    bindQuizEvents();
+}
+
+/**
+ * 取得結果顯示 (✔ 或 ✘ 或空白)
+ */
+function getResultDisplay(q) {
+    if (q.userAnswer === null) return '';
+    if (q.userAnswer === q.correctLabel) {
+        return '<span class="result-correct">✔</span>';
+    } else {
+        return '<span class="result-wrong">✘</span>';
+    }
+}
+
+/**
+ * 更新統計列
+ */
+function updateQuizStats() {
+    const total = quizData.length;
+    let answered = 0;
+    let correct = 0;
+    
+    for (const q of quizData) {
+        if (q.userAnswer !== null) {
+            answered++;
+            if (q.userAnswer === q.correctLabel) {
+                correct++;
+            }
+        }
+    }
+    
+    const rate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+    
+    const statsContainer = document.getElementById('quizStats');
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <span>Total Questions: <span class="stat-number">${total}</span></span>
+            <span>Answered: <span class="stat-number">${answered}</span></span>
+            <span>Correct Rate: <span class="stat-number">${answered > 0 ? rate + '%' : '--%'}</span></span>
+        `;
+    }
+}
+
+/**
+ * 更新進度顯示
+ */
+function updateQuizProgress() {
+    const progressEl = document.getElementById('quizProgress');
+    if (progressEl) {
+        progressEl.textContent = `Progress: ${currentQuestionIdx + 1} / ${quizData.length}`;
+    }
+}
+
+/**
+ * 綁定 Quiz 表格事件
+ */
+function bindQuizEvents() {
+    // 點擊列切換當前題目
+    document.querySelectorAll('#quizBody tr').forEach(row => {
+        row.addEventListener('click', function(e) {
+            // 如果點擊的是選項按鈕或朗讀按鈕，不觸發列切換
+            if (e.target.closest('.col-option') || e.target.closest('.listen-btn')) {
+                return;
+            }
+            const index = parseInt(this.dataset.index);
+            if (!isNaN(index) && index !== currentQuestionIdx) {
+                selectQuestion(index);
+            }
+        });
+    });
+    
+    // 點擊選項作答
+    document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
+        cell.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const index = parseInt(this.dataset.quizIndex);
+            const label = this.dataset.optionLabel;
+            if (!isNaN(index) && label) {
+                answerQuestion(index, label);
+            }
+        });
+    });
+    
+    // 點擊朗讀按鈕
+    document.querySelectorAll('.listen-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const index = parseInt(this.dataset.quizIndex);
+            if (!isNaN(index) && quizData[index]) {
+                const text = quizData[index].explanation;
+                if (text) {
+                    preheatVoice();
+                    speakOnce(text, null, 0.85);
+                }
+            }
+        });
+    });
+}
+
+/**
+ * 選擇題目（切換當前查看的題目）
+ */
+function selectQuestion(index) {
+    if (index < 0 || index >= quizData.length) return;
+    if (index === currentQuestionIdx) return;
+    
+    currentQuestionIdx = index;
+    
+    // 更新表格高亮
+    document.querySelectorAll('#quizBody tr').forEach(row => {
+        row.classList.remove('current-row');
+        const rowIndex = parseInt(row.dataset.index);
+        if (rowIndex === index) {
+            row.classList.add('current-row');
+        }
+    });
+    
+    // 更新進度
+    updateQuizProgress();
+}
+
+/**
+ * 作答
+ */
+function answerQuestion(index, selectedLabel) {
+    if (index < 0 || index >= quizData.length) return;
+    const q = quizData[index];
+    
+    // 如果已經作答，不能再次作答
+    if (q.userAnswer !== null) return;
+    
+    // 記錄答案
+    q.userAnswer = selectedLabel;
+    q.isCorrect = (selectedLabel === q.correctLabel);
+    
+    // 重新渲染表格
+    renderQuizTable();
+    
+    // 如果答錯了，自動高亮正確答案（在 renderQuizTable 中已處理）
+}
+
+/**
+ * 切換到 Quiz 分頁時初始化
+ */
+function initQuizTab() {
+    if (!quizGenerated && allWords && allWords.length > 0) {
+        generateQuizData(allWords);
+        renderQuizTable();
+    } else if (quizGenerated) {
+        // 如果已經生成過，重新渲染（可能資料已更新）
+        renderQuizTable();
+    } else {
+        // 沒有資料
+        const container = document.getElementById('quizBody');
+        if (container) {
+            container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No words loaded. Please select a file first.</td></tr>`;
+        }
+    }
+}
+
 function showAllWords() {
     if (allWords.length === 0) {
         alert('No words loaded. Please select a file first.');
