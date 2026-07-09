@@ -322,6 +322,386 @@
             text-decoration: none;
             margin: 0 6px;
         }
+/* ====================== 彈窗內分頁樣式 ====================== */
+.tab-bar {
+    display: flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 12px;
+    margin: 0 20px 16px 20px;
+    gap: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: transparent;
+    color: #64748b;
+}
+
+.tab-btn:hover {
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #ff9a56, #ff6b35);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.tab-panel {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====================== Quiz 分頁樣式 ====================== */
+.quiz-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    background: #f8fafc;
+    padding: 12px 20px;
+    border-radius: 12px;
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1e293b;
+    flex-wrap: wrap;
+}
+
+.quiz-stats span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.quiz-stats .stat-number {
+    color: #ff6b35;
+    font-weight: 700;
+}
+
+.quiz-table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 12px;
+}
+
+.quiz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 700px;
+}
+
+.quiz-table thead th {
+    background: #f8fafc;
+    padding: 10px 8px;
+    text-align: center;
+    font-weight: 600;
+    color: #1e293b;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.quiz-table tbody td {
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.quiz-table tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.quiz-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.quiz-table tbody tr.current-row {
+    background: #fff3cd !important;
+}
+
+.quiz-table tbody tr.current-row:hover {
+    background: #ffedb3 !important;
+}
+
+.quiz-table .col-no {
+    width: 50px;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.quiz-table .col-no .current-marker {
+    color: #ff6b35;
+    margin-right: 4px;
+}
+
+.quiz-table .col-explanation {
+    text-align: left;
+    min-width: 150px;
+    max-width: 250px;
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.quiz-table .col-option {
+    min-width: 70px;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 6px 4px;
+    transition: all 0.2s;
+}
+
+.quiz-table .col-option:hover {
+    background: #e2e8f0;
+}
+
+.quiz-table .col-option.option-correct {
+    background: #dcfce7 !important;
+    color: #15803d;
+    border-radius: 6px;
+}
+
+.quiz-table .col-option.option-wrong {
+    background: #fee2e2 !important;
+    color: #dc2626;
+    border-radius: 6px;
+}
+
+.quiz-table .col-option.option-disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.quiz-table .col-option.option-disabled:hover {
+    background: transparent;
+}
+
+.quiz-table .col-your-answer {
+    font-weight: 500;
+    color: #1e293b;
+    min-width: 70px;
+}
+
+.quiz-table .col-your-answer .not-answered {
+    color: #94a3b8;
+    font-weight: 400;
+    font-size: 12px;
+}
+
+.quiz-table .col-result {
+    min-width: 50px;
+    font-size: 18px;
+}
+
+.quiz-table .col-result .result-correct {
+    color: #22c55e;
+}
+
+.quiz-table .col-result .result-wrong {
+    color: #ef4444;
+}
+
+.quiz-table .col-listen {
+    min-width: 50px;
+}
+
+.quiz-table .listen-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.quiz-table .listen-btn:hover {
+    background: #e2e8f0;
+    transform: scale(1.1);
+}
+
+.quiz-table .listen-btn:active {
+    transform: scale(0.9);
+}
+
+.quiz-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 4px 0 4px;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.quiz-footer .quiz-progress {
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* ====================== 彈窗內 Words List 分頁樣式調整 ====================== */
+.words-control-bar {
+    background: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.words-control-bar .play-btn {
+    background: #22c55e;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 8px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.words-control-bar .play-btn:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .play-btn:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(0.97);
+}
+
+.words-control-bar .stop-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 8px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.words-control-bar .stop-btn:disabled {
+    background: #f0a3a3;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .stop-btn:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(0.97);
+}
+
+.words-control-bar .mode-switch {
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 160px;
+}
+
+.words-control-bar .mode-switch:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .words-progress {
+    font-size: 14px;
+    color: #1e293b;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+/* ====================== 響應式調整 ====================== */
+@media (max-width: 600px) {
+    .quiz-stats {
+        gap: 12px;
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+    
+    .quiz-table {
+        font-size: 12px;
+        min-width: 600px;
+    }
+    
+    .quiz-table thead th,
+    .quiz-table tbody td {
+        padding: 6px 4px;
+        font-size: 12px;
+    }
+    
+    .quiz-table .col-explanation {
+        min-width: 100px;
+        max-width: 150px;
+        font-size: 12px;
+    }
+    
+    .quiz-table .col-option {
+        min-width: 55px;
+        font-size: 12px;
+    }
+    
+    .tab-btn {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+    
+    .words-control-bar {
+        gap: 8px;
+        padding: 10px 12px;
+    }
+    
+    .words-control-bar .play-btn,
+    .words-control-bar .stop-btn {
+        padding: 6px 16px;
+        font-size: 12px;
+    }
+    
+    .words-control-bar .mode-switch {
+        font-size: 11px;
+        min-width: 120px;
+        padding: 4px 12px;
+    }
+}
+        
     </style>
 </head>
 <body>
