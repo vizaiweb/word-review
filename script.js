@@ -1820,18 +1820,13 @@ function showAllWords() {
                     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                     document.getElementById('tab-' + this.dataset.tab).classList.add('active');
                     
-                    // 如果切換到 Quiz 分頁，初始化 Quiz
                     if (this.dataset.tab === 'quiz') {
                         initQuizInPopup();
                     }
                 });
             });
             
-            // ===== Quiz 功能（彈窗內） =====
-            let quizDataPopup = [];
-            let userAnswersPopup = {};
-            let currentQuestionIdxPopup = 0;
-            
+            // ===== 輔助函數 =====
             function shuffleArrayPopup(arr) {
                 const shuffled = [...arr];
                 for (let i = shuffled.length - 1; i > 0; i--) {
@@ -1848,17 +1843,46 @@ function showAllWords() {
                     .filter(item => item.word !== correctWord);
                 const shuffled = shuffleArrayPopup(candidates);
                 const result = shuffled.slice(0, count).map(item => item.word);
-                while (result.length < count) {
-                    result.push('---');
-                }
+                while (result.length < count) { result.push('---'); }
                 return result;
             }
+            
+            function getAvailableVoicePopup() {
+                const voices = window.speechSynthesis.getVoices();
+                if (!voices || voices.length === 0) return null;
+                return voices.find(v => v.name && v.name.includes('Google US English')) ||
+                       voices.find(v => v.name && v.name.includes('Samantha')) ||
+                       voices.find(v => v.lang && v.lang === 'en-US') ||
+                       voices.find(v => v.lang && v.lang.includes('en')) ||
+                       voices[0];
+            }
+            
+            // ===== 朗讀完整題目（題號 + Explanation + 選項） =====
+            function speakFullQuestion(questionData, onComplete) {
+                // 組合朗讀內容
+                const no = questionData.wordIndex + 1;
+                const explanation = questionData.explanation || '';
+                const optA = questionData.options[0] || '';
+                const optB = questionData.options[1] || '';
+                const optC = questionData.options[2] || '';
+                
+                let text = `Question ${no}. ${explanation}. `;
+                text += `Option A: ${optA}. Option B: ${optB}. Option C: ${optC}.`;
+                
+                // 使用 speakOnce 朗讀
+                speakOnce(text, onComplete, 0.85);
+            }
+            
+            // ===== Quiz 核心功能 =====
+            let quizDataPopup = [];
+            let currentQuestionIdxPopup = 0;
             
             function generateQuizDataPopup(words) {
                 if (!words || words.length === 0) return [];
                 const data = [];
                 for (let i = 0; i < words.length; i++) {
                     const correctWord = words[i].word.toUpperCase();
+                    // 從 Excel 的 "English explanation" 欄位擷取
                     const explanation = words[i].meaning || '';
                     const wrongOptions = getRandomWrongOptionsPopup(words, i, 2);
                     let options = [correctWord, ...wrongOptions];
@@ -1986,22 +2010,15 @@ function showAllWords() {
                     });
                 });
                 
+                // ===== 朗讀按鈕：讀出完整題目 =====
                 document.querySelectorAll('.listen-btn').forEach(btn => {
                     btn.addEventListener('click', function(e) {
                         e.stopPropagation();
                         const index = parseInt(this.dataset.quizIndex);
                         if (!isNaN(index) && quizDataPopup[index]) {
-                            const text = quizDataPopup[index].explanation;
-                            if (text) {
-                                const utterance = new SpeechSynthesisUtterance(text);
-                                utterance.lang = 'en-US';
-                                utterance.rate = 0.85;
-                                utterance.pitch = 1.0;
-                                utterance.volume = 1;
-                                const voice = getAvailableVoice();
-                                if (voice) utterance.voice = voice;
-                                speechSynthesis.speak(utterance);
-                            }
+                            const q = quizDataPopup[index];
+                            // 使用 speakFullQuestion 讀出完整內容
+                            speakFullQuestion(q);
                         }
                     });
                 });
@@ -2011,7 +2028,6 @@ function showAllWords() {
                 const words = window.allWordsData || [];
                 if (words.length > 0) {
                     quizDataPopup = generateQuizDataPopup(words);
-                    userAnswersPopup = {};
                     currentQuestionIdxPopup = 0;
                     renderQuizTablePopup();
                 }
@@ -2036,7 +2052,7 @@ function showAllWords() {
                 
                 function cancelPlayback() {
                     isCancelled = true;
-                    try { speechSynthesis.cancel(); } catch(e) {}
+                    try { window.speechSynthesis.cancel(); } catch(e) {}
                 }
                 
                 function speakNext() {
@@ -2051,12 +2067,12 @@ function showAllWords() {
                         utterance.rate = 0.85;
                         utterance.pitch = 1.0;
                         utterance.volume = 1;
-                        const voice = getAvailableVoice();
+                        const voice = getAvailableVoicePopup();
                         if (voice) utterance.voice = voice;
                         let completed = false;
                         utterance.onend = () => { if (completed) return; completed = true; repeatCount++; if (repeatCount < 3) { setTimeout(speakNext, 450); } else { step = 1; repeatCount = 0; setTimeout(speakNext, 450); } };
                         utterance.onerror = () => { if (completed) return; completed = true; step = 1; repeatCount = 0; setTimeout(speakNext, 450); };
-                        try { speechSynthesis.speak(utterance); } catch(e) { step = 1; repeatCount = 0; setTimeout(speakNext, 450); }
+                        try { window.speechSynthesis.speak(utterance); } catch(e) { step = 1; repeatCount = 0; setTimeout(speakNext, 450); }
                     } else if (step === 1) {
                         const utterance = new SpeechSynthesisUtterance(meaning);
                         utterance.lang = 'yue';
@@ -2068,7 +2084,7 @@ function showAllWords() {
                         let completed = false;
                         utterance.onend = () => { if (completed) return; completed = true; setTimeout(() => { if (onComplete) onComplete(); }, 350); };
                         utterance.onerror = () => { if (completed) return; completed = true; setTimeout(() => { if (onComplete) onComplete(); }, 250); };
-                        try { speechSynthesis.speak(utterance); } catch(e) { if (onComplete) onComplete(); }
+                        try { window.speechSynthesis.speak(utterance); } catch(e) { if (onComplete) onComplete(); }
                     }
                 }
                 speakNext();
@@ -2148,7 +2164,7 @@ function showAllWords() {
             }
             
             function stopWordsAutoPlayPopup() {
-                try { speechSynthesis.cancel(); } catch(e) {}
+                try { window.speechSynthesis.cancel(); } catch(e) {}
                 if (wordsAutoPlayStatePopup.timeoutId) { clearTimeout(wordsAutoPlayStatePopup.timeoutId); wordsAutoPlayStatePopup.timeoutId = null; }
                 wordsAutoPlayStatePopup.isPlaying = false;
                 wordsAutoPlayStatePopup.isPaused = false;
@@ -2210,6 +2226,7 @@ function showAllWords() {
         newWindow.getAvailableVoice = getAvailableVoice;
         newWindow.getCantoneseVoice = getCantoneseVoice;
         newWindow.escapeHtml = escapeHtml;
+        newWindow.speakOnce = speakOnce;
         
     } else {
         alert("Popup blocked. Please allow popups for this site.");
