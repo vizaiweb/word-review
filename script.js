@@ -81,11 +81,30 @@ function getAvailableVoice() {
     const voices = synth.getVoices();
     if (!voices || voices.length === 0) return null;
     
-    return voices.find(v => v.name && v.name.includes('Google US English')) ||
-           voices.find(v => v.name && v.name.includes('Samantha')) ||
-           voices.find(v => v.lang && v.lang === 'en-US') ||
-           voices.find(v => v.lang && v.lang.includes('en')) ||
-           voices[0];
+    // 1. 優先選擇各平台的高品質英文女聲
+    const preferredVoices = [
+        'Samantha',     // iOS / macOS 自然女聲
+        'Siri',         // iOS / macOS 系統聲音
+        'Google US English', // Android 常用
+        'Microsoft Zira',   // Windows 自然女聲
+        'Microsoft Susan'   // Windows 另一種自然女聲
+    ];
+    
+    for (const name of preferredVoices) {
+        const found = voices.find(v => v.name && v.name.includes(name));
+        if (found) return found;
+    }
+    
+    // 2. 找任何 en-US 語音
+    const enUsVoice = voices.find(v => v.lang && v.lang === 'en-US');
+    if (enUsVoice) return enUsVoice;
+    
+    // 3. 找任何英文語音
+    const enVoice = voices.find(v => v.lang && v.lang.includes('en'));
+    if (enVoice) return enVoice;
+    
+    // 4. 回退到第一個可用語音
+    return voices[0];
 }
 
 let voiceEngineReady = false;
@@ -149,7 +168,7 @@ function ensureVoiceEngine(callback) {
     return false;
 }
 
-function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
+function speakOnce(text, onEnd, rate = 0.75, retryCount = 0) {
     if (!text) {
         if (onEnd) onEnd();
         return;
@@ -173,7 +192,7 @@ function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = rate;
-    utterance.pitch = 1.0;
+    utterance.pitch = 1.05; // 稍微提高音調，讓聲音更親切
     utterance.volume = 1;
     
     const voice = getAvailableVoice();
