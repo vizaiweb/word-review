@@ -2030,16 +2030,16 @@ function showAllWords() {
             }
             
             function bindQuizEventsPopup() {
-                document.querySelectorAll('#quizBody tr').forEach(row => {
-                    row.addEventListener('click', function(e) {
-                        if (e.target.closest('.col-option') || e.target.closest('.listen-btn')) return;
-                        const index = parseInt(this.dataset.index);
-                        if (!isNaN(index) && index !== currentQuestionIdxPopup) {
-                            currentQuestionIdxPopup = index;
-                            renderQuizTablePopup();
-                        }
-                    });
-                });
+                document.querySelectorAll('.listen-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var index = parseInt(this.dataset.quizIndex);
+        if (!isNaN(index) && quizDataPopup[index]) {
+            var q = quizDataPopup[index];
+            speakFullQuestionPopup(q);
+        }
+    });
+});
                 
                 document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
                     cell.addEventListener('click', function(e) {
