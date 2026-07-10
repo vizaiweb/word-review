@@ -1806,6 +1806,14 @@ function showAllWords() {
                         <span>Answered: <span class="stat-number">0</span></span>
                         <span>Correct Rate: <span class="stat-number">--%</span></span>
                     </div>
+
+                    <div class="quiz-speed-control" style="display: flex; align-items: center; justify-content: center; gap: 12px; background: #f8fafc; padding: 8px 16px; border-radius: 12px; margin: 0 0 12px 0; flex-wrap: wrap;">
+    <label for="quizSpeedSlider" style="font-size: 14px; font-weight: 500; color: #1e293b;">🔊 Speed:</label>
+    <input type="range" id="quizSpeedSlider" min="0.5" max="1.5" step="0.05" value="0.7" style="width: 160px; accent-color: #ff6b35;">
+    <span id="quizSpeedDisplay" style="font-size: 14px; font-weight: 600; color: #ff6b35; min-width: 40px;">0.7</span>
+    <button id="quizSpeedResetBtn" style="background: #e2e8f0; border: none; border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 600; color: #1e293b; cursor: pointer;">Reset</button>
+</div>
+
                     <div class="quiz-table-wrapper">
                         <table class="quiz-table">
                             <thead>
@@ -1896,16 +1904,22 @@ function showAllWords() {
     let text = 'Question ' + no + '. ' + explanation + '. ';
     text += 'Option A: ' + optA + '. Option B: ' + optB + '. Option C: ' + optC + '.';
     
+    // 從滑塊讀取語速，若無則使用 0.7
+    const speed = (window.getQuizSpeed && window.getQuizSpeed()) || 0.7;
+    
     if (window.opener && window.opener.speakOnce) {
-        window.opener.speakOnce(text, null, 0.85);
+        window.opener.speakOnce(text, null, speed);
     } else {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
-        utterance.rate = 0.85;
-        utterance.pitch = 1.0;
+        utterance.rate = speed;
+        utterance.pitch = 1.05;
         utterance.volume = 1;
         const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.name && v.name.includes('Google US English')) || voices.find(v => v.lang && v.lang === 'en-US') || voices[0];
+        const voice = voices.find(v => v.name && v.name.includes('Samantha')) || 
+                      voices.find(v => v.name && v.name.includes('Google US English')) ||
+                      voices.find(v => v.lang && v.lang === 'en-US') || 
+                      voices[0];
         if (voice) utterance.voice = voice;
         window.speechSynthesis.speak(utterance);
     }
@@ -2244,6 +2258,48 @@ function showAllWords() {
             
             // ===== 初始化 Quiz =====
             initQuizInPopup();
+
+            // ===== 語速控制功能 =====
+(function initSpeedControl() {
+    const slider = document.getElementById('quizSpeedSlider');
+    const display = document.getElementById('quizSpeedDisplay');
+    const resetBtn = document.getElementById('quizSpeedResetBtn');
+    
+    if (!slider || !display) return;
+    
+    // 從 localStorage 讀取儲存的語速
+    const savedSpeed = localStorage.getItem('quizSpeechRate');
+    if (savedSpeed !== null) {
+        const val = parseFloat(savedSpeed);
+        if (!isNaN(val) && val >= 0.5 && val <= 1.5) {
+            slider.value = val;
+            display.textContent = val.toFixed(1);
+        }
+    }
+    
+    // 更新顯示
+    function updateSpeedDisplay() {
+        const val = parseFloat(slider.value);
+        display.textContent = val.toFixed(1);
+        localStorage.setItem('quizSpeechRate', val.toFixed(1));
+    }
+    
+    slider.addEventListener('input', updateSpeedDisplay);
+    
+    // 重置按鈕
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            slider.value = '0.7';
+            display.textContent = '0.7';
+            localStorage.setItem('quizSpeechRate', '0.7');
+        });
+    }
+    
+    // 將當前語速儲存到全域，供 speakFullQuestionPopup 使用
+    window.getQuizSpeed = function() {
+        return parseFloat(slider.value) || 0.7;
+    };
+})();
         </script>
     </body>
     </html>`;
