@@ -149,7 +149,7 @@ function ensureVoiceEngine(callback) {
     return false;
 }
 
-function speakOnce(text, onEnd, rate = 0.85, retryCount = 0) {
+function speakOnce(text, onEnd, rate = 0.75, retryCount = 0) {
     if (!text) {
         if (onEnd) onEnd();
         return;
