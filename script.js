@@ -369,7 +369,7 @@ function speakCantoneseOnce(text, onEnd) {
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "yue";
-    utterance.rate = 0.9;
+    utterance.rate = 0.75;
     utterance.pitch = 1.0;
     utterance.volume = 1;
     
@@ -1032,7 +1032,7 @@ function speakWordWithEnglishAndCantonese(word, meaning, onComplete) {
         } else if (step === 1) {
             const utterance = new SpeechSynthesisUtterance(meaning);
             utterance.lang = "yue";
-            utterance.rate = 0.85;
+            utterance.rate = 0.75;
             utterance.pitch = 1.0;
             utterance.volume = 1;
             
@@ -1882,7 +1882,7 @@ function showAllWords() {
     } else {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
-        utterance.rate = 0.85;
+        utterance.rate = 0.75;
         utterance.pitch = 1.0;
         utterance.volume = 1;
         const voices = window.speechSynthesis.getVoices();
@@ -2077,7 +2077,7 @@ function showAllWords() {
                     if (step === 0) {
                         const utterance = new SpeechSynthesisUtterance(word);
                         utterance.lang = 'en-US';
-                        utterance.rate = 0.85;
+                        utterance.rate = 0.75;
                         utterance.pitch = 1.0;
                         utterance.volume = 1;
                         const voice = getAvailableVoice();
@@ -2089,7 +2089,7 @@ function showAllWords() {
                     } else if (step === 1) {
                         const utterance = new SpeechSynthesisUtterance(meaning);
                         utterance.lang = 'yue';
-                        utterance.rate = 0.85;
+                        utterance.rate = 0.75;
                         utterance.pitch = 1.0;
                         utterance.volume = 1;
                         const voice = getCantoneseVoice();
@@ -2372,7 +2372,7 @@ function speakSentenceWithEnglishAndCantonese(sentenceEn, sentenceZh, onComplete
         } else if (step === 1) {
             const utterance = new SpeechSynthesisUtterance(sentenceZh);
             utterance.lang = "yue";
-            utterance.rate = 0.85;
+            utterance.rate = 0.75;
             utterance.pitch = 1.0;
             utterance.volume = 1;
             
