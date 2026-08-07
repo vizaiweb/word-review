@@ -516,13 +516,12 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         
         allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
-    word: String(item.word).trim(),
-    meaning: String(item.meaning).trim(),
-    day: Number(item.day),
-    englishExplanation: String(item['English explanation'] || '').trim(),
-    phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
-    syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
-}));
+            word: String(item.word).trim(),
+            meaning: String(item.meaning).trim(),
+            day: Number(item.day),
+            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
+            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
+        }));
         
         filteredWords = [...allWords];
         currentWordIdx = 0;
@@ -1300,331 +1299,6 @@ function switchWordsPlayMode() {
     }
 }
 
-// ====================== Quiz 相關全域變量 ======================
-let quizData = [];
-let userAnswers = {};
-let currentQuestionIdx = 0;
-let quizGenerated = false;
-let allWordsForQuiz = [];
-
-// ====================== Quiz 核心函數 ======================
-
-function speakFullQuestion(questionData, onComplete) {
-    const no = questionData.wordIndex + 1;
-    const explanation = questionData.explanation || '';
-    const optA = questionData.options[0] || '';
-    const optB = questionData.options[1] || '';
-    const optC = questionData.options[2] || '';
-
-    let text = `Question ${no}. ${explanation}. `;
-    text += `Option A: ${optA}. Option B: ${optB}. Option C: ${optC}.`;
-
-    speakOnce(text, onComplete, 0.85);
-}
-
-/**
- * 生成選擇題資料
- * 為每個單字生成三選一選項（1 正確 + 2 隨機錯誤）
- */
-function generateQuizData(words) {
-    if (!words || words.length === 0) return [];
-    
-    allWordsForQuiz = words;
-    const data = [];
-    
-    for (let i = 0; i < words.length; i++) {
-        const correctWord = words[i].word.toUpperCase();
-        const explanation = words[i].englishExplanation || words[i].meaning || '';
-        
-        // 取得錯誤選項（從所有單字中隨機選取 2 個不同的）
-        const wrongOptions = getRandomWrongOptions(words, i, 2);
-        
-        // 建立選項陣列：1 正確 + 2 錯誤
-        let options = [correctWord, ...wrongOptions];
-        
-        // 隨機打亂選項順序
-        options = shuffleArray(options);
-        
-        // 記錄正確答案的位置（A=0, B=1, C=2）
-        const correctIndex = options.indexOf(correctWord);
-        const correctLabel = String.fromCharCode(65 + correctIndex); // A, B, C
-        
-        data.push({
-            wordIndex: i,
-            word: words[i].word,
-            explanation: explanation,
-            options: options,           // ['GUDONG', 'RENAO', 'BATUIJIUPO']
-            correctLabel: correctLabel, // 'A', 'B', or 'C'
-            userAnswer: null,           // null 表示未作答
-            isCorrect: null             // null 表示未作答
-        });
-    }
-    
-    quizData = data;
-    userAnswers = {};
-    currentQuestionIdx = 0;
-    quizGenerated = true;
-    
-    return data;
-}
-
-/**
- * 從 allWords 中隨機選取 n 個與正確答案不同的單字
- */
-function getRandomWrongOptions(words, correctIndex, count) {
-    const correctWord = words[correctIndex].word.toUpperCase();
-    const candidates = words
-        .map((w, idx) => ({ word: w.word.toUpperCase(), idx }))
-        .filter(item => item.word !== correctWord);
-    
-    // 打亂候選清單
-    const shuffled = shuffleArray(candidates);
-    
-    // 取前 count 個，若不夠則補 '---' 佔位（實際不會發生，因為字庫通常夠大）
-    const result = shuffled.slice(0, count).map(item => item.word);
-    while (result.length < count) {
-        result.push('---');
-    }
-    return result;
-}
-
-/**
- * 洗牌函數 (Fisher-Yates)
- */
-function shuffleArray(arr) {
-    const shuffled = [...arr];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
-/**
- * 渲染 Quiz 表格
- */
-function renderQuizTable() {
-    const container = document.getElementById('quizBody');
-    if (!container) return;
-    
-    if (!quizData || quizData.length === 0) {
-        container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No quiz data available. Please load a file first.</td></tr>`;
-        return;
-    }
-    
-    let html = '';
-    for (let i = 0; i < quizData.length; i++) {
-        const q = quizData[i];
-        const isCurrent = (i === currentQuestionIdx);
-        const isAnswered = (q.userAnswer !== null);
-        const answerDisplay = q.userAnswer !== null ? q.userAnswer : 'Please Select';
-        const resultDisplay = getResultDisplay(q);
-        
-        html += `
-            <tr id="quiz_row_${i}" class="${isCurrent ? 'current-row' : ''}" data-index="${i}">
-                <td class="col-no">
-                    ${isCurrent ? '<span class="current-marker">▶</span>' : ''}
-                    ${i + 1}
-                </td>
-                <td class="col-explanation">${escapeHtml(q.explanation)}</td>
-                ${q.options.map((opt, optIdx) => {
-                    const label = String.fromCharCode(65 + optIdx); // A, B, C
-                    let className = 'col-option';
-                    let extraAttr = '';
-                    
-                    if (isAnswered) {
-                        className += ' option-disabled';
-                        if (opt === q.options[q.correctLabel.charCodeAt(0) - 65]) {
-                            className += ' option-correct';
-                        }
-                        if (q.userAnswer === label && q.userAnswer !== q.correctLabel) {
-                            className += ' option-wrong';
-                        }
-                    }
-                    
-                    return `<td class="${className}" data-quiz-index="${i}" data-option-label="${label}" data-option-value="${escapeHtml(opt)}">
-                        ${escapeHtml(opt)}
-                    </td>`;
-                }).join('')}
-                <td class="col-your-answer">
-                    ${isAnswered ? escapeHtml(answerDisplay) : `<span class="not-answered">${escapeHtml(answerDisplay)}</span>`}
-                </td>
-                <td class="col-result">${resultDisplay}</td>
-                <td class="col-listen">
-                    <button class="listen-btn" data-quiz-index="${i}" title="Listen to explanation">🔊</button>
-                </td>
-            </tr>
-        `;
-    }
-    
-    container.innerHTML = html;
-    
-    // 更新統計
-    updateQuizStats();
-    
-    // 更新進度
-    updateQuizProgress();
-    
-    // 綁定事件
-    bindQuizEvents();
-}
-
-/**
- * 取得結果顯示 (✔ 或 ✘ 或空白)
- */
-function getResultDisplay(q) {
-    if (q.userAnswer === null) return '';
-    if (q.userAnswer === q.correctLabel) {
-        return '<span class="result-correct">✔</span>';
-    } else {
-        return '<span class="result-wrong">✘</span>';
-    }
-}
-
-/**
- * 更新統計列
- */
-function updateQuizStats() {
-    const total = quizData.length;
-    let answered = 0;
-    let correct = 0;
-    
-    for (const q of quizData) {
-        if (q.userAnswer !== null) {
-            answered++;
-            if (q.userAnswer === q.correctLabel) {
-                correct++;
-            }
-        }
-    }
-    
-    const rate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-    
-    const statsContainer = document.getElementById('quizStats');
-    if (statsContainer) {
-        statsContainer.innerHTML = `
-            <span>Total Questions: <span class="stat-number">${total}</span></span>
-            <span>Answered: <span class="stat-number">${answered}</span></span>
-            <span>Correct Rate: <span class="stat-number">${answered > 0 ? rate + '%' : '--%'}</span></span>
-        `;
-    }
-}
-
-/**
- * 更新進度顯示
- */
-function updateQuizProgress() {
-    const progressEl = document.getElementById('quizProgress');
-    if (progressEl) {
-        progressEl.textContent = `Progress: ${currentQuestionIdx + 1} / ${quizData.length}`;
-    }
-}
-
-/**
- * 綁定 Quiz 表格事件
- */
-function bindQuizEvents() {
-    // 點擊列切換當前題目
-    document.querySelectorAll('#quizBody tr').forEach(row => {
-        row.addEventListener('click', function(e) {
-            // 如果點擊的是選項按鈕或朗讀按鈕，不觸發列切換
-            if (e.target.closest('.col-option') || e.target.closest('.listen-btn')) {
-                return;
-            }
-            const index = parseInt(this.dataset.index);
-            if (!isNaN(index) && index !== currentQuestionIdx) {
-                selectQuestion(index);
-            }
-        });
-    });
-    
-    // 點擊選項作答
-    document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
-        cell.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const index = parseInt(this.dataset.quizIndex);
-            const label = this.dataset.optionLabel;
-            if (!isNaN(index) && label) {
-                answerQuestion(index, label);
-            }
-        });
-    });
-    
-    // 點擊朗讀按鈕
-   document.querySelectorAll('.listen-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const index = parseInt(this.dataset.quizIndex);
-        if (!isNaN(index) && quizData[index]) {
-            const q = quizData[index];
-            preheatVoice();
-            speakFullQuestion(q);
-        }
-    });
-});
-}
-
-/**
- * 選擇題目（切換當前查看的題目）
- */
-function selectQuestion(index) {
-    if (index < 0 || index >= quizData.length) return;
-    if (index === currentQuestionIdx) return;
-    
-    currentQuestionIdx = index;
-    
-    // 更新表格高亮
-    document.querySelectorAll('#quizBody tr').forEach(row => {
-        row.classList.remove('current-row');
-        const rowIndex = parseInt(row.dataset.index);
-        if (rowIndex === index) {
-            row.classList.add('current-row');
-        }
-    });
-    
-    // 更新進度
-    updateQuizProgress();
-}
-
-/**
- * 作答
- */
-function answerQuestion(index, selectedLabel) {
-    if (index < 0 || index >= quizData.length) return;
-    const q = quizData[index];
-    
-    // 如果已經作答，不能再次作答
-    if (q.userAnswer !== null) return;
-    
-    // 記錄答案
-    q.userAnswer = selectedLabel;
-    q.isCorrect = (selectedLabel === q.correctLabel);
-    
-    // 重新渲染表格
-    renderQuizTable();
-    
-    // 如果答錯了，自動高亮正確答案（在 renderQuizTable 中已處理）
-}
-
-/**
- * 切換到 Quiz 分頁時初始化
- */
-function initQuizTab() {
-    if (!quizGenerated && allWords && allWords.length > 0) {
-        generateQuizData(allWords);
-        renderQuizTable();
-    } else if (quizGenerated) {
-        // 如果已經生成過，重新渲染（可能資料已更新）
-        renderQuizTable();
-    } else {
-        // 沒有資料
-        const container = document.getElementById('quizBody');
-        if (container) {
-            container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No words loaded. Please select a file first.</td></tr>`;
-        }
-    }
-}
-
 // ===== 新增：彈窗內單一單字朗讀（英文3次 + 中文1次） =====
 function playSingleWord(word, meaning) {
     if (!word) return;
@@ -1721,7 +1395,7 @@ function showAllWords() {
         `;
     }
     
-    // ===== 生成彈窗完整 HTML（雙分頁） =====
+    // ===== 生成彈窗完整 HTML（簡潔版） =====
     const allHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1731,271 +1405,64 @@ function showAllWords() {
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
-            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            
-            /* Header */
-            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+            .container { max-width: 850px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
-            .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
-            
-            /* Tabs */
-            .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
-            .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: transparent; color: #64748b; }
-            .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
-            .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
-            
-            /* Tab Panels */
-            .tab-panel { display: none; animation: fadeIn 0.3s ease; padding: 16px 20px 0 20px; }
-            .tab-panel.active { display: block; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-            
-            /* Words List Panel */
-            .words-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-            .words-control-bar .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .words-control-bar .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .words-control-bar .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .words-control-bar .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .words-control-bar .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
-            .words-control-bar .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .words-control-bar .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
-            .words-control-bar .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .words-control-bar .words-progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
-            
-            /* Quiz Panel */
-            .quiz-stats { display: flex; justify-content: center; gap: 30px; background: #f8fafc; padding: 12px 20px; border-radius: 12px; margin: 0 0 16px 0; font-size: 15px; font-weight: 500; color: #1e293b; flex-wrap: wrap; }
-            .quiz-stats .stat-number { color: #ff6b35; font-weight: 700; }
-            .quiz-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
-            .quiz-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px; }
-            .quiz-table thead th { background: #f8fafc; padding: 10px 8px; text-align: center; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; font-size: 13px; }
-            .quiz-table tbody td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; transition: background 0.2s; }
-            .quiz-table tbody tr { cursor: pointer; transition: background 0.2s; }
-            .quiz-table tbody tr:hover { background: #f8fafc; }
-            .quiz-table tbody tr.current-row { background: #fff3cd !important; }
-            .quiz-table tbody tr.current-row:hover { background: #ffedb3 !important; }
-            .quiz-table .col-no { width: 50px; font-weight: 600; color: #64748b; font-size: 14px; }
-            .quiz-table .col-no .current-marker { color: #ff6b35; margin-right: 4px; }
-            .quiz-table .col-explanation { text-align: left; min-width: 150px; max-width: 250px; font-size: 13px; color: #334155; line-height: 1.4; word-break: break-word; }
-            .quiz-table .col-option { min-width: 70px; font-weight: 600; color: #0f172a; cursor: pointer; border-radius: 6px; padding: 6px 4px; transition: all 0.2s; }
-            .quiz-table .col-option:hover:not(.option-disabled) { background: #e2e8f0; }
-            .quiz-table .col-option.option-correct { background: #dcfce7 !important; color: #15803d; border-radius: 6px; }
-            .quiz-table .col-option.option-wrong { background: #fee2e2 !important; color: #dc2626; border-radius: 6px; }
-            .quiz-table .col-option.option-disabled { cursor: default; opacity: 0.7; }
-            .quiz-table .col-option.option-disabled:hover { background: transparent; }
-            .quiz-table .col-your-answer { font-weight: 500; color: #1e293b; min-width: 70px; }
-            .quiz-table .col-your-answer .not-answered { color: #94a3b8; font-weight: 400; font-size: 12px; }
-            .quiz-table .col-result { min-width: 50px; font-size: 18px; }
-            .quiz-table .col-result .result-correct { color: #22c55e; }
-            .quiz-table .col-result .result-wrong { color: #ef4444; }
-            .quiz-table .col-listen { min-width: 50px; }
-            .quiz-table .listen-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
-            .quiz-table .listen-btn:hover { background: #e2e8f0; transform: scale(1.1); }
-            .quiz-table .listen-btn:active { transform: scale(0.9); }
-            .quiz-footer { display: flex; justify-content: flex-end; padding: 4px 4px 0 4px; font-size: 14px; color: #64748b; }
-            .quiz-footer .quiz-progress { font-weight: 500; color: #1e293b; }
-            
-            /* Common */
-            .words-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
-            .words-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-            .words-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
-            .words-table thead th:first-child { width: 60px; text-align: center; }
-            .words-table tbody td { vertical-align: middle; }
+            .header p { color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 4px; }
+            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+            .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
+            .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
+            .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
+            table { width: 100%; border-collapse: collapse; }
+            thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+            thead th:first-child { width: 60px; text-align: center; }
+            thead th:last-child { text-align: center; width: 70px; }
+            td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
             .listen-single-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
             .listen-single-btn:hover { background: #e2e8f0; transform: scale(1.1); }
             .listen-single-btn:active { transform: scale(0.9); }
-            
-            /* Footer */
-            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; }
             .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
             .close-btn:hover { opacity: 0.85; }
-            
-            @media (max-width: 600px) {
-                .quiz-stats { gap: 12px; font-size: 13px; padding: 10px 14px; }
-                .quiz-table { font-size: 12px; min-width: 600px; }
-                .quiz-table thead th, .quiz-table tbody td { padding: 6px 4px; font-size: 12px; }
-                .quiz-table .col-explanation { min-width: 100px; max-width: 150px; font-size: 12px; }
-                .quiz-table .col-option { min-width: 55px; font-size: 12px; }
-                .tab-btn { font-size: 13px; padding: 8px 12px; }
-                .header h2 { font-size: 17px; }
-                .header p { font-size: 12px; }
-                .words-control-bar { gap: 8px; padding: 10px 12px; }
-                .words-control-bar .play-btn, .words-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
-                .words-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
-            }
         </style>
     </head>
     <body>
         <div class="container">
-            <!-- Header -->
             <div class="header">
                 <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>Total ${allWords.length} words</p>
             </div>
-            
-            <!-- Tab Bar -->
-            <div class="tab-bar">
-                <button class="tab-btn active" data-tab="words">📖 Words List</button>
-                <button class="tab-btn" data-tab="quiz">✏️ Quiz</button>
+            <div class="control-bar">
+                <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
+                <button id="wordsStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
+                <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
+                <span id="wordsProgress" class="progress">0 / ${allWords.length}</span>
             </div>
-            
-            <!-- Tab Panels -->
-            <div class="tab-content">
-                <!-- Words List Panel -->
-                <div id="tab-words" class="tab-panel active">
-                    <div class="words-control-bar">
-                        <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
-                        <button id="wordsStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
-                        <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
-                        <span id="wordsProgress" class="words-progress">0 / ${allWords.length}</span>
-                    </div>
-                    <div class="words-table-wrapper">
-                        <table class="words-table">
-                            <thead>
-                                <tr>
-                                    <th>Day</th>
-                                    <th>Word</th>
-                                    <th>Meaning</th>
-                                    <th style="text-align: center; width: 70px;">Listen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${tableRows}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- Quiz Panel -->
-                <div id="tab-quiz" class="tab-panel">
-                    <div class="quiz-stats" id="quizStats">
-                        <span>Total Questions: <span class="stat-number">${allWords.length}</span></span>
-                        <span>Answered: <span class="stat-number">0</span></span>
-                        <span>Correct Rate: <span class="stat-number">--%</span></span>
-                    </div>
-                    <div class="quiz-table-wrapper">
-                        <table class="quiz-table">
-                            <thead>
-                                <tr>
-                                    <th>No.</th>
-                                    <th>Explanation</th>
-                                    <th>Option A</th>
-                                    <th>Option B</th>
-                                    <th>Option C</th>
-                                    <th>Your Answer</th>
-                                    <th>Result</th>
-                                    <th>Listen</th>
-                                </tr>
-                            </thead>
-                            <tbody id="quizBody">
-                                <!-- 由 JS 動態生成 -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="quiz-footer">
-                        <span class="quiz-progress" id="quizProgress">Progress: 1 / ${allWords.length}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Footer -->
+            <table>
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Word</th>
+                        <th>Meaning</th>
+                        <th style="text-align: center;">Listen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
             <div class="footer">
                 <button class="close-btn" onclick="window.close()">Close</button>
             </div>
         </div>
-        
         <script>
-            // ===== 傳遞資料到彈窗 =====
-            window.allWordsData = ${JSON.stringify(allWords)};
-            window.filteredWordsData = ${JSON.stringify(filteredWords)};
-            window.currentLevel = "${currentLevel}";
-            window.currentFileName = "${currentFileName}";
-            
-            // ===== 分頁切換 =====
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                    this.classList.add('active');
-                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-                    
-                    // 切換到 Quiz 分頁時初始化
-                    if (this.dataset.tab === 'quiz') {
-                        if (typeof window.parent.initQuizTab === 'function') {
-                            window.parent.initQuizTab();
-                        } else {
-                            // 如果父視窗函數不可用，直接在此初始化
-                            if (!window.quizData || window.quizData.length === 0) {
-                                const words = window.allWordsData || [];
-                                if (words.length > 0) {
-                                    // 簡單的 quiz 初始化
-                                    const data = [];
-                                    for (let i = 0; i < words.length; i++) {
-                                        const w = words[i];
-                                        const correctWord = w.word.toUpperCase();
-                                        const explanation = w.englishExplanation || w.meaning || '';
-                                        // 取得錯誤選項
-                                        const candidates = words.map((ww, idx) => ({ word: ww.word.toUpperCase(), idx })).filter(item => item.word !== correctWord);
-                                        const shuffled = candidates.sort(() => Math.random() - 0.5);
-                                        const wrongOptions = shuffled.slice(0, 2).map(item => item.word);
-                                        while (wrongOptions.length < 2) wrongOptions.push('---');
-                                        let options = [correctWord, ...wrongOptions];
-                                        options = options.sort(() => Math.random() - 0.5);
-                                        const correctIndex = options.indexOf(correctWord);
-                                        const correctLabel = String.fromCharCode(65 + correctIndex);
-                                        data.push({
-                                            wordIndex: i,
-                                            word: w.word,
-                                            explanation: explanation,
-                                            options: options,
-                                            correctLabel: correctLabel,
-                                            userAnswer: null,
-                                            isCorrect: null
-                                        });
-                                    }
-                                    window.quizData = data;
-                                    window.currentQuestionIdx = 0;
-                                    // 渲染 quiz 表格
-                                    const container = document.getElementById('quizBody');
-                                    if (container) {
-                                        let html = '';
-                                        for (let i = 0; i < data.length; i++) {
-                                            const q = data[i];
-                                            const isCurrent = (i === 0);
-                                            html += `
-                                                <tr class="${isCurrent ? 'current-row' : ''}" data-index="${i}">
-                                                    <td class="col-no">${isCurrent ? '<span class="current-marker">▶</span>' : ''}${i + 1}</td>
-                                                    <td class="col-explanation">${escapeHtml(q.explanation)}</td>
-                                                    ${q.options.map((opt, optIdx) => {
-                                                        const label = String.fromCharCode(65 + optIdx);
-                                                        return `<td class="col-option" data-quiz-index="${i}" data-option-label="${label}">${escapeHtml(opt)}</td>`;
-                                                    }).join('')}
-                                                    <td class="col-your-answer"><span class="not-answered">Please Select</span></td>
-                                                    <td class="col-result"></td>
-                                                    <td class="col-listen"><button class="listen-btn" data-quiz-index="${i}">🔊</button></td>
-                                                </tr>
-                                            `;
-                                        }
-                                        container.innerHTML = html;
-                                        // 更新統計
-                                        const statsContainer = document.getElementById('quizStats');
-                                        if (statsContainer) {
-                                            statsContainer.innerHTML = `
-                                                <span>Total Questions: <span class="stat-number">${data.length}</span></span>
-                                                <span>Answered: <span class="stat-number">0</span></span>
-                                                <span>Correct Rate: <span class="stat-number">--%</span></span>
-                                            `;
-                                        }
-                                        // 更新進度
-                                        const progressEl = document.getElementById('quizProgress');
-                                        if (progressEl) progressEl.textContent = `Progress: 1 / ${data.length}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            });
-            
-            // ===== 綁定 Listen 單字按鈕事件 =====
+            // 綁定 Listen 單字按鈕事件
             document.querySelectorAll('.listen-single-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -2004,63 +1471,12 @@ function showAllWords() {
                     if (window.parent && typeof window.parent.playSingleWord === 'function') {
                         window.parent.playSingleWord(word, meaning);
                     } else {
-                        // 如果父視窗函數不可用，直接使用 speakOnce 和 getCantoneseVoice
-                        // 這裡作為備用方案
-                        if (window.parent && window.parent.stopAllReading) {
-                            window.parent.stopAllReading();
-                        }
-                        let step = 0;
-                        let repeatCount = 0;
-                        let isCancelled = false;
-                        function speakNext() {
-                            if (isCancelled) return;
-                            if (step === 0) {
-                                if (window.parent && window.parent.speakOnce) {
-                                    window.parent.speakOnce(word, () => {
-                                        if (isCancelled) return;
-                                        repeatCount++;
-                                        if (repeatCount < 3) {
-                                            setTimeout(speakNext, 450);
-                                        } else {
-                                            step = 1;
-                                            repeatCount = 0;
-                                            setTimeout(speakNext, 450);
-                                        }
-                                    }, 0.85);
-                                } else {
-                                    // 極端情況：使用瀏覽器原生語音
-                                    const utterance = new SpeechSynthesisUtterance(word);
-                                    utterance.lang = "en-US";
-                                    utterance.rate = 0.85;
-                                    utterance.onend = () => {
-                                        repeatCount++;
-                                        if (repeatCount < 3) {
-                                            setTimeout(speakNext, 450);
-                                        } else {
-                                            step = 1;
-                                            repeatCount = 0;
-                                            setTimeout(speakNext, 450);
-                                        }
-                                    };
-                                    speechSynthesis.speak(utterance);
-                                }
-                            } else if (step === 1) {
-                                const utterance = new SpeechSynthesisUtterance(meaning);
-                                utterance.lang = "yue";
-                                utterance.rate = 0.85;
-                                if (window.parent && window.parent.getCantoneseVoice) {
-                                    const voice = window.parent.getCantoneseVoice();
-                                    if (voice) utterance.voice = voice;
-                                }
-                                speechSynthesis.speak(utterance);
-                            }
-                        }
-                        speakNext();
+                        alert('Audio function not available. Please refresh the page.');
                     }
                 });
             });
             
-            // ===== 綁定 Words List 控制按鈕 =====
+            // 綁定 Words List 控制按鈕
             document.getElementById('wordsPlayBtn')?.addEventListener('click', function() {
                 if (window.parent && typeof window.parent.toggleWordsAutoPlay === 'function') {
                     window.parent.toggleWordsAutoPlay();
@@ -2076,24 +1492,12 @@ function showAllWords() {
                     window.parent.switchWordsPlayMode();
                 }
             });
-            
-            // ===== 輔助函數 =====
-            function escapeHtml(str) {
-                if (!str) return '';
-                return str.replace(/[&<>]/g, function(m) {
-                    if (m === '&') return '&amp;';
-                    if (m === '<') return '&lt;';
-                    if (m === '>') return '&gt;';
-                    return m;
-                });
-            }
         </script>
     </body>
     </html>`;
     
-    const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
+    const newWindow = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
     if (newWindow) {
-        // 儲存彈窗參照
         wordsAutoPlayState.playWindow = newWindow;
         wordsAutoPlayState.totalCount = allWords.length;
         wordsAutoPlayState.mode = 'sequential';
@@ -2101,20 +1505,6 @@ function showAllWords() {
         wordsAutoPlayState.isPaused = false;
         wordsAutoPlayState.playedIndices = [];
         wordsAutoPlayState.remainingIndices = [];
-        
-        // 將必要的函數暴露給彈窗
-        newWindow.playSingleWord = playSingleWord;
-        newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
-        newWindow.stopWordsAutoPlay = stopWordsAutoPlay;
-        newWindow.switchWordsPlayMode = switchWordsPlayMode;
-        newWindow.initQuizTab = initQuizTab;
-        newWindow.speakOnce = speakOnce;
-        newWindow.getCantoneseVoice = getCantoneseVoice;
-        newWindow.stopAllReading = stopAllReading;
-        newWindow.quizData = quizData;
-        newWindow.quizGenerated = quizGenerated;
-        newWindow.currentQuestionIdx = currentQuestionIdx;
-        newWindow.allWordsData = allWords;
         
         newWindow.document.write(allHtml);
         newWindow.document.close();
@@ -2587,6 +1977,11 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
+    if (!allSentences.length) {
+        alert('No sentences loaded. Please select a file first.');
+        return;
+    }
+    
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.focus();
@@ -2596,19 +1991,6 @@ function showAllSentencesPopup() {
         }
     }
     
-    if (!allSentences.length) {
-        alert('No sentences loaded. Please select a file first.');
-        return;
-    }
-
-    const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-    if (!newWindow) {
-        alert("Popup blocked. Please allow popups for this site.");
-        return;
-    }
-
-    sentencesAutoPlayState.playWindow = newWindow;
-
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -2682,18 +2064,51 @@ function showAllSentencesPopup() {
         </script>
     </body>
     </html>`;
-
-    try {
+    
+    const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+    if (newWindow) {
+        sentencesAutoPlayState.playWindow = newWindow;
+        sentencesAutoPlayState.totalCount = allSentences.length;
+        sentencesAutoPlayState.mode = 'sequential';
+        sentencesAutoPlayState.isPlaying = false;
+        sentencesAutoPlayState.isPaused = false;
+        sentencesAutoPlayState.playedIndices = [];
+        sentencesAutoPlayState.remainingIndices = [];
+        
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
-    } catch(e) {
-        console.error('Failed to write to popup window:', e);
-        alert('Failed to display sentences. Please try again.');
-        newWindow.close();
-        if (sentencesAutoPlayState.playWindow === newWindow) {
-            sentencesAutoPlayState.playWindow = null;
-        }
-        return;
+        
+        setTimeout(() => {
+            try {
+                const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
+                const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
+                const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
+                
+                if (playBtn) {
+                    playBtn.onclick = () => {
+                        toggleSentencesAutoPlay();
+                    };
+                }
+                if (stopBtn) {
+                    stopBtn.onclick = () => {
+                        stopSentencesAutoPlay();
+                    };
+                }
+                if (modeSwitch) {
+                    modeSwitch.onclick = () => {
+                        switchSentencesPlayMode();
+                    };
+                }
+                
+                newWindow.onbeforeunload = () => {
+                    if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
+                    sentencesAutoPlayState.isPlaying = false;
+                    sentencesAutoPlayState.isPaused = false;
+                };
+            } catch(e) {}
+        }, 100);
+    } else {
+        alert("Popup blocked. Please allow popups for this site.");
     }
 }
 
