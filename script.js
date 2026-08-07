@@ -1371,6 +1371,9 @@ function playSingleWord(word, meaning) {
     ensureVoiceEngine(speakNext);
 }
 
+// ===== 將函數暴露到全域，讓彈窗可以呼叫 =====
+window.playSingleWord = playSingleWord;
+
 function showAllWords() {
     if (allWords.length === 0) {
         alert('No words loaded. Please select a file first.');
