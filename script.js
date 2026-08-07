@@ -1467,17 +1467,21 @@ function showAllWords() {
         <script>
             // 綁定 Listen 單字按鈕事件
             document.querySelectorAll('.listen-single-btn').forEach(btn => {
-                btn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const word = this.dataset.word;
-                    const meaning = this.dataset.meaning;
-                    if (window.parent && typeof window.parent.playSingleWord === 'function') {
-                        window.parent.playSingleWord(word, meaning);
-                    } else {
-                        alert('Audio function not available. Please refresh the page.');
-                    }
-                });
-            });
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const word = this.dataset.word;
+        const meaning = this.dataset.meaning;
+        
+        // 優先使用 window.opener，備用 window.parent
+        if (window.opener && typeof window.opener.playSingleWord === 'function') {
+            window.opener.playSingleWord(word, meaning);
+        } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
+            window.parent.playSingleWord(word, meaning);
+        } else {
+            alert('Audio function not available. Please refresh the page.');
+        }
+    });
+});
             
             // 綁定 Words List 控制按鈕
             document.getElementById('wordsPlayBtn')?.addEventListener('click', function() {
