@@ -1399,6 +1399,7 @@ function showAllWords() {
     }
 
     // ===== 生成彈窗完整 HTML（雙分頁：Word List + Quiz） =====
+       // ===== 生成彈窗完整 HTML（雙分頁：Word List + Quiz） =====
     const allHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1723,7 +1724,7 @@ function showAllWords() {
                     return m;
                 });
             }
-        </script>
+        <\/script>
     </body>
     </html>`;
 
