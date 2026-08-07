@@ -1635,16 +1635,19 @@ function showAllWords() {
     
     // ===== 生成 Words List 表格 =====
     let tableRows = '';
-    for (let i = 0; i < allWords.length; i++) {
-        const w = allWords[i];
-        tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
-                <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
-                <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
-            </tr>
-        `;
-    }
+for (let i = 0; i < allWords.length; i++) {
+    const w = allWords[i];
+    tableRows += `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
+            <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
+            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
+            <td style="padding: 10px 12px; text-align: center; width: 60px;">
+                <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}">🔊</button>
+            </td>
+        </tr>
+    `;
+}
     
     // ===== 生成彈窗完整 HTML（雙分頁） =====
     const allHtml = `<!DOCTYPE html>
