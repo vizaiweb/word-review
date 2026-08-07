@@ -516,12 +516,13 @@ async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
         const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
         
         allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
-            word: String(item.word).trim(),
-            meaning: String(item.meaning).trim(),
-            day: Number(item.day),
-            phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
-            syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
-        }));
+    word: String(item.word).trim(),
+    meaning: String(item.meaning).trim(),
+    day: Number(item.day),
+    englishExplanation: String(item['English explanation'] || '').trim(),
+    phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
+    syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
+}));
         
         filteredWords = [...allWords];
         currentWordIdx = 0;
@@ -1299,6 +1300,331 @@ function switchWordsPlayMode() {
     }
 }
 
+// ====================== Quiz 相關全域變量 ======================
+let quizData = [];
+let userAnswers = {};
+let currentQuestionIdx = 0;
+let quizGenerated = false;
+let allWordsForQuiz = [];
+
+// ====================== Quiz 核心函數 ======================
+
+function speakFullQuestion(questionData, onComplete) {
+    const no = questionData.wordIndex + 1;
+    const explanation = questionData.explanation || '';
+    const optA = questionData.options[0] || '';
+    const optB = questionData.options[1] || '';
+    const optC = questionData.options[2] || '';
+
+    let text = `Question ${no}. ${explanation}. `;
+    text += `Option A: ${optA}. Option B: ${optB}. Option C: ${optC}.`;
+
+    speakOnce(text, onComplete, 0.85);
+}
+
+/**
+ * 生成選擇題資料
+ * 為每個單字生成三選一選項（1 正確 + 2 隨機錯誤）
+ */
+function generateQuizData(words) {
+    if (!words || words.length === 0) return [];
+    
+    allWordsForQuiz = words;
+    const data = [];
+    
+    for (let i = 0; i < words.length; i++) {
+        const correctWord = words[i].word.toUpperCase();
+        const explanation = words[i].englishExplanation || words[i].meaning || '';
+        
+        // 取得錯誤選項（從所有單字中隨機選取 2 個不同的）
+        const wrongOptions = getRandomWrongOptions(words, i, 2);
+        
+        // 建立選項陣列：1 正確 + 2 錯誤
+        let options = [correctWord, ...wrongOptions];
+        
+        // 隨機打亂選項順序
+        options = shuffleArray(options);
+        
+        // 記錄正確答案的位置（A=0, B=1, C=2）
+        const correctIndex = options.indexOf(correctWord);
+        const correctLabel = String.fromCharCode(65 + correctIndex); // A, B, C
+        
+        data.push({
+            wordIndex: i,
+            word: words[i].word,
+            explanation: explanation,
+            options: options,           // ['GUDONG', 'RENAO', 'BATUIJIUPO']
+            correctLabel: correctLabel, // 'A', 'B', or 'C'
+            userAnswer: null,           // null 表示未作答
+            isCorrect: null             // null 表示未作答
+        });
+    }
+    
+    quizData = data;
+    userAnswers = {};
+    currentQuestionIdx = 0;
+    quizGenerated = true;
+    
+    return data;
+}
+
+/**
+ * 從 allWords 中隨機選取 n 個與正確答案不同的單字
+ */
+function getRandomWrongOptions(words, correctIndex, count) {
+    const correctWord = words[correctIndex].word.toUpperCase();
+    const candidates = words
+        .map((w, idx) => ({ word: w.word.toUpperCase(), idx }))
+        .filter(item => item.word !== correctWord);
+    
+    // 打亂候選清單
+    const shuffled = shuffleArray(candidates);
+    
+    // 取前 count 個，若不夠則補 '---' 佔位（實際不會發生，因為字庫通常夠大）
+    const result = shuffled.slice(0, count).map(item => item.word);
+    while (result.length < count) {
+        result.push('---');
+    }
+    return result;
+}
+
+/**
+ * 洗牌函數 (Fisher-Yates)
+ */
+function shuffleArray(arr) {
+    const shuffled = [...arr];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+/**
+ * 渲染 Quiz 表格
+ */
+function renderQuizTable() {
+    const container = document.getElementById('quizBody');
+    if (!container) return;
+    
+    if (!quizData || quizData.length === 0) {
+        container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No quiz data available. Please load a file first.</td></tr>`;
+        return;
+    }
+    
+    let html = '';
+    for (let i = 0; i < quizData.length; i++) {
+        const q = quizData[i];
+        const isCurrent = (i === currentQuestionIdx);
+        const isAnswered = (q.userAnswer !== null);
+        const answerDisplay = q.userAnswer !== null ? q.userAnswer : 'Please Select';
+        const resultDisplay = getResultDisplay(q);
+        
+        html += `
+            <tr id="quiz_row_${i}" class="${isCurrent ? 'current-row' : ''}" data-index="${i}">
+                <td class="col-no">
+                    ${isCurrent ? '<span class="current-marker">▶</span>' : ''}
+                    ${i + 1}
+                </td>
+                <td class="col-explanation">${escapeHtml(q.explanation)}</td>
+                ${q.options.map((opt, optIdx) => {
+                    const label = String.fromCharCode(65 + optIdx); // A, B, C
+                    let className = 'col-option';
+                    let extraAttr = '';
+                    
+                    if (isAnswered) {
+                        className += ' option-disabled';
+                        if (opt === q.options[q.correctLabel.charCodeAt(0) - 65]) {
+                            className += ' option-correct';
+                        }
+                        if (q.userAnswer === label && q.userAnswer !== q.correctLabel) {
+                            className += ' option-wrong';
+                        }
+                    }
+                    
+                    return `<td class="${className}" data-quiz-index="${i}" data-option-label="${label}" data-option-value="${escapeHtml(opt)}">
+                        ${escapeHtml(opt)}
+                    </td>`;
+                }).join('')}
+                <td class="col-your-answer">
+                    ${isAnswered ? escapeHtml(answerDisplay) : `<span class="not-answered">${escapeHtml(answerDisplay)}</span>`}
+                </td>
+                <td class="col-result">${resultDisplay}</td>
+                <td class="col-listen">
+                    <button class="listen-btn" data-quiz-index="${i}" title="Listen to explanation">🔊</button>
+                </td>
+            </tr>
+        `;
+    }
+    
+    container.innerHTML = html;
+    
+    // 更新統計
+    updateQuizStats();
+    
+    // 更新進度
+    updateQuizProgress();
+    
+    // 綁定事件
+    bindQuizEvents();
+}
+
+/**
+ * 取得結果顯示 (✔ 或 ✘ 或空白)
+ */
+function getResultDisplay(q) {
+    if (q.userAnswer === null) return '';
+    if (q.userAnswer === q.correctLabel) {
+        return '<span class="result-correct">✔</span>';
+    } else {
+        return '<span class="result-wrong">✘</span>';
+    }
+}
+
+/**
+ * 更新統計列
+ */
+function updateQuizStats() {
+    const total = quizData.length;
+    let answered = 0;
+    let correct = 0;
+    
+    for (const q of quizData) {
+        if (q.userAnswer !== null) {
+            answered++;
+            if (q.userAnswer === q.correctLabel) {
+                correct++;
+            }
+        }
+    }
+    
+    const rate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+    
+    const statsContainer = document.getElementById('quizStats');
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <span>Total Questions: <span class="stat-number">${total}</span></span>
+            <span>Answered: <span class="stat-number">${answered}</span></span>
+            <span>Correct Rate: <span class="stat-number">${answered > 0 ? rate + '%' : '--%'}</span></span>
+        `;
+    }
+}
+
+/**
+ * 更新進度顯示
+ */
+function updateQuizProgress() {
+    const progressEl = document.getElementById('quizProgress');
+    if (progressEl) {
+        progressEl.textContent = `Progress: ${currentQuestionIdx + 1} / ${quizData.length}`;
+    }
+}
+
+/**
+ * 綁定 Quiz 表格事件
+ */
+function bindQuizEvents() {
+    // 點擊列切換當前題目
+    document.querySelectorAll('#quizBody tr').forEach(row => {
+        row.addEventListener('click', function(e) {
+            // 如果點擊的是選項按鈕或朗讀按鈕，不觸發列切換
+            if (e.target.closest('.col-option') || e.target.closest('.listen-btn')) {
+                return;
+            }
+            const index = parseInt(this.dataset.index);
+            if (!isNaN(index) && index !== currentQuestionIdx) {
+                selectQuestion(index);
+            }
+        });
+    });
+    
+    // 點擊選項作答
+    document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
+        cell.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const index = parseInt(this.dataset.quizIndex);
+            const label = this.dataset.optionLabel;
+            if (!isNaN(index) && label) {
+                answerQuestion(index, label);
+            }
+        });
+    });
+    
+    // 點擊朗讀按鈕
+   document.querySelectorAll('.listen-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const index = parseInt(this.dataset.quizIndex);
+        if (!isNaN(index) && quizData[index]) {
+            const q = quizData[index];
+            preheatVoice();
+            speakFullQuestion(q);
+        }
+    });
+});
+}
+
+/**
+ * 選擇題目（切換當前查看的題目）
+ */
+function selectQuestion(index) {
+    if (index < 0 || index >= quizData.length) return;
+    if (index === currentQuestionIdx) return;
+    
+    currentQuestionIdx = index;
+    
+    // 更新表格高亮
+    document.querySelectorAll('#quizBody tr').forEach(row => {
+        row.classList.remove('current-row');
+        const rowIndex = parseInt(row.dataset.index);
+        if (rowIndex === index) {
+            row.classList.add('current-row');
+        }
+    });
+    
+    // 更新進度
+    updateQuizProgress();
+}
+
+/**
+ * 作答
+ */
+function answerQuestion(index, selectedLabel) {
+    if (index < 0 || index >= quizData.length) return;
+    const q = quizData[index];
+    
+    // 如果已經作答，不能再次作答
+    if (q.userAnswer !== null) return;
+    
+    // 記錄答案
+    q.userAnswer = selectedLabel;
+    q.isCorrect = (selectedLabel === q.correctLabel);
+    
+    // 重新渲染表格
+    renderQuizTable();
+    
+    // 如果答錯了，自動高亮正確答案（在 renderQuizTable 中已處理）
+}
+
+/**
+ * 切換到 Quiz 分頁時初始化
+ */
+function initQuizTab() {
+    if (!quizGenerated && allWords && allWords.length > 0) {
+        generateQuizData(allWords);
+        renderQuizTable();
+    } else if (quizGenerated) {
+        // 如果已經生成過，重新渲染（可能資料已更新）
+        renderQuizTable();
+    } else {
+        // 沒有資料
+        const container = document.getElementById('quizBody');
+        if (container) {
+            container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No words loaded. Please select a file first.</td></tr>`;
+        }
+    }
+}
+
 // ===== 新增：彈窗內單一單字朗讀（英文3次 + 中文1次） =====
 function playSingleWord(word, meaning) {
     if (!word) return;
@@ -1371,18 +1697,15 @@ function playSingleWord(word, meaning) {
     ensureVoiceEngine(speakNext);
 }
 
-// ===== 將函數暴露到全域，讓彈窗可以呼叫 =====
-window.playSingleWord = playSingleWord;
-
 function showAllWords() {
     if (allWords.length === 0) {
         alert('No words loaded. Please select a file first.');
         return;
     }
-
+    
     const fileNice = removeFileExtension(currentFileName);
-
-    // ===== 生成 Words List 表格（含 Listen 欄位） =====
+    
+    // ===== 生成 Words List 表格（新增 Listen 欄位） =====
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
@@ -1397,9 +1720,8 @@ function showAllWords() {
             </tr>
         `;
     }
-
-    // ===== 生成彈窗完整 HTML（雙分頁：Word List + Quiz） =====
-       // ===== 生成彈窗完整 HTML（雙分頁：Word List + Quiz） =====
+    
+    // ===== 生成彈窗完整 HTML（雙分頁） =====
     const allHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1410,23 +1732,23 @@ function showAllWords() {
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
             .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-
+            
             /* Header */
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
-
+            
             /* Tabs */
             .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
             .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: transparent; color: #64748b; }
             .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
             .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
-
+            
             /* Tab Panels */
             .tab-panel { display: none; animation: fadeIn 0.3s ease; padding: 16px 20px 0 20px; }
             .tab-panel.active { display: block; }
             @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
+            
             /* Words List Panel */
             .words-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
             .words-control-bar .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
@@ -1438,7 +1760,7 @@ function showAllWords() {
             .words-control-bar .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
             .words-control-bar .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
             .words-control-bar .words-progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
-
+            
             /* Quiz Panel */
             .quiz-stats { display: flex; justify-content: center; gap: 30px; background: #f8fafc; padding: 12px 20px; border-radius: 12px; margin: 0 0 16px 0; font-size: 15px; font-weight: 500; color: #1e293b; flex-wrap: wrap; }
             .quiz-stats .stat-number { color: #ff6b35; font-weight: 700; }
@@ -1470,7 +1792,7 @@ function showAllWords() {
             .quiz-table .listen-btn:active { transform: scale(0.9); }
             .quiz-footer { display: flex; justify-content: flex-end; padding: 4px 4px 0 4px; font-size: 14px; color: #64748b; }
             .quiz-footer .quiz-progress { font-weight: 500; color: #1e293b; }
-
+            
             /* Common */
             .words-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
             .words-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -1480,12 +1802,12 @@ function showAllWords() {
             .listen-single-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
             .listen-single-btn:hover { background: #e2e8f0; transform: scale(1.1); }
             .listen-single-btn:active { transform: scale(0.9); }
-
+            
             /* Footer */
             .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
             .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
             .close-btn:hover { opacity: 0.85; }
-
+            
             @media (max-width: 600px) {
                 .quiz-stats { gap: 12px; font-size: 13px; padding: 10px 14px; }
                 .quiz-table { font-size: 12px; min-width: 600px; }
@@ -1508,13 +1830,13 @@ function showAllWords() {
                 <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>Total ${allWords.length} words</p>
             </div>
-
+            
             <!-- Tab Bar -->
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="words">📖 Words List</button>
                 <button class="tab-btn" data-tab="quiz">✏️ Quiz</button>
             </div>
-
+            
             <!-- Tab Panels -->
             <div class="tab-content">
                 <!-- Words List Panel -->
@@ -1541,7 +1863,7 @@ function showAllWords() {
                         </table>
                     </div>
                 </div>
-
+                
                 <!-- Quiz Panel -->
                 <div id="tab-quiz" class="tab-panel">
                     <div class="quiz-stats" id="quizStats">
@@ -1564,29 +1886,29 @@ function showAllWords() {
                                 </tr>
                             </thead>
                             <tbody id="quizBody">
-                                <!-- 由 JS 動態生成 -->
+                                <tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">Loading quiz data...</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <div class="quiz-footer">
-                        <span class="quiz-progress" id="quizProgress">Progress: 1 / ${allWords.length}</span>
+                        <span class="quiz-progress" id="quizProgress">Progress: 0 / ${allWords.length}</span>
                     </div>
                 </div>
             </div>
-
+            
             <!-- Footer -->
             <div class="footer">
                 <button class="close-btn" onclick="window.close()">Close</button>
             </div>
         </div>
-
+        
         <script>
             // ===== 傳遞資料到彈窗 =====
             window.allWordsData = ${JSON.stringify(allWords)};
             window.filteredWordsData = ${JSON.stringify(filteredWords)};
             window.currentLevel = "${currentLevel}";
             window.currentFileName = "${currentFileName}";
-
+            
             // ===== 分頁切換 =====
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
@@ -1594,7 +1916,7 @@ function showAllWords() {
                     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                     this.classList.add('active');
                     document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-
+                    
                     // 切換到 Quiz 分頁時初始化
                     if (this.dataset.tab === 'quiz') {
                         if (typeof window.parent.initQuizTab === 'function') {
@@ -1672,14 +1994,14 @@ function showAllWords() {
                     }
                 });
             });
-
+            
             // ===== Listen 單字按鈕事件 =====
             document.querySelectorAll('.listen-single-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const word = this.dataset.word;
                     const meaning = this.dataset.meaning;
-
+                    
                     // 優先使用 window.opener，備用 window.parent
                     if (window.opener && typeof window.opener.playSingleWord === 'function') {
                         window.opener.playSingleWord(word, meaning);
@@ -1690,7 +2012,7 @@ function showAllWords() {
                     }
                 });
             });
-
+            
             // ===== 綁定 Words List 控制按鈕 =====
             document.getElementById('wordsPlayBtn')?.addEventListener('click', function() {
                 if (window.opener && typeof window.opener.toggleWordsAutoPlay === 'function') {
@@ -1713,7 +2035,7 @@ function showAllWords() {
                     window.parent.switchWordsPlayMode();
                 }
             });
-
+            
             // ===== 輔助函數 =====
             function escapeHtml(str) {
                 if (!str) return '';
@@ -1727,7 +2049,7 @@ function showAllWords() {
         <\/script>
     </body>
     </html>`;
-
+    
     const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
     if (newWindow) {
         // 儲存彈窗參照
@@ -1738,7 +2060,7 @@ function showAllWords() {
         wordsAutoPlayState.isPaused = false;
         wordsAutoPlayState.playedIndices = [];
         wordsAutoPlayState.remainingIndices = [];
-
+        
         // 將必要的函數暴露給彈窗
         newWindow.playSingleWord = playSingleWord;
         newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
@@ -1752,10 +2074,10 @@ function showAllWords() {
         newWindow.quizGenerated = quizGenerated;
         newWindow.currentQuestionIdx = currentQuestionIdx;
         newWindow.allWordsData = allWords;
-
+        
         newWindow.document.write(allHtml);
         newWindow.document.close();
-
+        
         // 設定彈窗關閉時的清理
         newWindow.onbeforeunload = function() {
             if (wordsAutoPlayState.timeoutId) {
@@ -1766,7 +2088,7 @@ function showAllWords() {
             wordsAutoPlayState.isPaused = false;
             wordsAutoPlayState.playWindow = null;
         };
-
+        
         // 綁定 Words List 控制按鈕（備用）
         setTimeout(() => {
             try {
@@ -1774,7 +2096,7 @@ function showAllWords() {
                 const stopBtn = newWindow.document.getElementById('wordsStopBtn');
                 const modeSwitch = newWindow.document.getElementById('wordsModeSwitch');
                 const progressSpan = newWindow.document.getElementById('wordsProgress');
-
+                
                 if (playBtn) {
                     playBtn.onclick = function() {
                         if (newWindow.closed) return;
@@ -1793,7 +2115,7 @@ function showAllWords() {
                         switchWordsPlayMode();
                     };
                 }
-
+                
                 // 定期更新進度
                 const updateProgress = setInterval(() => {
                     if (newWindow.closed) {
@@ -1805,9 +2127,9 @@ function showAllWords() {
                         progressSpan.textContent = `${wordsAutoPlayState.playedIndices.length} / ${allWords.length}`;
                     }
                 }, 500);
-
+                
                 newWindow.wordsProgressInterval = updateProgress;
-
+                
                 newWindow.onbeforeunload = function() {
                     if (newWindow.wordsProgressInterval) {
                         clearInterval(newWindow.wordsProgressInterval);
@@ -1822,23 +2144,9 @@ function showAllWords() {
                 };
             } catch(e) {}
         }, 100);
-
+        
     } else {
         alert("Popup blocked. Please allow popups for this site.");
-    }
-}
-
-function initQuizTab() {
-    if (!quizGenerated && allWords && allWords.length > 0) {
-        generateQuizData(allWords);
-        renderQuizTable();
-    } else if (quizGenerated) {
-        renderQuizTable();
-    } else {
-        const container = document.getElementById('quizBody');
-        if (container) {
-            container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No words loaded. Please select a file first.</td></tr>`;
-        }
     }
 }
 
@@ -2238,11 +2546,6 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
-    if (!allSentences.length) {
-        alert('No sentences loaded. Please select a file first.');
-        return;
-    }
-    
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.focus();
@@ -2252,6 +2555,19 @@ function showAllSentencesPopup() {
         }
     }
     
+    if (!allSentences.length) {
+        alert('No sentences loaded. Please select a file first.');
+        return;
+    }
+
+    const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+    if (!newWindow) {
+        alert("Popup blocked. Please allow popups for this site.");
+        return;
+    }
+
+    sentencesAutoPlayState.playWindow = newWindow;
+
     const fileNice = removeFileExtension(currentFileNameForSentences);
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
@@ -2325,51 +2641,18 @@ function showAllSentencesPopup() {
         </script>
     </body>
     </html>`;
-    
-    const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-    if (newWindow) {
-        sentencesAutoPlayState.playWindow = newWindow;
-        sentencesAutoPlayState.totalCount = allSentences.length;
-        sentencesAutoPlayState.mode = 'sequential';
-        sentencesAutoPlayState.isPlaying = false;
-        sentencesAutoPlayState.isPaused = false;
-        sentencesAutoPlayState.playedIndices = [];
-        sentencesAutoPlayState.remainingIndices = [];
-        
+
+    try {
         newWindow.document.write(sentencesHtml);
         newWindow.document.close();
-        
-        setTimeout(() => {
-            try {
-                const playBtn = newWindow.document.getElementById('sentencesPlayBtn');
-                const stopBtn = newWindow.document.getElementById('sentencesStopBtn');
-                const modeSwitch = newWindow.document.getElementById('sentencesModeSwitch');
-                
-                if (playBtn) {
-                    playBtn.onclick = () => {
-                        toggleSentencesAutoPlay();
-                    };
-                }
-                if (stopBtn) {
-                    stopBtn.onclick = () => {
-                        stopSentencesAutoPlay();
-                    };
-                }
-                if (modeSwitch) {
-                    modeSwitch.onclick = () => {
-                        switchSentencesPlayMode();
-                    };
-                }
-                
-                newWindow.onbeforeunload = () => {
-                    if (sentencesAutoPlayState.timeoutId) clearTimeout(sentencesAutoPlayState.timeoutId);
-                    sentencesAutoPlayState.isPlaying = false;
-                    sentencesAutoPlayState.isPaused = false;
-                };
-            } catch(e) {}
-        }, 100);
-    } else {
-        alert("Popup blocked. Please allow popups for this site.");
+    } catch(e) {
+        console.error('Failed to write to popup window:', e);
+        alert('Failed to display sentences. Please try again.');
+        newWindow.close();
+        if (sentencesAutoPlayState.playWindow === newWindow) {
+            sentencesAutoPlayState.playWindow = null;
+        }
+        return;
     }
 }
 
