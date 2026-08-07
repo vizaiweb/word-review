@@ -1379,10 +1379,10 @@ function showAllWords() {
         alert('No words loaded. Please select a file first.');
         return;
     }
-    
+
     const fileNice = removeFileExtension(currentFileName);
-    
-    // ===== 生成 Words List 表格（新增 Listen 欄位） =====
+
+    // ===== 生成 Words List 表格（含 Listen 欄位） =====
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
@@ -1397,8 +1397,8 @@ function showAllWords() {
             </tr>
         `;
     }
-    
-    // ===== 生成彈窗完整 HTML（簡潔版） =====
+
+    // ===== 生成彈窗完整 HTML（雙分頁：Word List + Quiz） =====
     const allHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1408,103 +1408,328 @@ function showAllWords() {
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
-            .container { max-width: 850px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; }
+            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+            /* Header */
+            .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
-            .header p { color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 4px; }
-            .control-bar { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-            .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
-            .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
-            .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
-            table { width: 100%; border-collapse: collapse; }
-            thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
-            thead th:first-child { width: 60px; text-align: center; }
-            thead th:last-child { text-align: center; width: 70px; }
-            td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+            .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
+
+            /* Tabs */
+            .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
+            .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: transparent; color: #64748b; }
+            .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
+            .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
+
+            /* Tab Panels */
+            .tab-panel { display: none; animation: fadeIn 0.3s ease; padding: 16px 20px 0 20px; }
+            .tab-panel.active { display: block; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+            /* Words List Panel */
+            .words-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+            .words-control-bar .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .words-control-bar .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .words-control-bar .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .words-control-bar .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+            .words-control-bar .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
+            .words-control-bar .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+            .words-control-bar .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
+            .words-control-bar .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .words-control-bar .words-progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
+
+            /* Quiz Panel */
+            .quiz-stats { display: flex; justify-content: center; gap: 30px; background: #f8fafc; padding: 12px 20px; border-radius: 12px; margin: 0 0 16px 0; font-size: 15px; font-weight: 500; color: #1e293b; flex-wrap: wrap; }
+            .quiz-stats .stat-number { color: #ff6b35; font-weight: 700; }
+            .quiz-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+            .quiz-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px; }
+            .quiz-table thead th { background: #f8fafc; padding: 10px 8px; text-align: center; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; font-size: 13px; }
+            .quiz-table tbody td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; transition: background 0.2s; }
+            .quiz-table tbody tr { cursor: pointer; transition: background 0.2s; }
+            .quiz-table tbody tr:hover { background: #f8fafc; }
+            .quiz-table tbody tr.current-row { background: #fff3cd !important; }
+            .quiz-table tbody tr.current-row:hover { background: #ffedb3 !important; }
+            .quiz-table .col-no { width: 50px; font-weight: 600; color: #64748b; font-size: 14px; }
+            .quiz-table .col-no .current-marker { color: #ff6b35; margin-right: 4px; }
+            .quiz-table .col-explanation { text-align: left; min-width: 150px; max-width: 250px; font-size: 13px; color: #334155; line-height: 1.4; word-break: break-word; }
+            .quiz-table .col-option { min-width: 70px; font-weight: 600; color: #0f172a; cursor: pointer; border-radius: 6px; padding: 6px 4px; transition: all 0.2s; }
+            .quiz-table .col-option:hover:not(.option-disabled) { background: #e2e8f0; }
+            .quiz-table .col-option.option-correct { background: #dcfce7 !important; color: #15803d; border-radius: 6px; }
+            .quiz-table .col-option.option-wrong { background: #fee2e2 !important; color: #dc2626; border-radius: 6px; }
+            .quiz-table .col-option.option-disabled { cursor: default; opacity: 0.7; }
+            .quiz-table .col-option.option-disabled:hover { background: transparent; }
+            .quiz-table .col-your-answer { font-weight: 500; color: #1e293b; min-width: 70px; }
+            .quiz-table .col-your-answer .not-answered { color: #94a3b8; font-weight: 400; font-size: 12px; }
+            .quiz-table .col-result { min-width: 50px; font-size: 18px; }
+            .quiz-table .col-result .result-correct { color: #22c55e; }
+            .quiz-table .col-result .result-wrong { color: #ef4444; }
+            .quiz-table .col-listen { min-width: 50px; }
+            .quiz-table .listen-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
+            .quiz-table .listen-btn:hover { background: #e2e8f0; transform: scale(1.1); }
+            .quiz-table .listen-btn:active { transform: scale(0.9); }
+            .quiz-footer { display: flex; justify-content: flex-end; padding: 4px 4px 0 4px; font-size: 14px; color: #64748b; }
+            .quiz-footer .quiz-progress { font-weight: 500; color: #1e293b; }
+
+            /* Common */
+            .words-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+            .words-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+            .words-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+            .words-table thead th:first-child { width: 60px; text-align: center; }
+            .words-table tbody td { vertical-align: middle; }
             .listen-single-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
             .listen-single-btn:hover { background: #e2e8f0; transform: scale(1.1); }
             .listen-single-btn:active { transform: scale(0.9); }
-            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; }
+
+            /* Footer */
+            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
             .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
             .close-btn:hover { opacity: 0.85; }
+
+            @media (max-width: 600px) {
+                .quiz-stats { gap: 12px; font-size: 13px; padding: 10px 14px; }
+                .quiz-table { font-size: 12px; min-width: 600px; }
+                .quiz-table thead th, .quiz-table tbody td { padding: 6px 4px; font-size: 12px; }
+                .quiz-table .col-explanation { min-width: 100px; max-width: 150px; font-size: 12px; }
+                .quiz-table .col-option { min-width: 55px; font-size: 12px; }
+                .tab-btn { font-size: 13px; padding: 8px 12px; }
+                .header h2 { font-size: 17px; }
+                .header p { font-size: 12px; }
+                .words-control-bar { gap: 8px; padding: 10px 12px; }
+                .words-control-bar .play-btn, .words-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
+                .words-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
+            }
         </style>
     </head>
     <body>
         <div class="container">
+            <!-- Header -->
             <div class="header">
                 <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>Total ${allWords.length} words</p>
             </div>
-            <div class="control-bar">
-                <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
-                <button id="wordsStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
-                <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
-                <span id="wordsProgress" class="progress">0 / ${allWords.length}</span>
+
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="words">📖 Words List</button>
+                <button class="tab-btn" data-tab="quiz">✏️ Quiz</button>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Day</th>
-                        <th>Word</th>
-                        <th>Meaning</th>
-                        <th style="text-align: center;">Listen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${tableRows}
-                </tbody>
-            </table>
+
+            <!-- Tab Panels -->
+            <div class="tab-content">
+                <!-- Words List Panel -->
+                <div id="tab-words" class="tab-panel active">
+                    <div class="words-control-bar">
+                        <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
+                        <button id="wordsStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
+                        <button id="wordsModeSwitch" class="mode-switch">Sequential ○──● Random</button>
+                        <span id="wordsProgress" class="words-progress">0 / ${allWords.length}</span>
+                    </div>
+                    <div class="words-table-wrapper">
+                        <table class="words-table">
+                            <thead>
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Word</th>
+                                    <th>Meaning</th>
+                                    <th style="text-align: center; width: 70px;">Listen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Quiz Panel -->
+                <div id="tab-quiz" class="tab-panel">
+                    <div class="quiz-stats" id="quizStats">
+                        <span>Total Questions: <span class="stat-number">${allWords.length}</span></span>
+                        <span>Answered: <span class="stat-number">0</span></span>
+                        <span>Correct Rate: <span class="stat-number">--%</span></span>
+                    </div>
+                    <div class="quiz-table-wrapper">
+                        <table class="quiz-table">
+                            <thead>
+                                <tr>
+                                    <th>No.</th>
+                                    <th>Explanation</th>
+                                    <th>Option A</th>
+                                    <th>Option B</th>
+                                    <th>Option C</th>
+                                    <th>Your Answer</th>
+                                    <th>Result</th>
+                                    <th>Listen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quizBody">
+                                <!-- 由 JS 動態生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="quiz-footer">
+                        <span class="quiz-progress" id="quizProgress">Progress: 1 / ${allWords.length}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
             <div class="footer">
                 <button class="close-btn" onclick="window.close()">Close</button>
             </div>
         </div>
+
         <script>
-            // 綁定 Listen 單字按鈕事件
+            // ===== 傳遞資料到彈窗 =====
+            window.allWordsData = ${JSON.stringify(allWords)};
+            window.filteredWordsData = ${JSON.stringify(filteredWords)};
+            window.currentLevel = "${currentLevel}";
+            window.currentFileName = "${currentFileName}";
+
+            // ===== 分頁切換 =====
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+
+                    // 切換到 Quiz 分頁時初始化
+                    if (this.dataset.tab === 'quiz') {
+                        if (typeof window.parent.initQuizTab === 'function') {
+                            window.parent.initQuizTab();
+                        } else {
+                            // 如果父視窗函數不可用，直接在此初始化
+                            if (!window.quizData || window.quizData.length === 0) {
+                                const words = window.allWordsData || [];
+                                if (words.length > 0) {
+                                    // 簡單的 quiz 初始化
+                                    const data = [];
+                                    for (let i = 0; i < words.length; i++) {
+                                        const w = words[i];
+                                        const correctWord = w.word.toUpperCase();
+                                        const explanation = w.englishExplanation || w.meaning || '';
+                                        // 取得錯誤選項
+                                        const candidates = words.map((ww, idx) => ({ word: ww.word.toUpperCase(), idx })).filter(item => item.word !== correctWord);
+                                        const shuffled = candidates.sort(() => Math.random() - 0.5);
+                                        const wrongOptions = shuffled.slice(0, 2).map(item => item.word);
+                                        while (wrongOptions.length < 2) wrongOptions.push('---');
+                                        let options = [correctWord, ...wrongOptions];
+                                        options = options.sort(() => Math.random() - 0.5);
+                                        const correctIndex = options.indexOf(correctWord);
+                                        const correctLabel = String.fromCharCode(65 + correctIndex);
+                                        data.push({
+                                            wordIndex: i,
+                                            word: w.word,
+                                            explanation: explanation,
+                                            options: options,
+                                            correctLabel: correctLabel,
+                                            userAnswer: null,
+                                            isCorrect: null
+                                        });
+                                    }
+                                    window.quizData = data;
+                                    window.currentQuestionIdx = 0;
+                                    // 渲染 quiz 表格
+                                    const container = document.getElementById('quizBody');
+                                    if (container) {
+                                        let html = '';
+                                        for (let i = 0; i < data.length; i++) {
+                                            const q = data[i];
+                                            const isCurrent = (i === 0);
+                                            html += `
+                                                <tr class="${isCurrent ? 'current-row' : ''}" data-index="${i}">
+                                                    <td class="col-no">${isCurrent ? '<span class="current-marker">▶</span>' : ''}${i + 1}</td>
+                                                    <td class="col-explanation">${escapeHtml(q.explanation)}</td>
+                                                    ${q.options.map((opt, optIdx) => {
+                                                        const label = String.fromCharCode(65 + optIdx);
+                                                        return `<td class="col-option" data-quiz-index="${i}" data-option-label="${label}">${escapeHtml(opt)}</td>`;
+                                                    }).join('')}
+                                                    <td class="col-your-answer"><span class="not-answered">Please Select</span></td>
+                                                    <td class="col-result"></td>
+                                                    <td class="col-listen"><button class="listen-btn" data-quiz-index="${i}">🔊</button></td>
+                                                </tr>
+                                            `;
+                                        }
+                                        container.innerHTML = html;
+                                        // 更新統計
+                                        const statsContainer = document.getElementById('quizStats');
+                                        if (statsContainer) {
+                                            statsContainer.innerHTML = `
+                                                <span>Total Questions: <span class="stat-number">${data.length}</span></span>
+                                                <span>Answered: <span class="stat-number">0</span></span>
+                                                <span>Correct Rate: <span class="stat-number">--%</span></span>
+                                            `;
+                                        }
+                                        // 更新進度
+                                        const progressEl = document.getElementById('quizProgress');
+                                        if (progressEl) progressEl.textContent = `Progress: 1 / ${data.length}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+
+            // ===== Listen 單字按鈕事件 =====
             document.querySelectorAll('.listen-single-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const word = this.dataset.word;
-        const meaning = this.dataset.meaning;
-        
-        // 優先使用 window.opener，備用 window.parent
-        if (window.opener && typeof window.opener.playSingleWord === 'function') {
-            window.opener.playSingleWord(word, meaning);
-        } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
-            window.parent.playSingleWord(word, meaning);
-        } else {
-            alert('Audio function not available. Please refresh the page.');
-        }
-    });
-});
-            
-            // 綁定 Words List 控制按鈕
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const word = this.dataset.word;
+                    const meaning = this.dataset.meaning;
+
+                    // 優先使用 window.opener，備用 window.parent
+                    if (window.opener && typeof window.opener.playSingleWord === 'function') {
+                        window.opener.playSingleWord(word, meaning);
+                    } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
+                        window.parent.playSingleWord(word, meaning);
+                    } else {
+                        alert('Audio function not available. Please refresh the page.');
+                    }
+                });
+            });
+
+            // ===== 綁定 Words List 控制按鈕 =====
             document.getElementById('wordsPlayBtn')?.addEventListener('click', function() {
-                if (window.parent && typeof window.parent.toggleWordsAutoPlay === 'function') {
+                if (window.opener && typeof window.opener.toggleWordsAutoPlay === 'function') {
+                    window.opener.toggleWordsAutoPlay();
+                } else if (window.parent && typeof window.parent.toggleWordsAutoPlay === 'function') {
                     window.parent.toggleWordsAutoPlay();
                 }
             });
             document.getElementById('wordsStopBtn')?.addEventListener('click', function() {
-                if (window.parent && typeof window.parent.stopWordsAutoPlay === 'function') {
+                if (window.opener && typeof window.opener.stopWordsAutoPlay === 'function') {
+                    window.opener.stopWordsAutoPlay();
+                } else if (window.parent && typeof window.parent.stopWordsAutoPlay === 'function') {
                     window.parent.stopWordsAutoPlay();
                 }
             });
             document.getElementById('wordsModeSwitch')?.addEventListener('click', function() {
-                if (window.parent && typeof window.parent.switchWordsPlayMode === 'function') {
+                if (window.opener && typeof window.opener.switchWordsPlayMode === 'function') {
+                    window.opener.switchWordsPlayMode();
+                } else if (window.parent && typeof window.parent.switchWordsPlayMode === 'function') {
                     window.parent.switchWordsPlayMode();
                 }
             });
+
+            // ===== 輔助函數 =====
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/[&<>]/g, function(m) {
+                    if (m === '&') return '&amp;';
+                    if (m === '<') return '&lt;';
+                    if (m === '>') return '&gt;';
+                    return m;
+                });
+            }
         </script>
     </body>
     </html>`;
-    
-    const newWindow = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
+
+    const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
     if (newWindow) {
+        // 儲存彈窗參照
         wordsAutoPlayState.playWindow = newWindow;
         wordsAutoPlayState.totalCount = allWords.length;
         wordsAutoPlayState.mode = 'sequential';
@@ -1512,10 +1737,24 @@ function showAllWords() {
         wordsAutoPlayState.isPaused = false;
         wordsAutoPlayState.playedIndices = [];
         wordsAutoPlayState.remainingIndices = [];
-        
+
+        // 將必要的函數暴露給彈窗
+        newWindow.playSingleWord = playSingleWord;
+        newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
+        newWindow.stopWordsAutoPlay = stopWordsAutoPlay;
+        newWindow.switchWordsPlayMode = switchWordsPlayMode;
+        newWindow.initQuizTab = initQuizTab;
+        newWindow.speakOnce = speakOnce;
+        newWindow.getCantoneseVoice = getCantoneseVoice;
+        newWindow.stopAllReading = stopAllReading;
+        newWindow.quizData = quizData;
+        newWindow.quizGenerated = quizGenerated;
+        newWindow.currentQuestionIdx = currentQuestionIdx;
+        newWindow.allWordsData = allWords;
+
         newWindow.document.write(allHtml);
         newWindow.document.close();
-        
+
         // 設定彈窗關閉時的清理
         newWindow.onbeforeunload = function() {
             if (wordsAutoPlayState.timeoutId) {
@@ -1526,7 +1765,7 @@ function showAllWords() {
             wordsAutoPlayState.isPaused = false;
             wordsAutoPlayState.playWindow = null;
         };
-        
+
         // 綁定 Words List 控制按鈕（備用）
         setTimeout(() => {
             try {
@@ -1534,7 +1773,7 @@ function showAllWords() {
                 const stopBtn = newWindow.document.getElementById('wordsStopBtn');
                 const modeSwitch = newWindow.document.getElementById('wordsModeSwitch');
                 const progressSpan = newWindow.document.getElementById('wordsProgress');
-                
+
                 if (playBtn) {
                     playBtn.onclick = function() {
                         if (newWindow.closed) return;
@@ -1553,7 +1792,7 @@ function showAllWords() {
                         switchWordsPlayMode();
                     };
                 }
-                
+
                 // 定期更新進度
                 const updateProgress = setInterval(() => {
                     if (newWindow.closed) {
@@ -1565,9 +1804,9 @@ function showAllWords() {
                         progressSpan.textContent = `${wordsAutoPlayState.playedIndices.length} / ${allWords.length}`;
                     }
                 }, 500);
-                
+
                 newWindow.wordsProgressInterval = updateProgress;
-                
+
                 newWindow.onbeforeunload = function() {
                     if (newWindow.wordsProgressInterval) {
                         clearInterval(newWindow.wordsProgressInterval);
@@ -1582,9 +1821,23 @@ function showAllWords() {
                 };
             } catch(e) {}
         }, 100);
-        
+
     } else {
         alert("Popup blocked. Please allow popups for this site.");
+    }
+}
+
+function initQuizTab() {
+    if (!quizGenerated && allWords && allWords.length > 0) {
+        generateQuizData(allWords);
+        renderQuizTable();
+    } else if (quizGenerated) {
+        renderQuizTable();
+    } else {
+        const container = document.getElementById('quizBody');
+        if (container) {
+            container.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No words loaded. Please select a file first.</td></tr>`;
+        }
     }
 }
 
