@@ -1625,6 +1625,78 @@ function initQuizTab() {
     }
 }
 
+// ===== 新增：彈窗內單一單字朗讀（英文3次 + 中文1次） =====
+function playSingleWord(word, meaning) {
+    if (!word) return;
+    
+    // 停止目前正在播放的語音（避免重疊）
+    stopAllReading();
+    
+    let step = 0;
+    let repeatCount = 0;
+    let isCancelled = false;
+    
+    function cancelPlayback() {
+        isCancelled = true;
+        try { synth.cancel(); } catch(e) {}
+    }
+    
+    function speakNext() {
+        if (isCancelled) {
+            return;
+        }
+        
+        if (step === 0) {
+            // 英文朗讀 3 次
+            speakOnce(word, () => {
+                if (isCancelled) return;
+                repeatCount++;
+                if (repeatCount < 3) {
+                    setTimeout(speakNext, 450);
+                } else {
+                    step = 1;
+                    repeatCount = 0;
+                    setTimeout(speakNext, 450);
+                }
+            }, 0.85);
+        } else if (step === 1) {
+            // 中文朗讀 1 次（使用粵語語音）
+            const utterance = new SpeechSynthesisUtterance(meaning);
+            utterance.lang = "yue";
+            utterance.rate = 0.85;
+            utterance.pitch = 1.0;
+            utterance.volume = 1;
+            
+            const voice = getCantoneseVoice();
+            if (voice) {
+                utterance.voice = voice;
+            }
+            
+            let completed = false;
+            
+            utterance.onend = () => {
+                if (completed) return;
+                completed = true;
+            };
+            
+            utterance.onerror = (err) => {
+                console.error('Cantonese speech error:', err);
+                if (completed) return;
+                completed = true;
+            };
+            
+            try {
+                synth.speak(utterance);
+            } catch(e) {
+                console.error('Failed to speak Cantonese:', e);
+            }
+        }
+    }
+    
+    // 確保英文語音引擎就緒後開始
+    ensureVoiceEngine(speakNext);
+}
+
 function showAllWords() {
     if (allWords.length === 0) {
         alert('No words loaded. Please select a file first.');
@@ -1774,8 +1846,13 @@ for (let i = 0; i < allWords.length; i++) {
                     <div class="words-table-wrapper">
                         <table class="words-table">
                             <thead>
-                                <tr><th>Day</th><th>Word</th><th>Meaning</th></tr>
-                            </thead>
+    <tr>
+        <th>Day</th>
+        <th>Word</th>
+        <th>Meaning</th>
+        <th style="text-align: center; width: 70px;">Listen</th>
+    </tr>
+</thead>
                             <tbody>
                                 ${tableRows}
                             </tbody>
@@ -2228,6 +2305,25 @@ for (let i = 0; i < allWords.length; i++) {
             
             // ===== 初始化 Quiz =====
             initQuizInPopup();
+
+            // ===== Listen 單字按鈕事件（複製 Quiz Listen 按鈕的模式） =====
+document.querySelectorAll('.listen-single-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const word = this.dataset.word;
+        const meaning = this.dataset.meaning;
+        
+        // 呼叫父視窗的 playSingleWord 函數
+        if (window.opener && typeof window.opener.playSingleWord === 'function') {
+            window.opener.playSingleWord(word, meaning);
+        } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
+            window.parent.playSingleWord(word, meaning);
+        } else {
+            alert('Audio function not available. Please refresh the page.');
+        }
+    });
+});
+
         </script>
     </body>
     </html>`;
@@ -2235,6 +2331,7 @@ for (let i = 0; i < allWords.length; i++) {
     // 開啟彈窗
     const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
     if (newWindow) {
+        newWindow.playSingleWord = playSingleWord;
         newWindow.document.write(allHtml);
         newWindow.document.close();
         
