@@ -1706,7 +1706,7 @@ function showAllWords() {
     const fileNice = removeFileExtension(currentFileName);
     
     // ===== 生成 Words List 表格 =====
-    let tableRows = '';
+let tableRows = '';
 for (let i = 0; i < allWords.length; i++) {
     const w = allWords[i];
     tableRows += `
@@ -1715,7 +1715,7 @@ for (let i = 0; i < allWords.length; i++) {
             <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
             <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
             <td style="padding: 10px 12px; text-align: center; width: 60px;">
-                <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}">🔊</button>
+                <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
             </td>
         </tr>
     `;
