@@ -2332,6 +2332,7 @@ document.querySelectorAll('.listen-single-btn').forEach(btn => {
     const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
     if (newWindow) {
         newWindow.playSingleWord = playSingleWord;
+        newWindow.escapeHtml = escapeHtml;
         newWindow.document.write(allHtml);
         newWindow.document.close();
         
