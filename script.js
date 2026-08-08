@@ -2329,21 +2329,31 @@ document.querySelectorAll('.listen-single-btn').forEach(btn => {
     </html>`;
     
     // 開啟彈窗
-    const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
-    if (newWindow) {
-        newWindow.playSingleWord = playSingleWord;
-        newWindow.escapeHtml = escapeHtml;
-        newWindow.document.write(allHtml);
-        newWindow.document.close();
-        
-        // 將外部的函數引用傳遞給彈窗
-        newWindow.getAvailableVoice = getAvailableVoice;
-        newWindow.getCantoneseVoice = getCantoneseVoice;
-        newWindow.escapeHtml = escapeHtml;
-        
-    } else {
-        alert("Popup blocked. Please allow popups for this site.");
-    }
+const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
+if (newWindow) {
+    // 將必要的函數傳遞給彈窗
+    newWindow.playSingleWord = playSingleWord;
+    newWindow.escapeHtml = escapeHtml;
+    newWindow.getAvailableVoice = getAvailableVoice;
+    newWindow.getCantoneseVoice = getCantoneseVoice;
+    newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
+    newWindow.stopWordsAutoPlay = stopWordsAutoPlay;
+    newWindow.switchWordsPlayMode = switchWordsPlayMode;
+    newWindow.initQuizTab = initQuizTab;
+    newWindow.speakOnce = speakOnce;
+    newWindow.stopAllReading = stopAllReading;
+    newWindow.quizData = quizData;
+    newWindow.quizGenerated = quizGenerated;
+    newWindow.currentQuestionIdx = currentQuestionIdx;
+    newWindow.allWordsData = allWords;
+    
+    newWindow.document.write(allHtml);
+    newWindow.document.close();
+    
+    // ... 後續設定（setTimeout 等）保持不變 ...
+} else {
+    alert("Popup blocked. Please allow popups for this site.");
+}
 }
 
 // ====================== Show All Sentences 彈窗 ======================
