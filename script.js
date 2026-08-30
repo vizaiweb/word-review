@@ -2639,8 +2639,59 @@ newWindow.allSentences = allSentences;
         .sentence-builder .builder-meaning .listen-btn-builder:hover { background: #e2e8f0; }
         .sentence-builder .builder-meaning .listen-btn-builder:active { transform: scale(0.9); }
         
-        .sentence-builder .builder-dropzone { min-height: 80px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 16px; transition: all 0.2s; position: relative; }
-        
+        .sentence-builder .builder-dropzone {
+    min-height: 80px;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.sentence-builder .builder-dropzone.drag-over {
+    border-color: #ff9a56;
+    background: #fff7ed;
+}
+
+/* ===== 【新增】原始區樣式 ===== */
+.builder-source-area {
+    margin-bottom: 16px;
+}
+
+/* ===== 【新增】目標區樣式 ===== */
+.builder-target-area {
+    margin-bottom: 16px;
+    border-top: 2px dashed #cbd5e1;
+    padding-top: 16px;
+}
+
+/* ===== 【新增】空位樣式 ===== */
+.empty-slot {
+    display: inline-block;
+    padding: 10px 16px;
+    min-width: 50px;
+    background: #f1f5f9;
+    border: 2px dashed #94a3b8;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #94a3b8;
+    text-align: center;
+    user-select: none;
+    transition: all 0.2s;
+}
+
+.empty-slot.drag-over-me {
+    border-color: #ff9a56;
+    background: #fff7ed;
+}
         .sentence-builder .word-token { display: inline-block; padding: 10px 16px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 18px; font-weight: 500; color: #1e293b; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; }
         /* ===== 【新增】拖曳中的單字方塊樣式 ===== */
 .sentence-builder .word-token.dragging {
