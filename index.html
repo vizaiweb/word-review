@@ -7,14 +7,785 @@
     <!-- Excel 解析庫 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* ===== 所有樣式保持與您現有版本完全相同 ===== */
-        /* （請保留您現有的所有 CSS 樣式） */
+        <style>
+        /* ====================== 全局基礎樣式 ====================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f4f8;
+            padding: 15px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff9a56, #ff6b35);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            letter-spacing: 1px;
+        }
+
+        .select-section {
+            padding: 16px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .select-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .select-row label {
+            font-weight: 600;
+            color: #1e293b;
+            min-width: 60px;
+        }
+        .select-row select, .select-row input {
+            flex: 1;
+            padding: 8px 10px;
+            font-size: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            background: white;
+            height: 42px;
+        }
+        
+        .save-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .save-btn {
+            background: white !important;
+            color: #ff6b35 !important;
+            border: 2px solid #ff9a56 !important;
+            padding: 6px 15px !important;
+            border-radius: 30px !important;
+            font-weight: bold !important;
+            cursor: pointer !important;
+            transition: transform 0.1s !important;
+        }
+        .save-btn:active {
+            transform: scale(0.96) !important;
+        }
+
+        #dayRow {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 8px;
+        }
+        #dayRow label {
+            flex-shrink: 0;
+            min-width: 50px;
+        }
+        #daySelect {
+            flex: 2;
+            min-width: 0;
+        }
+        #dayNum {
+            flex: 1;
+            min-width: 60px;
+        }
+        #filterBtn {
+            flex-shrink: 0;
+            min-width: 70px;
+            background: #2b7e3a;
+            border: none;
+            border-radius: 30px;
+            color: white;
+            padding: 8px 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        #filterBtn:active {
+            transform: scale(0.96);
+        }
+        
+        @media (max-width: 550px) {
+            #dayRow {
+                gap: 6px;
+            }
+            #dayRow label {
+                min-width: 45px;
+                font-size: 14px;
+            }
+            #daySelect {
+                flex: 2;
+            }
+            #dayNum {
+                flex: 1;
+                min-width: 55px;
+                font-size: 14px;
+            }
+            #filterBtn {
+                min-width: 65px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        }
+
+        .practice-section {
+            padding: 20px 18px;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        
+        .meaning {
+            font-size: 26px;
+            color: #0f172a;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .word {
+            font-size: clamp(28px, 8vw, 52px);
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 20px;
+            word-break: break-word;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .btn-group button {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            background: #22c55e;
+            transition: transform 0.1s;
+        }
+        .btn-group button:active {
+            transform: scale(0.96);
+        }
+        .btn-prev:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .show-all-btn {
+            background: #3b82f6;
+            border: none;
+            border-radius: 40px;
+            padding: 12px;
+            color: white;
+            font-weight: bold;
+            margin: 8px 0 0;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: transform 0.1s;
+        }
+        .show-all-btn:active {
+            transform: scale(0.97);
+        }
+        .info-tip {
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .sentence-section {
+            background: #fef9e8;
+            border-top: 3px solid #ffb347;
+            padding: 20px 18px;
+            border-radius: 0 0 20px 20px;
+        }
+        .sentence-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ffd966;
+            padding-bottom: 8px;
+        }
+        .sentence-header h3 {
+            font-size: 1.5rem;
+            color: #c2410c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sentence-stats {
+            font-size: 14px;
+            background: #fff1d6;
+            padding: 4px 12px;
+            border-radius: 40px;
+        }
+        .sentence-meaning {
+            font-size: 22px;
+            color: #2c3e2f;
+            background: #fff6e5;
+            padding: 12px;
+            border-radius: 20px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .sentence-en {
+            font-size: clamp(20px, 6vw, 32px);
+            font-weight: bold;
+            color: #b45309;
+            margin: 12px 0;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .sentence-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .sentence-buttons button {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            background: #22c55e;
+            transition: transform 0.1s;
+        }
+        .sentence-buttons button:active {
+            transform: scale(0.96);
+        }
+        .sentence-prev:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .btn-sentence-all {
+            background: #3b82f6;
+            border: none;
+            border-radius: 40px;
+            padding: 12px;
+            color: white;
+            font-weight: bold;
+            margin-top: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: transform 0.1s;
+        }
+        .btn-sentence-all:active {
+            transform: scale(0.97);
+        }
+        .sentence-tip {
+            font-size: 12px;
+            text-align: center;
+            color: #a16207;
+            margin-top: 12px;
+        }
+        
+        button.reading-disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        
+        .footer {
+            max-width: 700px;
+            margin: 20px auto 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #5b6e8c;
+        }
+        .footer a {
+            color: #ff6b35;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+/* ====================== 彈窗內分頁樣式 ====================== */
+.tab-bar {
+    display: flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 12px;
+    margin: 0 20px 16px 20px;
+    gap: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: transparent;
+    color: #64748b;
+}
+
+.tab-btn:hover {
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #ff9a56, #ff6b35);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.tab-panel {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====================== Quiz 分頁樣式 ====================== */
+.quiz-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    background: #f8fafc;
+    padding: 12px 20px;
+    border-radius: 12px;
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1e293b;
+    flex-wrap: wrap;
+}
+
+.quiz-stats span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.quiz-stats .stat-number {
+    color: #ff6b35;
+    font-weight: 700;
+}
+
+.quiz-table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 12px;
+}
+
+.quiz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 700px;
+}
+
+.quiz-table thead th {
+    background: #f8fafc;
+    padding: 10px 8px;
+    text-align: center;
+    font-weight: 600;
+    color: #1e293b;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.quiz-table tbody td {
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.quiz-table tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.quiz-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.quiz-table tbody tr.current-row {
+    background: #fff3cd !important;
+}
+
+.quiz-table tbody tr.current-row:hover {
+    background: #ffedb3 !important;
+}
+
+.quiz-table .col-no {
+    width: 50px;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.quiz-table .col-no .current-marker {
+    color: #ff6b35;
+    margin-right: 4px;
+}
+
+.quiz-table .col-explanation {
+    text-align: left;
+    min-width: 150px;
+    max-width: 250px;
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.quiz-table .col-option {
+    min-width: 70px;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 6px 4px;
+    transition: all 0.2s;
+}
+
+.quiz-table .col-option:hover {
+    background: #e2e8f0;
+}
+
+.quiz-table .col-option.option-correct {
+    background: #dcfce7 !important;
+    color: #15803d;
+    border-radius: 6px;
+}
+
+.quiz-table .col-option.option-wrong {
+    background: #fee2e2 !important;
+    color: #dc2626;
+    border-radius: 6px;
+}
+
+.quiz-table .col-option.option-disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.quiz-table .col-option.option-disabled:hover {
+    background: transparent;
+}
+
+.quiz-table .col-your-answer {
+    font-weight: 500;
+    color: #1e293b;
+    min-width: 70px;
+}
+
+.quiz-table .col-your-answer .not-answered {
+    color: #94a3b8;
+    font-weight: 400;
+    font-size: 12px;
+}
+
+.quiz-table .col-result {
+    min-width: 50px;
+    font-size: 18px;
+}
+
+.quiz-table .col-result .result-correct {
+    color: #22c55e;
+}
+
+.quiz-table .col-result .result-wrong {
+    color: #ef4444;
+}
+
+.quiz-table .col-listen {
+    min-width: 50px;
+}
+
+.quiz-table .listen-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.quiz-table .listen-btn:hover {
+    background: #e2e8f0;
+    transform: scale(1.1);
+}
+
+.quiz-table .listen-btn:active {
+    transform: scale(0.9);
+}
+
+.quiz-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 4px 0 4px;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.quiz-footer .quiz-progress {
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* ====================== 彈窗內 Words List 分頁樣式調整 ====================== */
+.words-control-bar {
+    background: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.words-control-bar .play-btn {
+    background: #22c55e;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 8px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.words-control-bar .play-btn:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .play-btn:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(0.97);
+}
+
+.words-control-bar .stop-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 8px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.words-control-bar .stop-btn:disabled {
+    background: #f0a3a3;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .stop-btn:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(0.97);
+}
+
+.words-control-bar .mode-switch {
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 160px;
+}
+
+.words-control-bar .mode-switch:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.words-control-bar .words-progress {
+    font-size: 14px;
+    color: #1e293b;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+/* ===== 新增：單字朗讀按鈕樣式 ===== */
+.listen-single-btn {
+    background: none !important;
+    border: none !important;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+.listen-single-btn:hover {
+    background: #e2e8f0 !important;
+    transform: scale(1.1)!important;
+}
+.listen-single-btn:active {
+    transform: scale(0.9)!important;
+}       
+        
+/* ====================== 響應式調整 ====================== */
+@media (max-width: 600px) {
+    .quiz-stats {
+        gap: 12px;
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+    
+    .quiz-table {
+        font-size: 12px;
+        min-width: 600px;
+    }
+    
+    .quiz-table thead th,
+    .quiz-table tbody td {
+        padding: 6px 4px;
+        font-size: 12px;
+    }
+    
+    .quiz-table .col-explanation {
+        min-width: 100px;
+        max-width: 150px;
+        font-size: 12px;
+    }
+    
+    .quiz-table .col-option {
+        min-width: 55px;
+        font-size: 12px;
+    }
+    
+    .tab-btn {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+    
+    .words-control-bar {
+        gap: 8px;
+        padding: 10px 12px;
+    }
+    
+    .words-control-bar .play-btn,
+    .words-control-bar .stop-btn {
+        padding: 6px 16px;
+        font-size: 12px;
+    }
+    
+    .words-control-bar .mode-switch {
+        font-size: 11px;
+        min-width: 120px;
+        padding: 4px 12px;
+    }
+}
+        
     </style>
 </head>
 <body>
 <div class="container">
-    <!-- ===== 所有 HTML 結構保持與您現有版本完全相同 ===== -->
-    <!-- （請保留您現有的所有 HTML 內容） -->
+    <div class="header">
+        <h1>🌟 Kids English 🌟</h1>
+    </div>
+
+    <div class="select-section">
+        <div class="save-row">
+            <button id="saveSettingsBtn" class="save-btn">💾 Save Progress</button>
+        </div>
+        
+        <div class="select-row" id="levelRow">
+            <label>Level:</label>
+            <select id="levelSelect">
+                <option value="">Please Select</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="Common_Knowledge">Common_Knowledge</option>
+            </select>
+        </div>
+        
+        <div class="select-row" id="fileRow">
+            <label>File:</label>
+            <select id="fileSelect">
+                <option value="">Please Select</option>
+            </select>
+        </div>
+        
+        <div class="select-row" id="dayRow" style="display:none;">
+            <label>Day:</label>
+            <select id="daySelect">
+                <option value="all" selected>All Words</option>
+                <option value="custom">Custom Day</option>
+            </select>
+            <input type="text" id="dayNum" value="--" readonly>
+            <button class="btn-filter" id="filterBtn">Filter</button>
+        </div>
+    </div>
+
+    <div class="practice-section" id="wordPracticeArea">
+        <div id="wordContent"><p style="color:#64748b;">✨ Select Level & File to start ✨</p></div>
+        <button class="show-all-btn" id="showAllBtn" style="display:none;">📋 Show All Words</button>
+        <div id="infoTipContainer" class="info-tip"></div>
+    </div>
+
+    <div class="sentence-section" id="sentenceArea" style="display:none;">
+        <div class="sentence-header">
+            <h3>✏️ Sentence Practice</h3>
+            <span class="sentence-stats" id="sentenceStats">0 sentences</span>
+        </div>
+        <div id="sentenceContent">
+            <div class="sentence-meaning">💡 Chinese meaning will appear</div>
+            <div class="sentence-en" id="sentenceEnHidden" style="display:none;"></div>
+            <div class="sentence-buttons">
+                <button id="showSentenceBtn">📖 Show Sentence</button>
+                <button id="readSentenceBtn">🔊 Read 3x</button>
+                <button id="prevSentenceBtn" class="sentence-prev">⬅️ Previous</button>
+                <button id="nextSentenceBtn">➡️ Next</button>
+            </div>
+            <button id="showAllSentencesBtn" class="btn-sentence-all">📜 Show All Sentences</button>
+            <div class="sentence-tip" id="sentenceTip">⭐ Practice everyday sentences!</div>
+        </div>
+    </div>
 </div>
 <div class="footer">
     <a href="about.html">About</a> | <a href="privacy.html">Privacy Policy</a> | <a href="disclaimer.html">Disclaimer</a>
