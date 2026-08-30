@@ -3069,6 +3069,7 @@ newWindow.allSentences = allSentences;
         // 获取所有可放置的目标（source区域的所有token，target区域的所有token和空位）
         const allTargets = document.querySelectorAll('.source-token, .target-token, .empty-slot');
         allTargets.forEach(el => {
+        if (el === dragData.element) return;
             const rect = el.getBoundingClientRect();
             const cx = rect.left + rect.width/2;
             const cy = rect.top + rect.height/2;
