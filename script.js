@@ -2534,6 +2534,7 @@ function switchSentencesPlayMode() {
 }
 
 function showAllSentencesPopup() {
+    // 防止重複彈窗
     if (sentencesAutoPlayState.playWindow && !sentencesAutoPlayState.playWindow.closed) {
         try {
             sentencesAutoPlayState.playWindow.focus();
@@ -2553,6 +2554,14 @@ function showAllSentencesPopup() {
         alert("Popup blocked. Please allow popups for this site.");
         return;
     }
+
+    // ===== 【修復 1】將必要的函數暴露給彈窗 =====
+    newWindow.toggleSentencesAutoPlay = toggleSentencesAutoPlay;
+    newWindow.stopSentencesAutoPlay = stopSentencesAutoPlay;
+    newWindow.switchSentencesPlayMode = switchSentencesPlayMode;
+    newWindow.sentencesAutoPlayState = sentencesAutoPlayState;
+    newWindow.allSentences = allSentences;
+    newWindow.escapeHtml = escapeHtml;
 
     sentencesAutoPlayState.playWindow = newWindow;
 
@@ -2625,8 +2634,34 @@ function showAllSentencesPopup() {
             </div>
         </div>
         <script>
+            // ===== 【修復 2】綁定 Play All / Stop / Random 按鈕 =====
+            document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
+                if (window.opener && typeof window.opener.toggleSentencesAutoPlay === 'function') {
+                    window.opener.toggleSentencesAutoPlay();
+                } else {
+                    console.error('toggleSentencesAutoPlay not available');
+                    alert('Function not available. Please close and reopen the popup.');
+                }
+            });
+            
+            document.getElementById('sentencesStopBtn').addEventListener('click', function() {
+                if (window.opener && typeof window.opener.stopSentencesAutoPlay === 'function') {
+                    window.opener.stopSentencesAutoPlay();
+                } else {
+                    console.error('stopSentencesAutoPlay not available');
+                }
+            });
+            
+            document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
+                if (window.opener && typeof window.opener.switchSentencesPlayMode === 'function') {
+                    window.opener.switchSentencesPlayMode();
+                } else {
+                    console.error('switchSentencesPlayMode not available');
+                }
+            });
+            
             window.sentenceData = ${JSON.stringify(allSentences)};
-        </script>
+        <\/script>
     </body>
     </html>`;
 
