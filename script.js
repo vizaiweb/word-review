@@ -2806,9 +2806,9 @@ newWindow.allSentences = allSentences;
             const current = builderState.currentIndex + 1;
             const shuffledWords = builderState.shuffledWords;
             
-            let tokensHtml = shuffledWords.map(word => {
-                return '<span class="word-token">' + escapeHtml(word) + '</span>';
-            }).join('');
+            let tokensHtml = shuffledWords.map((word, idx) => {
+    return '<span class="word-token" data-index="' + idx + '">' + escapeHtml(word) + '</span>';
+}).join('');
             
             if (tokensHtml === '') {
                 tokensHtml = '<span class="empty-hint">⚠️ No words to arrange</span>';
@@ -2844,54 +2844,250 @@ newWindow.allSentences = allSentences;
         }
         
         function bindBuilderEvents() {
-            const listenBtn = document.getElementById('builderListenBtn');
-            if (listenBtn) {
-                listenBtn.onclick = function() {
-                    const sentence = builderState.sentences[builderState.currentIndex];
-                    if (sentence && sentence.sentence_en) {
-                        if (window.opener && typeof window.opener.speakOnce === 'function') {
-                            window.opener.speakOnce(sentence.sentence_en, null, 0.85);
-                        } else {
-                            const utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
-                            utterance.lang = 'en-US';
-                            utterance.rate = 0.85;
-                            speechSynthesis.speak(utterance);
-                        }
-                    }
-                };
+    // ===== 朗讀按鈕 =====
+    const listenBtn = document.getElementById('builderListenBtn');
+    if (listenBtn) {
+        listenBtn.onclick = function() {
+            const sentence = builderState.sentences[builderState.currentIndex];
+            if (sentence && sentence.sentence_en) {
+                if (window.opener && typeof window.opener.speakOnce === 'function') {
+                    window.opener.speakOnce(sentence.sentence_en, null, 0.85);
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.85;
+                    speechSynthesis.speak(utterance);
+                }
             }
-            
-            const prevBtn = document.getElementById('builderPrevBtn');
-            if (prevBtn) {
-                prevBtn.onclick = function() {
-                    if (builderState.currentIndex > 0) {
-                        builderState.currentIndex--;
-                        loadSentence(builderState.currentIndex);
-                    }
-                };
+        };
+    }
+    
+    // ===== 上一句 / 下一句 / Shuffle =====
+    const prevBtn = document.getElementById('builderPrevBtn');
+    if (prevBtn) {
+        prevBtn.onclick = function() {
+            if (builderState.currentIndex > 0) {
+                builderState.currentIndex--;
+                loadSentence(builderState.currentIndex);
             }
-            
-            const nextBtn = document.getElementById('builderNextBtn');
-            if (nextBtn) {
-                nextBtn.onclick = function() {
-                    if (builderState.currentIndex < builderState.totalCount - 1) {
-                        builderState.currentIndex++;
-                        loadSentence(builderState.currentIndex);
-                    }
-                };
+        };
+    }
+    
+    const nextBtn = document.getElementById('builderNextBtn');
+    if (nextBtn) {
+        nextBtn.onclick = function() {
+            if (builderState.currentIndex < builderState.totalCount - 1) {
+                builderState.currentIndex++;
+                loadSentence(builderState.currentIndex);
             }
-            
-            const shuffleBtn = document.getElementById('builderShuffleBtn');
-            if (shuffleBtn) {
-                shuffleBtn.onclick = function() {
-                    const sentence = builderState.sentences[builderState.currentIndex];
-                    if (sentence) {
-                        builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
-                        renderBuilder();
-                    }
-                };
+        };
+    }
+    
+    const shuffleBtn = document.getElementById('builderShuffleBtn');
+    if (shuffleBtn) {
+        shuffleBtn.onclick = function() {
+            const sentence = builderState.sentences[builderState.currentIndex];
+            if (sentence) {
+                builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
+                renderBuilder();
             }
+        };
+    }
+    
+    // ===== 【新增】拖曳功能（支援滑鼠 + 觸控） =====
+    const dropzone = document.getElementById('builderDropzone');
+    if (!dropzone) return;
+    
+    let dragData = null;        // 滑鼠拖曳狀態
+    let touchData = null;       // 觸控拖曳狀態
+    
+    // --- 滑鼠事件 ---
+    function onMouseDown(e) {
+        const token = e.target.closest('.word-token');
+        if (!token) return;
+        if (builderState.isAnswered) return;
+        
+        const index = parseInt(token.dataset.index);
+        if (isNaN(index)) return;
+        
+        dragData = {
+            index: index,
+            element: token,
+            startX: e.clientX,
+            startY: e.clientY
+        };
+        token.classList.add('dragging');
+        e.preventDefault();
+    }
+    
+    function onMouseMove(e) {
+        if (!dragData) return;
+        e.preventDefault();
+        
+        const dropzone = document.getElementById('builderDropzone');
+        if (!dropzone) return;
+        
+        const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
+        let targetIndex = -1;
+        
+        tokens.forEach(token => {
+            const rect = token.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+            if (dist < 80) {
+                const idx = parseInt(token.dataset.index);
+                if (!isNaN(idx) && idx !== dragData.index) {
+                    targetIndex = idx;
+                }
+            }
+        });
+        
+        tokens.forEach(token => {
+            const idx = parseInt(token.dataset.index);
+            if (idx === targetIndex) {
+                token.classList.add('drag-over-me');
+            } else {
+                token.classList.remove('drag-over-me');
+            }
+        });
+        
+        builderState.dragOverIndex = targetIndex;
+    }
+    
+    function onMouseUp(e) {
+        if (dragData) {
+            const dropzone = document.getElementById('builderDropzone');
+            if (dropzone) {
+                dropzone.querySelectorAll('.word-token').forEach(t => {
+                    t.classList.remove('drag-over-me', 'dragging');
+                });
+                
+                if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== dragData.index) {
+                    const from = dragData.index;
+                    const to = builderState.dragOverIndex;
+                    const shuffled = builderState.shuffledWords;
+                    const temp = shuffled[from];
+                    shuffled[from] = shuffled[to];
+                    shuffled[to] = temp;
+                    builderState.shuffledWords = shuffled;
+                    renderBuilder();
+                } else {
+                    renderBuilder();
+                }
+            }
+            dragData = null;
+            builderState.dragOverIndex = null;
         }
+    }
+    
+    // --- 觸控事件 ---
+    function onTouchStart(e) {
+        const token = e.target.closest('.word-token');
+        if (!token) return;
+        if (builderState.isAnswered) return;
+        
+        const touch = e.touches[0];
+        const index = parseInt(token.dataset.index);
+        if (isNaN(index)) return;
+        
+        touchData = {
+            index: index,
+            element: token,
+            startX: touch.clientX,
+            startY: touch.clientY
+        };
+        token.classList.add('dragging');
+    }
+    
+    function onTouchMove(e) {
+        if (!touchData) return;
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        const dropzone = document.getElementById('builderDropzone');
+        if (!dropzone) return;
+        
+        const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
+        let targetIndex = -1;
+        
+        tokens.forEach(token => {
+            const rect = token.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dist = Math.sqrt(Math.pow(touch.clientX - centerX, 2) + Math.pow(touch.clientY - centerY, 2));
+            if (dist < 80) {
+                const idx = parseInt(token.dataset.index);
+                if (!isNaN(idx) && idx !== touchData.index) {
+                    targetIndex = idx;
+                }
+            }
+        });
+        
+        tokens.forEach(token => {
+            const idx = parseInt(token.dataset.index);
+            if (idx === targetIndex) {
+                token.classList.add('drag-over-me');
+            } else {
+                token.classList.remove('drag-over-me');
+            }
+        });
+        
+        builderState.dragOverIndex = targetIndex;
+    }
+    
+    function onTouchEnd(e) {
+        if (touchData) {
+            const dropzone = document.getElementById('builderDropzone');
+            if (dropzone) {
+                dropzone.querySelectorAll('.word-token').forEach(t => {
+                    t.classList.remove('drag-over-me', 'dragging');
+                });
+                
+                if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== touchData.index) {
+                    const from = touchData.index;
+                    const to = builderState.dragOverIndex;
+                    const shuffled = builderState.shuffledWords;
+                    const temp = shuffled[from];
+                    shuffled[from] = shuffled[to];
+                    shuffled[to] = temp;
+                    builderState.shuffledWords = shuffled;
+                    renderBuilder();
+                } else {
+                    renderBuilder();
+                }
+            }
+            touchData = null;
+            builderState.dragOverIndex = null;
+        }
+    }
+    
+    // --- 綁定事件（每次都重新綁定，確保最新 DOM） ---
+    // 移除舊的事件監聽器（避免重複綁定）
+    if (window._builderDragCleanup) {
+        window._builderDragCleanup();
+    }
+    
+    // 綁定滑鼠事件
+    dropzone.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    
+    // 綁定觸控事件
+    dropzone.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    
+    // 儲存清理函數
+    window._builderDragCleanup = function() {
+        dropzone.removeEventListener('mousedown', onMouseDown);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        dropzone.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+    };
+}
         
         // ===== 綁定 Sentence List 控制按鈕 =====
         document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
