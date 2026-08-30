@@ -2755,11 +2755,13 @@ newWindow.allSentences = allSentences;
         
         // ===== Sentence Builder 邏輯 =====
         let builderState = {
-            sentences: [],
-            currentIndex: 0,
-            shuffledWords: [],
-            totalCount: 0
-        };
+    sentences: [],
+    currentIndex: 0,
+    sourceWords: [],     // 原始区域的单词列表（包含所有单词，未被拖走的）
+    targetWords: [],     // 目标区域的单词列表（长度等于单词数，null表示空位）
+    totalCount: 0,
+    isAnswered: false
+};
         
         function shuffleArray(arr) {
             const shuffled = [...arr];
@@ -2791,68 +2793,100 @@ newWindow.allSentences = allSentences;
         }
         
         function loadSentence(index) {
-            const sentences = builderState.sentences;
-            if (!sentences || sentences.length === 0 || index >= sentences.length) return;
-            
-            builderState.currentIndex = index;
-            const sentence = sentences[index];
-            builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
-            renderBuilder();
-        }
+    const sentences = builderState.sentences;
+    if (!sentences || sentences.length === 0 || index >= sentences.length) return;
+    
+    builderState.currentIndex = index;
+    const sentence = sentences[index];
+    const words = splitSentence(sentence.sentence_en);
+    // 初始化：所有单词在source，target全为空
+    builderState.sourceWords = shuffleArray([...words]);  // 随机排列
+    builderState.targetWords = words.map(() => null);     // 全空
+    builderState.isAnswered = false;
+    renderBuilder();
+}
         
         function renderBuilder() {
-            const container = document.getElementById('builderContainer');
-            if (!container) return;
-            
-            const sentence = builderState.sentences[builderState.currentIndex];
-            if (!sentence) {
-                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
-                return;
-            }
-            
-            const total = builderState.totalCount;
-            const current = builderState.currentIndex + 1;
-            const shuffledWords = builderState.shuffledWords;
-            
-            let tokensHtml = shuffledWords.map((word, idx) => {
-    return '<span class="word-token" data-index="' + idx + '">' + escapeHtml(word) + '</span>';
-}).join('');
-            
-            if (tokensHtml === '') {
-                tokensHtml = '<span class="empty-hint">⚠️ No words to arrange</span>';
-            }
-            
-            const isFirst = (builderState.currentIndex === 0);
-            const isLast = (builderState.currentIndex >= builderState.totalCount - 1);
-            
-            container.innerHTML = 
-                '<div class="sentence-builder">' +
-                    '<div class="builder-header">' +
-                        '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
-                        '<span class="score-text">💡 Drag to arrange</span>' +
-                        '<div class="builder-controls">' +
-                            '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="builder-meaning">' +
-                        '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
-                    '</div>' +
-                    '<div class="builder-dropzone" id="builderDropzone">' +
-                        tokensHtml +
-                    '</div>' +
-                    '<div class="builder-actions">' +
-                        '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>⬅️ Previous</button>' +
-                        '<button class="btn-shuffle" id="builderShuffleBtn">🔀 Shuffle</button>' +
-                        '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>➡️ Next</button>' +
-                    '</div>' +
-                    '<div class="builder-feedback">📝 Drag the words to arrange them in the correct order</div>' +
-                '</div>';
-            
-            bindBuilderEvents();
+    const container = document.getElementById('builderContainer');
+    if (!container) return;
+    
+    const sentence = builderState.sentences[builderState.currentIndex];
+    if (!sentence) {
+        container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+        return;
+    }
+    
+    const total = builderState.totalCount;
+    const current = builderState.currentIndex + 1;
+    const sourceWords = builderState.sourceWords;
+    const targetWords = builderState.targetWords;
+    const isAnswered = builderState.isAnswered;
+    
+    // 生成原始区方塊
+    let sourceHtml = '';
+    if (sourceWords.length === 0) {
+        sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All words placed)</span>';
+    } else {
+        sourceHtml = sourceWords.map((word, idx) => {
+            return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtml(word) + '</span>';
+        }).join('');
+    }
+    
+    // 生成目标区空位
+    let targetHtml = targetWords.map((word, idx) => {
+        if (word !== null) {
+            return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtml(word) + '</span>';
+        } else {
+            return '<span class="word-token target-token empty-slot" data-target-index="' + idx + '">?</span>';
         }
+    }).join('');
+    
+    // 检查是否全部填满
+    const allFilled = targetWords.every(w => w !== null);
+    
+    // 按钮状态
+    const isFirst = (builderState.currentIndex === 0);
+    const isLast = (builderState.currentIndex >= builderState.totalCount - 1);
+    
+    container.innerHTML = 
+        '<div class="sentence-builder">' +
+            '<div class="builder-header">' +
+                '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
+                '<span class="score-text">💡 Drag words to the slots</span>' +
+                '<div class="builder-controls">' +
+                    '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="builder-meaning">' +
+                '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
+            '</div>' +
+            '<div class="builder-source-area">' +
+                '<div class="builder-dropzone source-dropzone" id="sourceDropzone">' +
+                    sourceHtml +
+                '</div>' +
+            '</div>' +
+            '<div class="builder-target-area">' +
+                '<div class="builder-dropzone target-dropzone" id="targetDropzone">' +
+                    targetHtml +
+                '</div>' +
+            '</div>' +
+            '<div class="builder-actions">' +
+                '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>⬅️ Previous</button>' +
+                '<button class="btn-shuffle" id="builderShuffleBtn">🔀 Shuffle</button>' +
+                '<button class="btn-check" id="builderCheckBtn" ' + (isAnswered ? 'disabled' : '') + '>✅ Check Answer</button>' +
+                '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>➡️ Next</button>' +
+            '</div>' +
+            '<div class="builder-feedback" id="builderFeedback">' + 
+                (isAnswered ? (allFilled && targetWords.every((w, i) => w === splitSentence(sentence.sentence_en)[i]) ? '✅ Correct!' : '❌ Incorrect, try again') : '📝 Drag words to the slots') +
+            '</div>' +
+        '</div>';
+    
+    // 重新绑定事件
+    bindBuilderEvents();
+}
         
         function bindBuilderEvents() {
-    // ===== 朗讀按鈕 =====
+    // --- 按钮事件（朗读、切换、shuffle、check） ---
     const listenBtn = document.getElementById('builderListenBtn');
     if (listenBtn) {
         listenBtn.onclick = function() {
@@ -2870,7 +2904,6 @@ newWindow.allSentences = allSentences;
         };
     }
     
-    // ===== 上一句 / 下一句 / Shuffle =====
     const prevBtn = document.getElementById('builderPrevBtn');
     if (prevBtn) {
         prevBtn.onclick = function() {
@@ -2894,227 +2927,273 @@ newWindow.allSentences = allSentences;
     const shuffleBtn = document.getElementById('builderShuffleBtn');
     if (shuffleBtn) {
         shuffleBtn.onclick = function() {
+            if (builderState.isAnswered) return;
+            // 重置source为所有单词随机排列，target全空
             const sentence = builderState.sentences[builderState.currentIndex];
-            if (sentence) {
-                builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
-                renderBuilder();
-            }
+            const words = splitSentence(sentence.sentence_en);
+            builderState.sourceWords = shuffleArray([...words]);
+            builderState.targetWords = words.map(() => null);
+            renderBuilder();
         };
     }
     
-    // ===== 【拖曳功能（滑鼠 + 觸控）】 =====
-    const dropzone = document.getElementById('builderDropzone');
-    if (!dropzone) return;
+    const checkBtn = document.getElementById('builderCheckBtn');
+    if (checkBtn) {
+        checkBtn.onclick = function() {
+            checkAnswer();
+        };
+    }
     
-    let dragData = null;
-    let touchData = null;
+    // --- 拖拽逻辑（支持source和target两个区域） ---
+    const sourceDropzone = document.getElementById('sourceDropzone');
+    const targetDropzone = document.getElementById('targetDropzone');
+    if (!sourceDropzone && !targetDropzone) return;
     
-    // --- 滑鼠事件 ---
-    function onMouseDown(e) {
+    let dragData = null;   // 统一拖拽数据
+    
+    // 获取拖拽起始的token和区域
+    function getDragData(e) {
         const token = e.target.closest('.word-token');
-        if (!token) return;
-        if (builderState.isAnswered) return;
+        if (!token) return null;
+        if (builderState.isAnswered) return null;
         
-        const index = parseInt(token.dataset.index);
-        if (isNaN(index)) return;
+        const isSource = token.classList.contains('source-token');
+        const isTarget = token.classList.contains('target-token');
+        if (!isSource && !isTarget) return null;
         
-        const rect = token.getBoundingClientRect();
-        dragData = {
+        let index, type;
+        if (isSource) {
+            index = parseInt(token.dataset.sourceIndex);
+            type = 'source';
+        } else {
+            index = parseInt(token.dataset.targetIndex);
+            type = 'target';
+        }
+        if (isNaN(index)) return null;
+        
+        // 对于target，如果该位置为空（即单词为null），不能拖拽
+        if (type === 'target' && builderState.targetWords[index] === null) return null;
+        
+        return {
+            type: type,
             index: index,
             element: token,
-            offsetX: e.clientX - rect.left,
-            offsetY: e.clientY - rect.top,
-            startX: e.clientX,
-            startY: e.clientY
+            startX: e.clientX || e.touches[0].clientX,
+            startY: e.clientY || e.touches[0].clientY
         };
-        
-        // 設定拖曳樣式
-        token.style.transition = 'none';
-        token.style.zIndex = '1000';
-        token.style.transform = 'translate(0, 0)';
-        token.classList.add('dragging');
-        
-        e.preventDefault();
     }
     
-    function onMouseMove(e) {
+    function onDragStart(e) {
+        const data = getDragData(e);
+        if (!data) return;
+        dragData = data;
+        const el = data.element;
+        el.style.transition = 'none';
+        el.style.zIndex = '1000';
+        el.style.transform = 'translate(0, 0)';
+        el.classList.add('dragging');
+        if (e.type === 'mousedown') e.preventDefault();
+    }
+    
+    function onDragMove(e) {
         if (!dragData) return;
         e.preventDefault();
-        
-        const dx = e.clientX - dragData.startX;
-        const dy = e.clientY - dragData.startY;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        if (clientX === undefined) return;
+        const dx = clientX - dragData.startX;
+        const dy = clientY - dragData.startY;
         dragData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
         
-        // 計算拖曳目標
-        const dropzone = document.getElementById('builderDropzone');
-        if (!dropzone) return;
-        const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
-        let targetIndex = -1;
-        tokens.forEach(token => {
-            const rect = token.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
-            if (dist < 80) {
-                const idx = parseInt(token.dataset.index);
-                if (!isNaN(idx) && idx !== dragData.index) {
-                    targetIndex = idx;
-                }
+        // 检测当前悬停的目标区域和位置
+        // 先清除所有高亮
+        document.querySelectorAll('.word-token').forEach(t => t.classList.remove('drag-over-me'));
+        document.querySelectorAll('.empty-slot').forEach(t => t.classList.remove('drag-over-me'));
+        
+        // 检测悬停的token或空位
+        let targetElement = null;
+        let targetType = null;
+        let targetIndex = null;
+        
+        // 获取所有可放置的目标（source区域的所有token，target区域的所有token和空位）
+        const allTargets = document.querySelectorAll('.source-token, .target-token, .empty-slot');
+        allTargets.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width/2;
+            const cy = rect.top + rect.height/2;
+            const dist = Math.sqrt(Math.pow(clientX - cx, 2) + Math.pow(clientY - cy, 2));
+            if (dist < 60) {
+                targetElement = el;
             }
         });
-        tokens.forEach(token => {
-            const idx = parseInt(token.dataset.index);
-            if (idx === targetIndex) {
-                token.classList.add('drag-over-me');
-            } else {
-                token.classList.remove('drag-over-me');
+        
+        if (targetElement) {
+            targetElement.classList.add('drag-over-me');
+            // 判断目标类型和索引
+            if (targetElement.classList.contains('source-token')) {
+                targetType = 'source';
+                targetIndex = parseInt(targetElement.dataset.sourceIndex);
+            } else if (targetElement.classList.contains('target-token')) {
+                targetType = 'target';
+                targetIndex = parseInt(targetElement.dataset.targetIndex);
+            } else if (targetElement.classList.contains('empty-slot')) {
+                targetType = 'target';
+                targetIndex = parseInt(targetElement.dataset.targetIndex);
             }
-        });
-        builderState.dragOverIndex = targetIndex;
+        }
+        dragData.target = { type: targetType, index: targetIndex, element: targetElement };
+    }
+
+function checkAnswer() {
+    const sentence = builderState.sentences[builderState.currentIndex];
+    if (!sentence) return;
+    const correctWords = splitSentence(sentence.sentence_en);
+    const targetWords = builderState.targetWords;
+    
+    // 检查是否全部填满
+    if (targetWords.some(w => w === null)) {
+        document.getElementById('builderFeedback').innerHTML = '⚠️ Please fill all slots before checking.';
+        document.getElementById('builderFeedback').style.color = '#f59e0b';
+        return;
     }
     
-    function onMouseUp(e) {
-        if (dragData) {
-            const el = dragData.element;
-            el.style.transition = 'all 0.2s';
-            el.style.transform = 'translate(0, 0)';
-            el.style.zIndex = '';
-            el.classList.remove('dragging');
-            
-            const dropzone = document.getElementById('builderDropzone');
-            if (dropzone) {
-                dropzone.querySelectorAll('.word-token').forEach(t => {
-                    t.classList.remove('drag-over-me');
-                });
-                if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== dragData.index) {
-                    const from = dragData.index;
-                    const to = builderState.dragOverIndex;
-                    const shuffled = builderState.shuffledWords;
-                    const temp = shuffled[from];
-                    shuffled[from] = shuffled[to];
-                    shuffled[to] = temp;
-                    builderState.shuffledWords = shuffled;
-                    renderBuilder();
-                } else {
-                    renderBuilder();
-                }
-            }
-            dragData = null;
-            builderState.dragOverIndex = null;
+    // 比较
+    let isCorrect = true;
+    for (let i = 0; i < correctWords.length; i++) {
+        if (targetWords[i] !== correctWords[i]) {
+            isCorrect = false;
+            break;
         }
     }
     
-    // --- 觸控事件 ---
-    function onTouchStart(e) {
-        const token = e.target.closest('.word-token');
-        if (!token) return;
-        if (builderState.isAnswered) return;
-        
-        const touch = e.touches[0];
-        const rect = token.getBoundingClientRect();
-        const index = parseInt(token.dataset.index);
-        if (isNaN(index)) return;
-        
-        touchData = {
-            index: index,
-            element: token,
-            offsetX: touch.clientX - rect.left,
-            offsetY: touch.clientY - rect.top,
-            startX: touch.clientX,
-            startY: touch.clientY
-        };
-        
-        token.style.transition = 'none';
-        token.style.zIndex = '1000';
-        token.style.transform = 'translate(0, 0)';
-        token.classList.add('dragging');
-    }
+    builderState.isAnswered = true;
+    // 重新渲染以显示正确/错误状态
+    renderBuilder();
     
-    function onTouchMove(e) {
-        if (!touchData) return;
-        e.preventDefault();
-        const touch = e.touches[0];
-        const dx = touch.clientX - touchData.startX;
-        const dy = touch.clientY - touchData.startY;
-        touchData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-        
-        const dropzone = document.getElementById('builderDropzone');
-        if (!dropzone) return;
-        const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
-        let targetIndex = -1;
-        tokens.forEach(token => {
-            const rect = token.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const dist = Math.sqrt(Math.pow(touch.clientX - centerX, 2) + Math.pow(touch.clientY - centerY, 2));
-            if (dist < 80) {
-                const idx = parseInt(token.dataset.index);
-                if (!isNaN(idx) && idx !== touchData.index) {
-                    targetIndex = idx;
-                }
-            }
-        });
-        tokens.forEach(token => {
-            const idx = parseInt(token.dataset.index);
-            if (idx === targetIndex) {
-                token.classList.add('drag-over-me');
-            } else {
-                token.classList.remove('drag-over-me');
-            }
-        });
-        builderState.dragOverIndex = targetIndex;
+    // 显示反馈信息
+    const feedback = document.getElementById('builderFeedback');
+    if (feedback) {
+        feedback.innerHTML = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect. Try again!';
+        feedback.style.color = isCorrect ? '#22c55e' : '#ef4444';
     }
+}
     
-    function onTouchEnd(e) {
-        if (touchData) {
-            const el = touchData.element;
-            el.style.transition = 'all 0.2s';
-            el.style.transform = 'translate(0, 0)';
-            el.style.zIndex = '';
-            el.classList.remove('dragging');
+    function onDragEnd(e) {
+        if (!dragData) return;
+        const el = dragData.element;
+        el.style.transition = 'all 0.2s';
+        el.style.transform = 'translate(0, 0)';
+        el.style.zIndex = '';
+        el.classList.remove('dragging');
+        document.querySelectorAll('.word-token, .empty-slot').forEach(t => t.classList.remove('drag-over-me'));
+        
+        // 执行交换
+        const sourceType = dragData.type;
+        const sourceIndex = dragData.index;
+        const target = dragData.target;
+        if (target && target.type !== null && target.index !== null) {
+            const targetType = target.type;
+            const targetIndex = target.index;
             
-            const dropzone = document.getElementById('builderDropzone');
-            if (dropzone) {
-                dropzone.querySelectorAll('.word-token').forEach(t => {
-                    t.classList.remove('drag-over-me');
-                });
-                if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== touchData.index) {
-                    const from = touchData.index;
-                    const to = builderState.dragOverIndex;
-                    const shuffled = builderState.shuffledWords;
-                    const temp = shuffled[from];
-                    shuffled[from] = shuffled[to];
-                    shuffled[to] = temp;
-                    builderState.shuffledWords = shuffled;
-                    renderBuilder();
-                } else {
-                    renderBuilder();
-                }
+            // 如果拖拽的源和目标相同，不做任何事
+            if (sourceType === targetType && sourceIndex === targetIndex) {
+                dragData = null;
+                renderBuilder();
+                return;
             }
-            touchData = null;
-            builderState.dragOverIndex = null;
+            
+            // 获取当前状态
+            const sourceWords = builderState.sourceWords;
+            const targetWords = builderState.targetWords;
+            let sourceWord, targetWord;
+            
+            // 获取源单词
+            if (sourceType === 'source') {
+                sourceWord = sourceWords[sourceIndex];
+                if (sourceWord === undefined) { dragData = null; renderBuilder(); return; }
+            } else {
+                sourceWord = targetWords[sourceIndex];
+                if (sourceWord === null) { dragData = null; renderBuilder(); return; }
+            }
+            
+            // 获取目标单词（可能为null）
+            if (targetType === 'source') {
+                targetWord = sourceWords[targetIndex];
+                if (targetWord === undefined) { dragData = null; renderBuilder(); return; }
+            } else {
+                targetWord = targetWords[targetIndex];
+                // 如果目标为空位，targetWord为null
+            }
+            
+            // 执行交换（注意：如果目标为空位，直接移动，无需交换）
+            if (sourceType === 'source' && targetType === 'source') {
+                // 源内部交换
+                [sourceWords[sourceIndex], sourceWords[targetIndex]] = [sourceWords[targetIndex], sourceWords[sourceIndex]];
+            } else if (sourceType === 'target' && targetType === 'target') {
+                // 目标内部交换（两个都不为空）
+                if (targetWords[targetIndex] !== null) {
+                    [targetWords[sourceIndex], targetWords[targetIndex]] = [targetWords[targetIndex], targetWords[sourceIndex]];
+                } else {
+                    // 如果目标为空位，将源移动到目标，源位置置空
+                    targetWords[targetIndex] = targetWords[sourceIndex];
+                    targetWords[sourceIndex] = null;
+                }
+            } else if (sourceType === 'source' && targetType === 'target') {
+                // 从源移动到目标
+                if (targetWords[targetIndex] === null) {
+                    // 目标为空，直接移动
+                    targetWords[targetIndex] = sourceWords[sourceIndex];
+                    sourceWords.splice(sourceIndex, 1); // 移除源
+                } else {
+                    // 目标有单词，交换（但交换后源会多一个，目标少一个，需要调整）
+                    // 更好的处理：交换源和目标单词，但目标位置有单词，源位置增加一个
+                    const temp = sourceWords[sourceIndex];
+                    sourceWords[sourceIndex] = targetWords[targetIndex];
+                    targetWords[targetIndex] = temp;
+                }
+            } else if (sourceType === 'target' && targetType === 'source') {
+                // 从目标移动到源
+                if (sourceWords[targetIndex] === undefined) {
+                    // 如果源目标位置不存在（不正常情况），忽略
+                    dragData = null; renderBuilder(); return;
+                }
+                // 交换目标单词和源单词
+                const temp = targetWords[sourceIndex];
+                targetWords[sourceIndex] = sourceWords[targetIndex];
+                sourceWords[targetIndex] = temp;
+            }
         }
+        
+        dragData = null;
+        // 重新渲染
+        renderBuilder();
     }
     
-    // --- 綁定事件 ---
+    // --- 绑定滑鼠和触控事件 ---
     if (window._builderDragCleanup) {
         window._builderDragCleanup();
     }
     
-    dropzone.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    dropzone.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    // 监听mousedown在source和target区域
+    document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(zone => {
+        zone.addEventListener('mousedown', onDragStart);
+        zone.addEventListener('touchstart', onDragStart, { passive: true });
+    });
+    
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd, { passive: true });
     
     window._builderDragCleanup = function() {
-        dropzone.removeEventListener('mousedown', onMouseDown);
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        dropzone.removeEventListener('touchstart', onTouchStart);
-        document.removeEventListener('touchmove', onTouchMove);
-        document.removeEventListener('touchend', onTouchEnd);
+        document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(zone => {
+            zone.removeEventListener('mousedown', onDragStart);
+            zone.removeEventListener('touchstart', onDragStart);
+        });
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('touchend', onDragEnd);
     };
 }
         
