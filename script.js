@@ -2557,6 +2557,11 @@ function showAllSentencesPopup() {
 
     // ===== 只暴露必要的函數（未來會用到，但現在先保留） =====
     newWindow.escapeHtml = escapeHtml;
+    newWindow.toggleSentencesAutoPlay = toggleSentencesAutoPlay;
+newWindow.stopSentencesAutoPlay = stopSentencesAutoPlay;
+newWindow.switchSentencesPlayMode = switchSentencesPlayMode;
+newWindow.sentencesAutoPlayState = sentencesAutoPlayState;
+newWindow.allSentences = allSentences;
 
     sentencesAutoPlayState.playWindow = newWindow;
 
@@ -2701,7 +2706,33 @@ function showAllSentencesPopup() {
             
             // ===== 綁定 Play All / Stop / Random 按鈕（保留原有功能，但暫時註解，因為父視窗函數尚未暴露） =====
             // 這裡先不綁定，等第二步再處理
-            
+
+            // ===== 綁定 Play All / Stop / Random 按鈕 =====
+document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
+    if (window.opener && typeof window.opener.toggleSentencesAutoPlay === 'function') {
+        window.opener.toggleSentencesAutoPlay();
+    } else {
+        console.error('toggleSentencesAutoPlay not available');
+        alert('Function not available. Please close and reopen the popup.');
+    }
+});
+
+document.getElementById('sentencesStopBtn').addEventListener('click', function() {
+    if (window.opener && typeof window.opener.stopSentencesAutoPlay === 'function') {
+        window.opener.stopSentencesAutoPlay();
+    } else {
+        console.error('stopSentencesAutoPlay not available');
+    }
+});
+
+document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
+    if (window.opener && typeof window.opener.switchSentencesPlayMode === 'function') {
+        window.opener.switchSentencesPlayMode();
+    } else {
+        console.error('switchSentencesPlayMode not available');
+    }
+});
+
             window.sentenceData = ${JSON.stringify(allSentences)};
         <\/script>
     </body>
