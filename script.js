@@ -454,9 +454,10 @@ function showWord() {
     }
     
     const hiddenContent = `
-        <div style="font-size: clamp(28px, 8vw, 52px); font-weight: bold; color: #dc2626;">${w.word.toUpperCase()}</div>
-        ${detailsHtml}
-    `;
+    <div style="font-size: clamp(28px, 8vw, 52px); font-weight: bold; color: #dc2626;">${w.word.toUpperCase()}</div>
+    ${detailsHtml}
+    ${w.englishExplanation ? `<div style="font-size: 16px; color: #475569; margin-top: 8px; font-style: italic; border-top: 1px solid #e2e8f0; padding-top: 8px;">${escapeHtml(w.englishExplanation)}</div>` : ''}
+`;
     
     container.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
