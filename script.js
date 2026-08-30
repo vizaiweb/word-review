@@ -2734,6 +2734,16 @@ newWindow.allSentences = allSentences;
             .sentences-control-bar .play-btn, .sentences-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
             .sentences-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
         }
+
+        /* 拖拽懸停高亮 - 目標格 */
+.word-token.drag-over-me,
+.empty-slot.drag-over-me {
+    background: #ffedd5 !important;
+    border-color: #ff9a56 !important;
+    box-shadow: 0 0 0 3px #ff9a56 !important;
+    transform: scale(1.03);
+    transition: all 0.15s ease;
+}
     </style>
 </head>
 <body>
