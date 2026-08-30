@@ -252,7 +252,13 @@ function bindCoreEvents() {
     }
     
     if (filterBtn) {
-        filterBtn.addEventListener('click', filterByDay);
+        // 移除可能存在的舊監聽器
+        filterBtn.removeEventListener('click', filterByDay);
+        // 綁定新監聽器
+        filterBtn.addEventListener('click', function(e) {
+            console.log('Filter button clicked!'); // 測試用
+            filterByDay();
+        });
     }
     
     if (saveBtn) {
@@ -277,5 +283,7 @@ function bindCoreEvents() {
 
 // ====================== 核心模組初始化 ======================
 initDaySelectToggle();
-bindCoreEvents();
+document.addEventListener('DOMContentLoaded', function() {
+    bindCoreEvents();
+});
 console.log('✅ Core module loaded successfully');
