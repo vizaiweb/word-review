@@ -2713,7 +2713,14 @@ newWindow.allSentences = allSentences;
         .sentence-builder .builder-actions .btn-shuffle { background: #f59e0b; }
         
         .sentence-builder .builder-feedback { text-align: center; margin-top: 12px; font-size: 16px; font-weight: 600; min-height: 30px; color: #94a3b8; }
-        
+
+        .sentence-builder .builder-actions .btn-check {
+    background: #8b5cf6; /* 紫色 */
+}
+.sentence-builder .builder-actions .btn-check:hover {
+    opacity: 0.85;
+}
+
         /* ===== 頁尾 ===== */
         .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
         .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
@@ -2934,7 +2941,7 @@ newWindow.allSentences = allSentences;
             '<div class="builder-actions">' +
                 '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>⬅️ Previous</button>' +
                 '<button class="btn-shuffle" id="builderShuffleBtn">🔀 Shuffle</button>' +
-                '<button class="btn-check" id="builderCheckBtn" ' + (isAnswered ? 'disabled' : '') + '>✅ Check Answer</button>' +
+                '<button class="btn-check" id="builderCheckBtn">✅ Check Answer</button>' +
                 '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>➡️ Next</button>' +
             '</div>' +
             '<div class="builder-feedback" id="builderFeedback">' + 
@@ -3016,7 +3023,7 @@ newWindow.allSentences = allSentences;
     function getDragData(e) {
         const token = e.target.closest('.word-token');
         if (!token) return null;
-        if (builderState.isAnswered) return null;
+        
         
         const isSource = token.classList.contains('source-token');
         const isTarget = token.classList.contains('target-token');
@@ -3106,20 +3113,39 @@ newWindow.allSentences = allSentences;
         dragData.target = { type: targetType, index: targetIndex, element: targetElement };
     }
 
+function playBeep(frequency, duration) {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + duration);
+    } catch(e) {
+        console.warn('Audio not supported');
+    }
+}
+
 function checkAnswer() {
     const sentence = builderState.sentences[builderState.currentIndex];
     if (!sentence) return;
     const correctWords = splitSentence(sentence.sentence_en);
     const targetWords = builderState.targetWords;
     
-    // 检查是否全部填满
+    // 檢查是否全部填滿
     if (targetWords.some(w => w === null)) {
         document.getElementById('builderFeedback').innerHTML = '⚠️ Please fill all slots before checking.';
         document.getElementById('builderFeedback').style.color = '#f59e0b';
+        playBeep(400, 0.3); // 低音提示未填滿
         return;
     }
     
-    // 比较
+    // 比較
     let isCorrect = true;
     for (let i = 0; i < correctWords.length; i++) {
         if (targetWords[i] !== correctWords[i]) {
@@ -3128,15 +3154,20 @@ function checkAnswer() {
         }
     }
     
-    builderState.isAnswered = true;
-    // 重新渲染以显示正确/错误状态
-    renderBuilder();
-    
-    // 显示反馈信息
+    // 顯示反饋（但不鎖定）
     const feedback = document.getElementById('builderFeedback');
     if (feedback) {
         feedback.innerHTML = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect. Try again!';
         feedback.style.color = isCorrect ? '#22c55e' : '#ef4444';
+    }
+    
+    // 播放音效
+    if (isCorrect) {
+        playBeep(880, 0.2); // 高音（正確）
+        // 再疊一個泛音讓它更開心
+        setTimeout(() => playBeep(1100, 0.15), 150);
+    } else {
+        playBeep(440, 0.4); // 低音（錯誤）
     }
 }
     
