@@ -2715,7 +2715,7 @@ newWindow.allSentences = allSentences;
         .sentence-builder .builder-feedback { text-align: center; margin-top: 12px; font-size: 16px; font-weight: 600; min-height: 30px; color: #94a3b8; }
 
         .sentence-builder .builder-actions .btn-check {
-    background: #8b5cf6; /* 紫色 */
+    background: #22c55e; /* 綠色 */
 }
 .sentence-builder .builder-actions .btn-check:hover {
     opacity: 0.85;
