@@ -2580,164 +2580,351 @@ newWindow.allSentences = allSentences;
     }
     
     const sentencesHtml = `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>All Sentences - ${currentLevel}</title>
-        <style>
-            /* ===== 彈窗基礎樣式 ===== */
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
-            .container { max-width: 920px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            
-            .header { background: linear-gradient(135deg, #ffb347, #ff8c42); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-            .header h2 { color: white; font-size: 20px; font-weight: 600; }
-            .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
-            
-            /* ===== 分頁樣式 ===== */
-            .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
-            .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: transparent; color: #64748b; }
-            .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
-            .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
-            
-            .tab-panel { display: none; animation: fadeIn 0.3s ease; padding: 16px 20px 0 20px; }
-            .tab-panel.active { display: block; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-            
-            /* ===== Sentence List 樣式 ===== */
-            .sentences-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-            .sentences-control-bar .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .sentences-control-bar .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .sentences-control-bar .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .sentences-control-bar .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .sentences-control-bar .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
-            .sentences-control-bar .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
-            .sentences-control-bar .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
-            .sentences-control-bar .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-            .sentences-control-bar .sentences-progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
-            
-            .sentences-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
-            .sentences-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-            .sentences-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
-            .sentences-table thead th:first-child { width: 60px; text-align: center; }
-            .sentences-table tbody td { padding: 12px; vertical-align: top; }
-            
-            /* ===== Sentence Builder 佔位樣式 ===== */
-            .coming-soon { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 18px; }
-            .coming-soon .icon { font-size: 48px; display: block; margin-bottom: 16px; }
-            
-            /* ===== 頁尾 ===== */
-            .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
-            .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-            .close-btn:hover { opacity: 0.85; }
-            
-            /* ===== 響應式 ===== */
-            @media (max-width: 600px) {
-                .tab-btn { font-size: 13px; padding: 8px 12px; }
-                .header h2 { font-size: 17px; }
-                .header p { font-size: 12px; }
-                .sentences-control-bar { gap: 8px; padding: 10px 12px; }
-                .sentences-control-bar .play-btn, .sentences-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
-                .sentences-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <!-- Header -->
-            <div class="header">
-                <h2>📝 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
-                <p>Total ${allSentences.length} sentences</p>
-            </div>
-            
-            <!-- Tab Bar -->
-            <div class="tab-bar">
-                <button class="tab-btn active" data-tab="sentences">📜 Sentence List</button>
-                <button class="tab-btn" data-tab="builder">🧩 Build a Sentence</button>
-            </div>
-            
-            <!-- Tab Panels -->
-            <div class="tab-content">
-                <!-- Sentence List Panel -->
-                <div id="tab-sentences" class="tab-panel active">
-                    <div class="sentences-control-bar">
-                        <button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>
-                        <button id="sentencesStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
-                        <button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>
-                        <span id="sentencesProgress" class="sentences-progress">0 / ${allSentences.length}</span>
-                    </div>
-                    <div class="sentences-table-wrapper">
-                        <table class="sentences-table">
-                            <thead>
-                                <tr><th>#</th><th>English</th><th>Chinese</th></tr>
-                            </thead>
-                            <tbody>
-                                ${tableRows}
-                            </tbody>
-                        </table>
-                    </div>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Sentences - ${currentLevel}</title>
+    <style>
+        /* ===== 彈窗基礎樣式 ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; background: #f0f4f8; padding: 20px; }
+        .container { max-width: 920px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .header { background: linear-gradient(135deg, #ffb347, #ff8c42); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .header h2 { color: white; font-size: 20px; font-weight: 600; }
+        .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
+        
+        /* ===== 分頁樣式 ===== */
+        .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
+        .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: transparent; color: #64748b; }
+        .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
+        .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
+        
+        .tab-panel { display: none; animation: fadeIn 0.3s ease; padding: 16px 20px 0 20px; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* ===== Sentence List 樣式 ===== */
+        .sentences-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .sentences-control-bar .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .sentences-control-bar .play-btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+        .sentences-control-bar .play-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+        .sentences-control-bar .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .sentences-control-bar .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; opacity: 0.6; }
+        .sentences-control-bar .stop-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(0.97); }
+        .sentences-control-bar .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; min-width: 160px; }
+        .sentences-control-bar .mode-switch:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+        .sentences-control-bar .sentences-progress { font-size: 14px; color: #1e293b; font-weight: 500; margin-left: auto; }
+        
+        .sentences-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+        .sentences-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .sentences-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+        .sentences-table thead th:first-child { width: 60px; text-align: center; }
+        .sentences-table tbody td { padding: 12px; vertical-align: top; }
+        
+        /* ===== Sentence Builder 樣式 ===== */
+        .sentence-builder { padding: 0 4px; }
+        .sentence-builder .builder-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9; }
+        .sentence-builder .builder-header .progress-text { font-weight: 600; color: #1e293b; font-size: 15px; }
+        .sentence-builder .builder-header .score-text { font-weight: 600; color: #22c55e; font-size: 15px; }
+        .sentence-builder .builder-header .builder-controls { display: flex; gap: 8px; align-items: center; }
+        .sentence-builder .builder-header .builder-controls button { background: none; border: none; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+        .sentence-builder .builder-header .builder-controls button:hover { background: #e2e8f0; }
+        .sentence-builder .builder-header .builder-controls button:active { transform: scale(0.9); }
+        
+        .sentence-builder .builder-meaning { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 18px; color: #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .sentence-builder .builder-meaning .meaning-text { font-weight: 500; }
+        .sentence-builder .builder-meaning .listen-btn-builder { background: none; border: none; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+        .sentence-builder .builder-meaning .listen-btn-builder:hover { background: #e2e8f0; }
+        .sentence-builder .builder-meaning .listen-btn-builder:active { transform: scale(0.9); }
+        
+        .sentence-builder .builder-dropzone { min-height: 80px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 16px; transition: all 0.2s; position: relative; }
+        
+        .sentence-builder .word-token { display: inline-block; padding: 10px 16px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 18px; font-weight: 500; color: #1e293b; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; }
+        
+        .sentence-builder .builder-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+        .sentence-builder .builder-actions button { padding: 10px 24px; border: none; border-radius: 40px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: white; }
+        .sentence-builder .builder-actions button:hover { opacity: 0.85; transform: scale(0.97); }
+        .sentence-builder .builder-actions button:active { transform: scale(0.94); }
+        .sentence-builder .builder-actions .btn-prev { background: #3b82f6; }
+        .sentence-builder .builder-actions .btn-prev:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+        .sentence-builder .builder-actions .btn-next { background: #8b5cf6; }
+        .sentence-builder .builder-actions .btn-next:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+        .sentence-builder .builder-actions .btn-shuffle { background: #f59e0b; }
+        
+        .sentence-builder .builder-feedback { text-align: center; margin-top: 12px; font-size: 16px; font-weight: 600; min-height: 30px; color: #94a3b8; }
+        
+        /* ===== 頁尾 ===== */
+        .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+        .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .close-btn:hover { opacity: 0.85; }
+        
+        /* ===== 響應式 ===== */
+        @media (max-width: 600px) {
+            .sentence-builder .builder-header { flex-direction: column; align-items: stretch; gap: 8px; }
+            .sentence-builder .builder-header .builder-controls { justify-content: center; }
+            .sentence-builder .builder-meaning { font-size: 16px; padding: 10px 12px; }
+            .sentence-builder .word-token { font-size: 16px; padding: 8px 12px; }
+            .sentence-builder .builder-actions button { padding: 8px 16px; font-size: 13px; flex: 1; min-width: 60px; }
+            .sentence-builder .builder-dropzone { min-height: 60px; padding: 12px; gap: 8px; }
+            .tab-btn { font-size: 13px; padding: 8px 12px; }
+            .header h2 { font-size: 17px; }
+            .header p { font-size: 12px; }
+            .sentences-control-bar { gap: 8px; padding: 10px 12px; }
+            .sentences-control-bar .play-btn, .sentences-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
+            .sentences-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h2>📝 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
+            <p>Total ${allSentences.length} sentences</p>
+        </div>
+        
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="sentences">📜 Sentence List</button>
+            <button class="tab-btn" data-tab="builder">🧩 Build a Sentence</button>
+        </div>
+        
+        <!-- Tab Panels -->
+        <div class="tab-content">
+            <!-- Sentence List Panel -->
+            <div id="tab-sentences" class="tab-panel active">
+                <div class="sentences-control-bar">
+                    <button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>
+                    <button id="sentencesStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
+                    <button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>
+                    <span id="sentencesProgress" class="sentences-progress">0 / ${allSentences.length}</span>
                 </div>
-                
-                <!-- Sentence Builder Panel（佔位） -->
-                <div id="tab-builder" class="tab-panel">
-                    <div class="coming-soon">
-                        <span class="icon">🧩</span>
-                        <p>Build a Sentence coming soon!</p>
-                    </div>
+                <div class="sentences-table-wrapper">
+                    <table class="sentences-table">
+                        <thead>
+                            <tr><th>#</th><th>English</th><th>Chinese</th></tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
                 </div>
             </div>
             
-            <!-- Footer -->
-            <div class="footer">
-                <button class="close-btn" onclick="window.close()">Close</button>
+            <!-- Sentence Builder Panel -->
+            <div id="tab-builder" class="tab-panel">
+                <div id="builderContainer"></div>
             </div>
         </div>
         
-        <script>
-            // ===== 分頁切換 =====
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                    this.classList.add('active');
-                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-                });
+        <!-- Footer -->
+        <div class="footer">
+            <button class="close-btn" onclick="window.close()">Close</button>
+        </div>
+    </div>
+    
+    <script>
+        // ===== 傳遞資料到彈窗 =====
+        window.allSentencesData = ${JSON.stringify(allSentences)};
+        window.currentLevel = "${currentLevel}";
+        window.currentFileName = "${currentFileName}";
+        
+        // ===== 分頁切換 =====
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                
+                if (this.dataset.tab === 'builder') {
+                    initBuilder();
+                }
             });
+        });
+        
+        // ===== Sentence Builder 邏輯 =====
+        let builderState = {
+            sentences: [],
+            currentIndex: 0,
+            shuffledWords: [],
+            totalCount: 0
+        };
+        
+        function shuffleArray(arr) {
+            const shuffled = [...arr];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+        
+        function splitSentence(sentence) {
+            return sentence.trim().split(/\\s+/).filter(p => p.length > 0);
+        }
+        
+        function initBuilder() {
+            const container = document.getElementById('builderContainer');
+            if (!container) return;
             
-            // ===== 綁定 Play All / Stop / Random 按鈕（保留原有功能，但暫時註解，因為父視窗函數尚未暴露） =====
-            // 這裡先不綁定，等第二步再處理
-
-            // ===== 綁定 Play All / Stop / Random 按鈕 =====
-document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
-    if (window.opener && typeof window.opener.toggleSentencesAutoPlay === 'function') {
-        window.opener.toggleSentencesAutoPlay();
-    } else {
-        console.error('toggleSentencesAutoPlay not available');
-        alert('Function not available. Please close and reopen the popup.');
-    }
-});
-
-document.getElementById('sentencesStopBtn').addEventListener('click', function() {
-    if (window.opener && typeof window.opener.stopSentencesAutoPlay === 'function') {
-        window.opener.stopSentencesAutoPlay();
-    } else {
-        console.error('stopSentencesAutoPlay not available');
-    }
-});
-
-document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
-    if (window.opener && typeof window.opener.switchSentencesPlayMode === 'function') {
-        window.opener.switchSentencesPlayMode();
-    } else {
-        console.error('switchSentencesPlayMode not available');
-    }
-});
-
-            window.sentenceData = ${JSON.stringify(allSentences)};
-        <\/script>
-    </body>
-    </html>`;
+            const sentences = window.allSentencesData || [];
+            if (sentences.length === 0) {
+                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+                return;
+            }
+            
+            builderState.sentences = sentences;
+            builderState.totalCount = sentences.length;
+            builderState.currentIndex = 0;
+            loadSentence(0);
+        }
+        
+        function loadSentence(index) {
+            const sentences = builderState.sentences;
+            if (!sentences || sentences.length === 0 || index >= sentences.length) return;
+            
+            builderState.currentIndex = index;
+            const sentence = sentences[index];
+            builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
+            renderBuilder();
+        }
+        
+        function renderBuilder() {
+            const container = document.getElementById('builderContainer');
+            if (!container) return;
+            
+            const sentence = builderState.sentences[builderState.currentIndex];
+            if (!sentence) {
+                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+                return;
+            }
+            
+            const total = builderState.totalCount;
+            const current = builderState.currentIndex + 1;
+            const shuffledWords = builderState.shuffledWords;
+            
+            let tokensHtml = shuffledWords.map(word => {
+                return '<span class="word-token">' + escapeHtml(word) + '</span>';
+            }).join('');
+            
+            if (tokensHtml === '') {
+                tokensHtml = '<span class="empty-hint">⚠️ No words to arrange</span>';
+            }
+            
+            const isFirst = (builderState.currentIndex === 0);
+            const isLast = (builderState.currentIndex >= builderState.totalCount - 1);
+            
+            container.innerHTML = 
+                '<div class="sentence-builder">' +
+                    '<div class="builder-header">' +
+                        '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
+                        '<span class="score-text">💡 Drag to arrange</span>' +
+                        '<div class="builder-controls">' +
+                            '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="builder-meaning">' +
+                        '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
+                    '</div>' +
+                    '<div class="builder-dropzone" id="builderDropzone">' +
+                        tokensHtml +
+                    '</div>' +
+                    '<div class="builder-actions">' +
+                        '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>⬅️ Previous</button>' +
+                        '<button class="btn-shuffle" id="builderShuffleBtn">🔀 Shuffle</button>' +
+                        '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>➡️ Next</button>' +
+                    '</div>' +
+                    '<div class="builder-feedback">📝 Drag the words to arrange them in the correct order</div>' +
+                '</div>';
+            
+            bindBuilderEvents();
+        }
+        
+        function bindBuilderEvents() {
+            const listenBtn = document.getElementById('builderListenBtn');
+            if (listenBtn) {
+                listenBtn.onclick = function() {
+                    const sentence = builderState.sentences[builderState.currentIndex];
+                    if (sentence && sentence.sentence_en) {
+                        if (window.opener && typeof window.opener.speakOnce === 'function') {
+                            window.opener.speakOnce(sentence.sentence_en, null, 0.85);
+                        } else {
+                            const utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
+                            utterance.lang = 'en-US';
+                            utterance.rate = 0.85;
+                            speechSynthesis.speak(utterance);
+                        }
+                    }
+                };
+            }
+            
+            const prevBtn = document.getElementById('builderPrevBtn');
+            if (prevBtn) {
+                prevBtn.onclick = function() {
+                    if (builderState.currentIndex > 0) {
+                        builderState.currentIndex--;
+                        loadSentence(builderState.currentIndex);
+                    }
+                };
+            }
+            
+            const nextBtn = document.getElementById('builderNextBtn');
+            if (nextBtn) {
+                nextBtn.onclick = function() {
+                    if (builderState.currentIndex < builderState.totalCount - 1) {
+                        builderState.currentIndex++;
+                        loadSentence(builderState.currentIndex);
+                    }
+                };
+            }
+            
+            const shuffleBtn = document.getElementById('builderShuffleBtn');
+            if (shuffleBtn) {
+                shuffleBtn.onclick = function() {
+                    const sentence = builderState.sentences[builderState.currentIndex];
+                    if (sentence) {
+                        builderState.shuffledWords = shuffleArray(splitSentence(sentence.sentence_en));
+                        renderBuilder();
+                    }
+                };
+            }
+        }
+        
+        // ===== 綁定 Sentence List 控制按鈕 =====
+        document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
+            if (window.opener && typeof window.opener.toggleSentencesAutoPlay === 'function') {
+                window.opener.toggleSentencesAutoPlay();
+            }
+        });
+        
+        document.getElementById('sentencesStopBtn').addEventListener('click', function() {
+            if (window.opener && typeof window.opener.stopSentencesAutoPlay === 'function') {
+                window.opener.stopSentencesAutoPlay();
+            }
+        });
+        
+        document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
+            if (window.opener && typeof window.opener.switchSentencesPlayMode === 'function') {
+                window.opener.switchSentencesPlayMode();
+            }
+        });
+        
+        // ===== 輔助函數 =====
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    <\/script>
+</body>
+</html>`;
 
     try {
         newWindow.document.write(sentencesHtml);
