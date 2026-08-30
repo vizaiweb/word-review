@@ -2764,7 +2764,7 @@ newWindow.allSentences = allSentences;
         <!-- Tab Bar -->
         <div class="tab-bar">
             <button class="tab-btn active" data-tab="sentences">📜 Sentence List</button>
-            <button class="tab-btn" data-tab="builder">🧩 Build a Sentence</button>
+            <button class="tab-btn" data-tab="builder">📝 Build a Sentence</button>
         </div>
         
         <!-- Tab Panels -->
@@ -2995,7 +2995,7 @@ newWindow.allSentences = allSentences;
     const shuffleBtn = document.getElementById('builderShuffleBtn');
     if (shuffleBtn) {
         shuffleBtn.onclick = function() {
-            if (builderState.isAnswered) return;
+            
             // 重置source为所有单词随机排列，target全空
             const sentence = builderState.sentences[builderState.currentIndex];
             const words = splitSentence(sentence.sentence_en);
