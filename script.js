@@ -1,80 +1,15 @@
-// ====================== 全局狀態變量 ======================
-let allWords = [];          
-let filteredWords = [];     
-let currentWordIdx = 0;     
-let currentFileName = "";   
-let currentLevel = "";      
+// ====================== UI 互動與功能模組 ======================
+// 此檔案包含所有 UI 互動、彈窗、朗讀、Quiz 等功能。
+// 核心資料載入邏輯已移至 core.js，請勿在此重複定義。
 
-let allSentences = [];      
-let currentSentenceIdx = 0; 
-let currentFileNameForSentences = ""; 
-
-const synth = window.speechSynthesis;
+// ====================== 語音引擎相關變量 ======================
+// 注意：synth 已在 core.js 中定義，此處直接使用
 
 // 英文朗讀相關變量（僅用於句子朗讀，保留 Stop 功能）
 let isSentenceReading = false;
 let currentSentenceReadButton = null;
 let currentSentenceText = "";
 let currentReadCount = 0;
-
-// ====================== 動態分支路徑工具 ======================
-function getRawBaseUrl() {
-    if (window.location.protocol === 'file:') {
-        return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
-    }
-    const host = window.location.hostname;
-    const path = window.location.pathname;
-    if (host.includes('dev') || path.includes('dev')) {
-        return 'https://raw.githubusercontent.com/vizaiweb/word-review/dev';
-    }
-    return 'https://raw.githubusercontent.com/vizaiweb/word-review/main';
-}
-
-// ====================== 工具函數 ======================
-function removeFileExtension(filename) {
-    return filename.replace(/\.xlsx$/i, '');
-}
-
-function getFileListUrl(level) {
-    const base = getRawBaseUrl();
-    return `${base}/data/${level}/fileList.json`;
-}
-
-function getXlsxFileUrl(level, filename) {
-    const base = getRawBaseUrl();
-    return `${base}/data/${level}/${filename}`;
-}
-
-function initDaySelectToggle() {
-    const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    
-    function updateDayInputState() {
-        if (daySelect.value === 'all') {
-            dayNum.type = 'text';
-            dayNum.value = '--';
-            dayNum.readOnly = true;
-            dayNum.min = '';
-        } else {
-            dayNum.type = 'number';
-            dayNum.value = '1';
-            dayNum.readOnly = false;
-            dayNum.min = '1';
-        }
-    }
-    
-    daySelect.addEventListener('change', updateDayInputState);
-    updateDayInputState();
-}
-
-function resetDayArea() {
-    const daySelect = document.getElementById('daySelect');
-    const dayNum = document.getElementById('dayNum');
-    if (daySelect) {
-        daySelect.value = 'all';
-        daySelect.dispatchEvent(new Event('change'));
-    }
-}
 
 // ====================== 英文語音模塊 ======================
 function getAvailableVoice() {
@@ -449,157 +384,6 @@ setTimeout(function() {
     preheatVoice();
 }, 1000);
 
-// ====================== 數據加載邏輯 ======================
-async function loadFileListByLevel(level) {
-    const fileSelect = document.getElementById('fileSelect');
-    const fileRow = document.getElementById('fileRow');
-    
-    fileSelect.innerHTML = '<option value="">Loading...</option>';
-    fileRow.style.display = 'flex';
-    
-    try {
-        const res = await fetch(getFileListUrl(level));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
-        const config = await res.json();
-        const files = config.files || [];
-        
-        fileSelect.innerHTML = '';
-        if (files.length === 0) {
-            fileSelect.innerHTML = '<option value="">No files available</option>';
-            return;
-        }
-        
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'Please Select';
-        fileSelect.appendChild(defaultOption);
-        
-        files.forEach(file => {
-            const option = document.createElement('option');
-            option.value = file;
-            option.textContent = removeFileExtension(file);
-            fileSelect.appendChild(option);
-        });
-        
-        fileSelect.value = '';
-        
-        allWords = [];
-        filteredWords = [];
-        allSentences = [];
-        currentFileName = "";
-        currentFileNameForSentences = "";
-        currentWordIdx = 0;
-        currentSentenceIdx = 0;
-        
-        const wordDiv = document.getElementById("wordContent");
-        wordDiv.innerHTML = '<p style="color:#64748b;">✨ Select Level & File to start ✨</p>';
-        
-        document.getElementById("sentenceArea").style.display = 'none';
-        document.getElementById("showAllBtn").style.display = 'none';
-        document.getElementById("dayRow").style.display = 'none';
-        document.getElementById("infoTipContainer").innerHTML = '';
-        
-        resetDayArea();
-        stopAllReading();
-        
-    } catch (e) {
-        fileSelect.innerHTML = '<option value="">Load failed</option>';
-        console.error("文件列表加載失敗:", e);
-    }
-}
-
-async function parseExcelBufferAndLoad(buf, sourceLabel = "file") {
-    try {
-        const wb = XLSX.read(buf, { type: "array" });
-        const sheetName0 = wb.SheetNames[0];
-        const wordData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName0]);
-        
-        allWords = wordData.filter(item => item.word && item.meaning && item.day).map(item => ({
-    word: String(item.word).trim(),
-    meaning: String(item.meaning).trim(),
-    day: Number(item.day),
-    englishExplanation: String(item['English explanation'] || '').trim(),
-    phonetics: item.phonetics || item.phonetic || item.pronunciation || item.音標 || null,
-    syllable: item.syllable || item.syllable_splitting || item.syllables || item.音節 || item.音節劃分 || null
-}));
-        
-        filteredWords = [...allWords];
-        currentWordIdx = 0;
-        
-        allSentences = [];
-        if (wb.SheetNames.length >= 2) {
-            const sheetName1 = wb.SheetNames[1];
-            const rawSentences = XLSX.utils.sheet_to_json(wb.Sheets[sheetName1]);
-            
-            if (rawSentences && rawSentences.length > 0) {
-                for (let row of rawSentences) {
-                    let en = row.sentence || row.sentence_en || row.english || row.en || row.Sentence || row.English;
-                    let zh = row.chinese || row.meaning || row.zh || row.sentence_zh || row.Chinese || row.Meaning;
-                    
-                    if (en && String(en).trim()) {
-                        allSentences.push({
-                            sentence_en: String(en).trim(),
-                            sentence_zh: zh ? String(zh).trim() : "✨ Practice sentence"
-                        });
-                    }
-                }
-            }
-        }
-        
-        const wordDiv = document.getElementById("wordContent");
-        if (filteredWords.length) {
-            showWord();
-            updateInfoTip();
-        } else {
-            wordDiv.innerHTML = '<p>⚠️ No word data in this source.</p>';
-        }
-        document.getElementById("showAllBtn").style.display = allWords.length ? 'inline-block' : 'none';
-        document.getElementById("dayRow").style.display = 'flex';
-        
-        if (allSentences.length === 0) {
-            document.getElementById("sentenceArea").style.display = 'none';
-        } else {
-            document.getElementById("sentenceArea").style.display = 'block';
-            currentSentenceIdx = 0;
-            updateSentenceUI();
-            updateSentenceStats();
-        }
-        
-        return true;
-    } catch (parseErr) {
-        console.error("Excel parsing failed", parseErr);
-        return false;
-    }
-}
-
-async function loadSelectedFile(filename) {
-    if (!filename || !currentLevel) return;
-    
-    stopAllReading();
-    currentFileName = filename;
-    currentFileNameForSentences = filename;
-    
-    const wordDiv = document.getElementById("wordContent");
-    wordDiv.innerHTML = '<p>📖 Loading words & sentences...</p>';
-    document.getElementById("dayRow").style.display = 'flex';
-    document.getElementById("sentenceArea").style.display = 'none';
-    document.getElementById("showAllBtn").style.display = 'none';
-    document.getElementById("infoTipContainer").innerHTML = '';
-    
-    try {
-        const url = getXlsxFileUrl(currentLevel, filename);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const buf = await res.arrayBuffer();
-        await parseExcelBufferAndLoad(buf, filename);
-    } catch (err) {
-        wordDiv.innerHTML = '<p style="color:#ef4444;">❌ Failed to load file.</p>';
-        document.getElementById("sentenceArea").style.display = 'none';
-        console.error(err);
-    }
-}
-
 // ====================== 篩選與導航邏輯 ======================
 function filterByDay() {
     stopAllReading();
@@ -639,6 +423,7 @@ function getMaxDay() {
     return max;
 }
 
+// ====================== 單詞顯示功能 ======================
 function showWord() {
     stopAllReading();
     const container = document.getElementById("wordContent");
@@ -689,11 +474,9 @@ function showWord() {
     
     updateInfoTip();
     
-    // ===== 粵語按鈕（按下動態效果） =====
     const cantoneseBtn = document.getElementById("readCantoneseBtn");
     if (cantoneseBtn) {
         cantoneseBtn.onclick = () => {
-            // 按下縮放效果
             cantoneseBtn.style.transform = 'scale(0.92)';
             setTimeout(() => {
                 cantoneseBtn.style.transform = 'scale(1)';
@@ -707,11 +490,9 @@ function showWord() {
     let isWordVisible = false;
     const wordSpan = document.getElementById("currentWordSpan");
     
-    // ===== Show Word 按鈕（按下動態效果） =====
     const showBtn = document.getElementById("btnShowWord");
     if (showBtn) {
         showBtn.onclick = () => {
-            // 按下縮放效果
             showBtn.style.transform = 'scale(0.92)';
             setTimeout(() => {
                 showBtn.style.transform = 'scale(1)';
@@ -904,6 +685,7 @@ function stopAllReading() {
         window.sentencesAutoPlayInterval = null;
     }
 }
+
 
 // ====================== Show All Words 彈窗 ======================
 let wordsAutoPlayState = {
@@ -2862,43 +2644,11 @@ function showAllSentencesPopup() {
     }
 }
 
-// ====================== 事件綁定與初始化 ======================
-function bindEvents() {
-    const levelSelect = document.getElementById('levelSelect');
-    const fileSelect = document.getElementById('fileSelect');
-    const filterBtn = document.getElementById('filterBtn');
-    const saveBtn = document.getElementById('saveSettingsBtn');
+
+// ====================== UI 事件綁定 ======================
+function bindUIEvents() {
     const showAllBtn = document.getElementById('showAllBtn');
     const showAllSentencesBtn = document.getElementById('showAllSentencesBtn');
-    
-    if (levelSelect) {
-        levelSelect.addEventListener('change', async (e) => {
-            const level = e.target.value;
-            if (!level) return;
-            currentLevel = level;
-            await loadFileListByLevel(level);
-        });
-    }
-    
-    if (fileSelect) {
-        fileSelect.addEventListener('change', async (e) => {
-            const filename = e.target.value;
-            if (!filename || !currentLevel) return;
-            await loadSelectedFile(filename);
-        });
-    }
-    
-    if (filterBtn) {
-        filterBtn.addEventListener('click', filterByDay);
-    }
-    
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            localStorage.setItem('savedLevel', currentLevel);
-            localStorage.setItem('savedFile', currentFileName);
-            alert('Progress saved!');
-        });
-    }
     
     if (showAllBtn) {
         showAllBtn.addEventListener('click', function(e) {
@@ -2913,23 +2663,8 @@ function bindEvents() {
             showAllSentencesPopup();
         });
     }
-    
-    const savedLevel = localStorage.getItem('savedLevel');
-    const savedFile = localStorage.getItem('savedFile');
-    if (savedLevel && savedFile) {
-        levelSelect.value = savedLevel;
-        currentLevel = savedLevel;
-        loadFileListByLevel(savedLevel).then(() => {
-            fileSelect.value = savedFile;
-            if (savedFile) loadSelectedFile(savedFile);
-        });
-    }
 }
 
-function init() {
-    initDaySelectToggle();
-    bindEvents();
-    console.log('✅ App initialized successfully');
-}
-
-init();
+// ====================== UI 模組初始化 ======================
+bindUIEvents();
+console.log('✅ UI module loaded successfully');
