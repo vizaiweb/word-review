@@ -2642,7 +2642,15 @@ newWindow.allSentences = allSentences;
         .sentence-builder .builder-dropzone { min-height: 80px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 16px; transition: all 0.2s; position: relative; }
         
         .sentence-builder .word-token { display: inline-block; padding: 10px 16px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 18px; font-weight: 500; color: #1e293b; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; }
-        
+        /* ===== 【新增】拖曳中的單字方塊樣式 ===== */
+.sentence-builder .word-token.dragging {
+    opacity: 0.7;
+    transform: scale(1.08);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    transition: none !important;
+    cursor: grabbing;
+}
         .sentence-builder .builder-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
         .sentence-builder .builder-actions button { padding: 10px 24px; border: none; border-radius: 40px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: white; }
         .sentence-builder .builder-actions button:hover { opacity: 0.85; transform: scale(0.97); }
@@ -2894,12 +2902,12 @@ newWindow.allSentences = allSentences;
         };
     }
     
-    // ===== 【新增】拖曳功能（支援滑鼠 + 觸控） =====
+    // ===== 【拖曳功能（滑鼠 + 觸控）】 =====
     const dropzone = document.getElementById('builderDropzone');
     if (!dropzone) return;
     
-    let dragData = null;        // 滑鼠拖曳狀態
-    let touchData = null;       // 觸控拖曳狀態
+    let dragData = null;
+    let touchData = null;
     
     // --- 滑鼠事件 ---
     function onMouseDown(e) {
@@ -2910,13 +2918,22 @@ newWindow.allSentences = allSentences;
         const index = parseInt(token.dataset.index);
         if (isNaN(index)) return;
         
+        const rect = token.getBoundingClientRect();
         dragData = {
             index: index,
             element: token,
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
             startX: e.clientX,
             startY: e.clientY
         };
+        
+        // 設定拖曳樣式
+        token.style.transition = 'none';
+        token.style.zIndex = '1000';
+        token.style.transform = 'translate(0, 0)';
         token.classList.add('dragging');
+        
         e.preventDefault();
     }
     
@@ -2924,12 +2941,15 @@ newWindow.allSentences = allSentences;
         if (!dragData) return;
         e.preventDefault();
         
+        const dx = e.clientX - dragData.startX;
+        const dy = e.clientY - dragData.startY;
+        dragData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+        
+        // 計算拖曳目標
         const dropzone = document.getElementById('builderDropzone');
         if (!dropzone) return;
-        
         const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
         let targetIndex = -1;
-        
         tokens.forEach(token => {
             const rect = token.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
@@ -2942,7 +2962,6 @@ newWindow.allSentences = allSentences;
                 }
             }
         });
-        
         tokens.forEach(token => {
             const idx = parseInt(token.dataset.index);
             if (idx === targetIndex) {
@@ -2951,18 +2970,22 @@ newWindow.allSentences = allSentences;
                 token.classList.remove('drag-over-me');
             }
         });
-        
         builderState.dragOverIndex = targetIndex;
     }
     
     function onMouseUp(e) {
         if (dragData) {
+            const el = dragData.element;
+            el.style.transition = 'all 0.2s';
+            el.style.transform = 'translate(0, 0)';
+            el.style.zIndex = '';
+            el.classList.remove('dragging');
+            
             const dropzone = document.getElementById('builderDropzone');
             if (dropzone) {
                 dropzone.querySelectorAll('.word-token').forEach(t => {
-                    t.classList.remove('drag-over-me', 'dragging');
+                    t.classList.remove('drag-over-me');
                 });
-                
                 if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== dragData.index) {
                     const from = dragData.index;
                     const to = builderState.dragOverIndex;
@@ -2988,29 +3011,37 @@ newWindow.allSentences = allSentences;
         if (builderState.isAnswered) return;
         
         const touch = e.touches[0];
+        const rect = token.getBoundingClientRect();
         const index = parseInt(token.dataset.index);
         if (isNaN(index)) return;
         
         touchData = {
             index: index,
             element: token,
+            offsetX: touch.clientX - rect.left,
+            offsetY: touch.clientY - rect.top,
             startX: touch.clientX,
             startY: touch.clientY
         };
+        
+        token.style.transition = 'none';
+        token.style.zIndex = '1000';
+        token.style.transform = 'translate(0, 0)';
         token.classList.add('dragging');
     }
     
     function onTouchMove(e) {
         if (!touchData) return;
         e.preventDefault();
-        
         const touch = e.touches[0];
+        const dx = touch.clientX - touchData.startX;
+        const dy = touch.clientY - touchData.startY;
+        touchData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+        
         const dropzone = document.getElementById('builderDropzone');
         if (!dropzone) return;
-        
         const tokens = dropzone.querySelectorAll('.word-token:not(.dragging)');
         let targetIndex = -1;
-        
         tokens.forEach(token => {
             const rect = token.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
@@ -3023,7 +3054,6 @@ newWindow.allSentences = allSentences;
                 }
             }
         });
-        
         tokens.forEach(token => {
             const idx = parseInt(token.dataset.index);
             if (idx === targetIndex) {
@@ -3032,18 +3062,22 @@ newWindow.allSentences = allSentences;
                 token.classList.remove('drag-over-me');
             }
         });
-        
         builderState.dragOverIndex = targetIndex;
     }
     
     function onTouchEnd(e) {
         if (touchData) {
+            const el = touchData.element;
+            el.style.transition = 'all 0.2s';
+            el.style.transform = 'translate(0, 0)';
+            el.style.zIndex = '';
+            el.classList.remove('dragging');
+            
             const dropzone = document.getElementById('builderDropzone');
             if (dropzone) {
                 dropzone.querySelectorAll('.word-token').forEach(t => {
-                    t.classList.remove('drag-over-me', 'dragging');
+                    t.classList.remove('drag-over-me');
                 });
-                
                 if (builderState.dragOverIndex !== null && builderState.dragOverIndex !== touchData.index) {
                     const from = touchData.index;
                     const to = builderState.dragOverIndex;
@@ -3062,23 +3096,18 @@ newWindow.allSentences = allSentences;
         }
     }
     
-    // --- 綁定事件（每次都重新綁定，確保最新 DOM） ---
-    // 移除舊的事件監聽器（避免重複綁定）
+    // --- 綁定事件 ---
     if (window._builderDragCleanup) {
         window._builderDragCleanup();
     }
     
-    // 綁定滑鼠事件
     dropzone.addEventListener('mousedown', onMouseDown);
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-    
-    // 綁定觸控事件
     dropzone.addEventListener('touchstart', onTouchStart, { passive: true });
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd, { passive: true });
     
-    // 儲存清理函數
     window._builderDragCleanup = function() {
         dropzone.removeEventListener('mousedown', onMouseDown);
         document.removeEventListener('mousemove', onMouseMove);
