@@ -2924,7 +2924,7 @@ newWindow.allSentences = allSentences;
         '<div class="sentence-builder">' +
             '<div class="builder-header">' +
                 '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
-                '<span class="score-text" id="builderStats">📊 Answered: ${builderState.stats.total} | Correct: ${builderState.stats.correct} | Rate: ${builderState.stats.total > 0 ? Math.round((builderState.stats.correct / builderState.stats.total) * 100) + '%' : '--%'}</span>' +
+                '<span class="score-text" id="builderStats">📊 Answered: 0 | Correct: 0 | Rate: --%</span>'
                 '<div class="builder-controls">' +
                     '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
                 '</div>' +
