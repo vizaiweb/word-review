@@ -468,8 +468,8 @@ function showWord() {
         <div class="btn-group">
             <button class="btn-show" id="btnShowWord" style="transition: transform 0.1s;">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
-            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
-            <button class="btn-next" id="btnNextWord">➡️ Next</button>
+            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>Previous</button>
+            <button class="btn-next" id="btnNextWord">Next</button>
         </div>
     `;
     
@@ -2939,10 +2939,10 @@ newWindow.allSentences = allSentences;
                 '</div>' +
             '</div>' +
             '<div class="builder-actions">' +
-                '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>⬅️ Previous</button>' +
-                '<button class="btn-shuffle" id="builderShuffleBtn">🔀 Shuffle</button>' +
-                '<button class="btn-check" id="builderCheckBtn">✅ Check Answer</button>' +
-                '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>➡️ Next</button>' +
+                '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>Previous</button>' +
+                '<button class="btn-shuffle" id="builderShuffleBtn">Shuffle</button>' +
+                '<button class="btn-check" id="builderCheckBtn">Check Answer</button>' +
+                '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>Next</button>' +
             '</div>' +
             '<div class="builder-feedback" id="builderFeedback">' + 
                 (isAnswered ? (allFilled && targetWords.every((w, i) => w === splitSentence(sentence.sentence_en)[i]) ? '✅ Correct!' : '❌ Incorrect, try again') : '📝 Drag words to the slots') +
