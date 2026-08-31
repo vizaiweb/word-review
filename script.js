@@ -2840,21 +2840,25 @@ function showAllSentencesPopup() {
         }
         
         function initBuilder() {
-            var container = document.getElementById('builderContainer');
-            if (!container) return;
-            
-            var sentences = allSentencesData || [];
-            if (sentences.length === 0) {
-                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
-                return;
-            }
-            
-            builderState.sentences = sentences;
-            builderState.totalCount = sentences.length;
-            builderState.currentIndex = 0;
-            loadSentence(0);
-        }
-        
+    var container = document.getElementById('builderContainer');
+    console.log('🔍 initBuilder called, container:', container);
+    if (!container) {
+        console.error('❌ builderContainer not found!');
+        return;
+    }
+    
+    var sentences = allSentencesData || [];
+    console.log('📊 sentences count:', sentences.length);
+    if (sentences.length === 0) {
+        container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+        return;
+    }
+    
+    builderState.sentences = sentences;
+    builderState.totalCount = sentences.length;
+    builderState.currentIndex = 0;
+    loadSentence(0);
+}
         function loadSentence(index) {
             var sentences = builderState.sentences;
             if (!sentences || sentences.length === 0 || index >= sentences.length) return;
