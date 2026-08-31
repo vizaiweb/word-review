@@ -468,8 +468,8 @@ function showWord() {
         <div class="btn-group">
             <button class="btn-show" id="btnShowWord" style="transition: transform 0.1s;">👀 Show Word</button>
             <button class="btn-read" id="btnReadWord">🔊 Read 3x</button>
-            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>Previous</button>
-            <button class="btn-next" id="btnNextWord">Next</button>
+            <button class="btn-prev" id="btnPrevWord" ${isFirst ? "disabled" : ""}>⬅️ Previous</button>
+            <button class="btn-next" id="btnNextWord">➡️ Next</button>
         </div>
     `;
     
