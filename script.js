@@ -2560,7 +2560,7 @@ function showAllSentencesPopup() {
 
     const fileNice = removeFileExtension(currentFileNameForSentences);
     
-    // ===== 直接在父視窗拼接 tableRows =====
+    // ===== 拼接句子列表 =====
     let tableRows = '';
     for (let i = 0; i < allSentences.length; i++) {
         const s = allSentences[i];
@@ -2573,7 +2573,7 @@ function showAllSentencesPopup() {
         `;
     }
 
-    // ===== 將資料直接寫入模板字串（類似 showAllWords） =====
+    // ===== 彈窗完整 HTML（仿照 showAllWords 方式） =====
     const sentencesHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -2787,14 +2787,18 @@ function showAllSentencesPopup() {
     </div>
     
     <script>
-        // ===== 接收父視窗傳遞的資料（透過 window.opener 取得） =====
-        var allSentencesData = window.opener.allSentences || [];
-        var currentLevel = window.opener.currentLevel || '';
-        var escapeHtmlFn = window.opener.escapeHtml || function(s) { return s; };
-        var speakOnceFn = window.opener.speakOnce || null;
-        var toggleSentencesAutoPlayFn = window.opener.toggleSentencesAutoPlay || null;
-        var stopSentencesAutoPlayFn = window.opener.stopSentencesAutoPlay || null;
-        var switchSentencesPlayModeFn = window.opener.switchSentencesPlayMode || null;
+        // ===== 直接從父視窗寫入資料（仿照 showAllWords） =====
+        window.allSentencesData = ${JSON.stringify(allSentences)};
+        window.currentLevel = "${currentLevel}";
+        window.currentFileName = "${currentFileName}";
+        window.escapeHtmlFn = ${escapeHtml.toString()};
+        window.speakOnceFn = ${speakOnce.toString()};
+        window.toggleSentencesAutoPlayFn = ${toggleSentencesAutoPlay.toString()};
+        window.stopSentencesAutoPlayFn = ${stopSentencesAutoPlay.toString()};
+        window.switchSentencesPlayModeFn = ${switchSentencesPlayMode.toString()};
+        window.getAvailableVoiceFn = ${getAvailableVoice.toString()};
+        window.getCantoneseVoiceFn = ${getCantoneseVoice.toString()};
+        window.synth = synth;
         
         // ===== 分頁切換 =====
         document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -2840,25 +2844,21 @@ function showAllSentencesPopup() {
         }
         
         function initBuilder() {
-    var container = document.getElementById('builderContainer');
-    console.log('🔍 initBuilder called, container:', container);
-    if (!container) {
-        console.error('❌ builderContainer not found!');
-        return;
-    }
-    
-    var sentences = allSentencesData || [];
-    console.log('📊 sentences count:', sentences.length);
-    if (sentences.length === 0) {
-        container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
-        return;
-    }
-    
-    builderState.sentences = sentences;
-    builderState.totalCount = sentences.length;
-    builderState.currentIndex = 0;
-    loadSentence(0);
-}
+            var container = document.getElementById('builderContainer');
+            if (!container) return;
+            
+            var sentences = window.allSentencesData || [];
+            if (sentences.length === 0) {
+                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+                return;
+            }
+            
+            builderState.sentences = sentences;
+            builderState.totalCount = sentences.length;
+            builderState.currentIndex = 0;
+            loadSentence(0);
+        }
+        
         function loadSentence(index) {
             var sentences = builderState.sentences;
             if (!sentences || sentences.length === 0 || index >= sentences.length) return;
@@ -2888,19 +2888,20 @@ function showAllSentencesPopup() {
             var targetWords = builderState.targetWords;
             var isAnswered = builderState.isAnswered;
             var stats = builderState.stats;
+            var escapeHtml = window.escapeHtmlFn || function(s) { return s; };
             
             var sourceHtml = '';
             if (sourceWords.length === 0) {
                 sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All words placed)</span>';
             } else {
                 sourceHtml = sourceWords.map(function(word, idx) {
-                    return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtmlFn(word) + '</span>';
+                    return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtml(word) + '</span>';
                 }).join('');
             }
             
             var targetHtml = targetWords.map(function(word, idx) {
                 if (word !== null) {
-                    return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtmlFn(word) + '</span>';
+                    return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtml(word) + '</span>';
                 } else {
                     return '<span class="word-token target-token empty-slot" data-target-index="' + idx + '">?</span>';
                 }
@@ -2935,7 +2936,7 @@ function showAllSentencesPopup() {
                         '</div>' +
                     '</div>' +
                     '<div class="builder-meaning">' +
-                        '<span class="meaning-text">📖 ' + escapeHtmlFn(sentence.sentence_zh) + '</span>' +
+                        '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
                     '</div>' +
                     '<div class="builder-source-area">' +
                         '<div class="builder-dropzone source-dropzone" id="sourceDropzone">' +
@@ -2961,12 +2962,14 @@ function showAllSentencesPopup() {
         
         function bindBuilderEvents() {
             var listenBtn = document.getElementById('builderListenBtn');
+            var speakOnce = window.speakOnceFn || null;
+            
             if (listenBtn) {
                 listenBtn.onclick = function() {
                     var sentence = builderState.sentences[builderState.currentIndex];
                     if (sentence && sentence.sentence_en) {
-                        if (speakOnceFn) {
-                            speakOnceFn(sentence.sentence_en, null, 0.85);
+                        if (speakOnce) {
+                            speakOnce(sentence.sentence_en, null, 0.85);
                         } else {
                             var utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
                             utterance.lang = 'en-US';
@@ -3284,21 +3287,25 @@ function showAllSentencesPopup() {
         }
         
         // ===== 綁定 Sentence List 控制按鈕 =====
+        var toggleFn = window.toggleSentencesAutoPlayFn || null;
+        var stopFn = window.stopSentencesAutoPlayFn || null;
+        var switchFn = window.switchSentencesPlayModeFn || null;
+        
         document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
-            if (toggleSentencesAutoPlayFn) {
-                toggleSentencesAutoPlayFn();
+            if (toggleFn) {
+                toggleFn();
             }
         });
         
         document.getElementById('sentencesStopBtn').addEventListener('click', function() {
-            if (stopSentencesAutoPlayFn) {
-                stopSentencesAutoPlayFn();
+            if (stopFn) {
+                stopFn();
             }
         });
         
         document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
-            if (switchSentencesPlayModeFn) {
-                switchSentencesPlayModeFn();
+            if (switchFn) {
+                switchFn();
             }
         });
         
