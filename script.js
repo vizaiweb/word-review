@@ -2825,14 +2825,10 @@ newWindow.allSentences = allSentences;
         let builderState = {
     sentences: [],
     currentIndex: 0,
-    sourceWords: [],
-    targetWords: [],
+    sourceWords: [],     // 原始区域的单词列表（包含所有单词，未被拖走的）
+    targetWords: [],     // 目标区域的单词列表（长度等于单词数，null表示空位）
     totalCount: 0,
-    isAnswered: false,
-    stats: {           // ← 新增
-        total: 0,      // 總作答次數
-        correct: 0     // 正確次數
-    }
+    isAnswered: false
 };
         
         function shuffleArray(arr) {
@@ -2924,7 +2920,7 @@ newWindow.allSentences = allSentences;
         '<div class="sentence-builder">' +
             '<div class="builder-header">' +
                 '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
-                '<span class="score-text" id="builderStats">📊 Answered: ${builderState.stats.total} | Correct: ${builderState.stats.correct} | Rate: ${builderState.stats.total > 0 ? Math.round((builderState.stats.correct / builderState.stats.total) * 100) + '%' : '--%'}</span>' +
+                '<span class="score-text">💡 Drag words to the slots</span>' +
                 '<div class="builder-controls">' +
                     '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
                 '</div>' +
@@ -3157,22 +3153,7 @@ function checkAnswer() {
             break;
         }
     }
-
-    // 更新統計
-builderState.stats.total++;
-if (isCorrect) {
-    builderState.stats.correct++;
-}
-
-// 更新計分顯示
-const statsEl = document.getElementById('builderStats');
-if (statsEl) {
-    const total = builderState.stats.total;
-    const correct = builderState.stats.correct;
-    const rate = total > 0 ? Math.round((correct / total) * 100) + '%' : '--%';
-    statsEl.textContent = `📊 Answered: ${total} | Correct: ${correct} | Rate: ${rate}`;
-}
-
+    
     // 顯示反饋（但不鎖定）
     const feedback = document.getElementById('builderFeedback');
     if (feedback) {
