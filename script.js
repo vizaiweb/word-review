@@ -3171,7 +3171,7 @@ if (statsEl) {
     const total = builderState.stats.total;
     const correct = builderState.stats.correct;
     const rate = total > 0 ? Math.round((correct / total) * 100) + '%' : '--%';
-    statsEl.textContent = \`📊 Answered: ${total} | Correct: ${correct} | Rate: ${rate}\`;
+    statsEl.textContent = '📊 Answered: ' + total + ' | Correct: ' + correct + ' | Rate: ' + rate;
 }
 
     // 顯示反饋（但不鎖定）
