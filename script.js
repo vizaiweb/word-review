@@ -2557,9 +2557,9 @@ function showAllSentencesPopup() {
     }
 
     // ===== 傳遞資料到彈窗 =====
-    newWindow.allSentencesData = allSentences;
+    newWindow.openerAllSentencesData = allSentences;
     newWindow.currentLevel = currentLevel;
-    newWindow.currentFileName = currentFileName;
+newWindow.currentFileName = currentFileName;
     
     // 傳遞父視窗的函數
     newWindow.escapeHtml = escapeHtml;
@@ -2768,9 +2768,9 @@ function showAllSentencesPopup() {
     
     <script>
         // ===== 接收父視窗資料 =====
-        window.allSentencesData = window.opener.allSentencesData || [];
-        window.currentLevel = window.opener.currentLevel || '';
-        window.currentFileName = window.opener.currentFileName || '';
+        window.allSentencesData = window.opener.openerAllSentencesData || [];
+        window.currentLevel = window.opener.openerCurrentLevel || '';
+window.currentFileName = window.opener.openerCurrentFileName || '';
         window.escapeHtml = window.opener.escapeHtml || function(s) { return s; };
         
         // ===== 分頁切換 =====
