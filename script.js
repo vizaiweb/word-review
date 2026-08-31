@@ -2556,26 +2556,24 @@ function showAllSentencesPopup() {
         return;
     }
 
-    // ===== 傳遞資料到彈窗 =====
-    newWindow.openerAllSentencesData = allSentences;
-    newWindow.currentLevel = currentLevel;
-newWindow.currentFileName = currentFileName;
-    
-    // 傳遞父視窗的函數
-    newWindow.escapeHtml = escapeHtml;
-    newWindow.toggleSentencesAutoPlay = toggleSentencesAutoPlay;
-    newWindow.stopSentencesAutoPlay = stopSentencesAutoPlay;
-    newWindow.switchSentencesPlayMode = switchSentencesPlayMode;
-    newWindow.sentencesAutoPlayState = sentencesAutoPlayState;
-    newWindow.speakOnce = speakOnce;
-    newWindow.getAvailableVoice = getAvailableVoice;
-    newWindow.getCantoneseVoice = getCantoneseVoice;
-
     sentencesAutoPlayState.playWindow = newWindow;
 
     const fileNice = removeFileExtension(currentFileNameForSentences);
+    
+    // ===== 直接在父視窗拼接 tableRows =====
+    let tableRows = '';
+    for (let i = 0; i < allSentences.length; i++) {
+        const s = allSentences[i];
+        tableRows += `
+            <tr id="sentence_row_${i}" style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px; text-align: center; width: 60px;">${i + 1}</td>
+                <td style="padding: 12px; font-weight: bold; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
+                <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
+            </tr>
+        `;
+    }
 
-    // ===== 骨架 HTML（不含動態內容） =====
+    // ===== 將資料直接寫入模板字串（類似 showAllWords） =====
     const sentencesHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -2757,8 +2755,30 @@ newWindow.currentFileName = currentFileName;
         </div>
         
         <div class="tab-content">
-            <div id="tab-sentences" class="tab-panel active"></div>
-            <div id="tab-builder" class="tab-panel"></div>
+            <!-- Sentence List Panel -->
+            <div id="tab-sentences" class="tab-panel active">
+                <div class="sentences-control-bar">
+                    <button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>
+                    <button id="sentencesStopBtn" class="stop-btn" disabled>⏹️ Stop</button>
+                    <button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>
+                    <span id="sentencesProgress" class="sentences-progress">0 / ${allSentences.length}</span>
+                </div>
+                <div class="sentences-table-wrapper">
+                    <table class="sentences-table">
+                        <thead>
+                            <tr><th>#</th><th>English</th><th>Chinese</th></tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Sentence Builder Panel -->
+            <div id="tab-builder" class="tab-panel">
+                <div id="builderContainer"></div>
+            </div>
         </div>
         
         <div class="footer">
@@ -2767,11 +2787,14 @@ newWindow.currentFileName = currentFileName;
     </div>
     
     <script>
-        // ===== 接收父視窗資料 =====
-        window.allSentencesData = window.opener.openerAllSentencesData || [];
-        window.currentLevel = window.opener.openerCurrentLevel || '';
-window.currentFileName = window.opener.openerCurrentFileName || '';
-        window.escapeHtml = window.opener.escapeHtml || function(s) { return s; };
+        // ===== 接收父視窗傳遞的資料（透過 window.opener 取得） =====
+        var allSentencesData = window.opener.allSentences || [];
+        var currentLevel = window.opener.currentLevel || '';
+        var escapeHtmlFn = window.opener.escapeHtml || function(s) { return s; };
+        var speakOnceFn = window.opener.speakOnce || null;
+        var toggleSentencesAutoPlayFn = window.opener.toggleSentencesAutoPlay || null;
+        var stopSentencesAutoPlayFn = window.opener.stopSentencesAutoPlay || null;
+        var switchSentencesPlayModeFn = window.opener.switchSentencesPlayMode || null;
         
         // ===== 分頁切換 =====
         document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -2787,58 +2810,6 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
             });
         });
         
-        // ===== 渲染句子列表 =====
-        function renderSentenceList() {
-            var container = document.getElementById('tab-sentences');
-            var sentences = window.allSentencesData || [];
-            
-            var html = '';
-            html += '<div class="sentences-control-bar">';
-            html += '<button id="sentencesPlayBtn" class="play-btn">▶️ Play All</button>';
-            html += '<button id="sentencesStopBtn" class="stop-btn" disabled>⏹️ Stop</button>';
-            html += '<button id="sentencesModeSwitch" class="mode-switch">Sequential ○──● Random</button>';
-            html += '<span id="sentencesProgress" class="sentences-progress">0 / ' + sentences.length + '</span>';
-            html += '</div>';
-            
-            html += '<div class="sentences-table-wrapper">';
-            html += '<table class="sentences-table">';
-            html += '<thead><tr><th>#</th><th>English</th><th>Chinese</th></tr></thead>';
-            html += '<tbody>';
-            
-            if (sentences.length === 0) {
-                html += '<tr><td colspan="3" style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</td></tr>';
-            } else {
-                for (var i = 0; i < sentences.length; i++) {
-                    var s = sentences[i];
-                    html += '<tr id="sentence_row_' + i + '" style="border-bottom: 1px solid #e2e8f0;">';
-                    html += '<td style="padding: 12px; text-align: center; width: 60px;">' + (i + 1) + '</td>';
-                    html += '<td style="padding: 12px; font-weight: bold; color: #b45309;">' + window.escapeHtml(s.sentence_en) + '</td>';
-                    html += '<td style="padding: 12px; color: #334155;">' + window.escapeHtml(s.sentence_zh) + '</td>';
-                    html += '</tr>';
-                }
-            }
-            
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
-            
-            // 綁定按鈕事件
-            document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
-                if (window.opener && typeof window.opener.toggleSentencesAutoPlay === 'function') {
-                    window.opener.toggleSentencesAutoPlay();
-                }
-            });
-            document.getElementById('sentencesStopBtn').addEventListener('click', function() {
-                if (window.opener && typeof window.opener.stopSentencesAutoPlay === 'function') {
-                    window.opener.stopSentencesAutoPlay();
-                }
-            });
-            document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
-                if (window.opener && typeof window.opener.switchSentencesPlayMode === 'function') {
-                    window.opener.switchSentencesPlayMode();
-                }
-            });
-        }
-        
         // ===== Sentence Builder 邏輯 =====
         var builderState = {
             sentences: [],
@@ -2846,7 +2817,11 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
             sourceWords: [],
             targetWords: [],
             totalCount: 0,
-            isAnswered: false
+            isAnswered: false,
+            stats: {
+                total: 0,
+                correct: 0
+            }
         };
         
         function shuffleArray(arr) {
@@ -2865,10 +2840,10 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
         }
         
         function initBuilder() {
-            var container = document.getElementById('tab-builder');
+            var container = document.getElementById('builderContainer');
             if (!container) return;
             
-            var sentences = window.allSentencesData || [];
+            var sentences = allSentencesData || [];
             if (sentences.length === 0) {
                 container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
                 return;
@@ -2908,19 +2883,20 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
             var sourceWords = builderState.sourceWords;
             var targetWords = builderState.targetWords;
             var isAnswered = builderState.isAnswered;
+            var stats = builderState.stats;
             
             var sourceHtml = '';
             if (sourceWords.length === 0) {
                 sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All words placed)</span>';
             } else {
                 sourceHtml = sourceWords.map(function(word, idx) {
-                    return '<span class="word-token source-token" data-source-index="' + idx + '">' + window.escapeHtml(word) + '</span>';
+                    return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtmlFn(word) + '</span>';
                 }).join('');
             }
             
             var targetHtml = targetWords.map(function(word, idx) {
                 if (word !== null) {
-                    return '<span class="word-token target-token" data-target-index="' + idx + '">' + window.escapeHtml(word) + '</span>';
+                    return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtmlFn(word) + '</span>';
                 } else {
                     return '<span class="word-token target-token empty-slot" data-target-index="' + idx + '">?</span>';
                 }
@@ -2943,17 +2919,19 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
                 feedbackText = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect, try again';
             }
             
+            var rateDisplay = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) + '%' : '--%';
+            
             container.innerHTML = 
                 '<div class="sentence-builder">' +
                     '<div class="builder-header">' +
                         '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
-                        '<span class="score-text" id="builderStats">📊 Answered: 0 | Correct: 0 | Rate: --%</span>' +
+                        '<span class="score-text" id="builderStats">📊 Answered: ' + stats.total + ' | Correct: ' + stats.correct + ' | Rate: ' + rateDisplay + '</span>' +
                         '<div class="builder-controls">' +
                             '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
                         '</div>' +
                     '</div>' +
                     '<div class="builder-meaning">' +
-                        '<span class="meaning-text">📖 ' + window.escapeHtml(sentence.sentence_zh) + '</span>' +
+                        '<span class="meaning-text">📖 ' + escapeHtmlFn(sentence.sentence_zh) + '</span>' +
                     '</div>' +
                     '<div class="builder-source-area">' +
                         '<div class="builder-dropzone source-dropzone" id="sourceDropzone">' +
@@ -2983,8 +2961,8 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
                 listenBtn.onclick = function() {
                     var sentence = builderState.sentences[builderState.currentIndex];
                     if (sentence && sentence.sentence_en) {
-                        if (window.opener && typeof window.opener.speakOnce === 'function') {
-                            window.opener.speakOnce(sentence.sentence_en, null, 0.85);
+                        if (speakOnceFn) {
+                            speakOnceFn(sentence.sentence_en, null, 0.85);
                         } else {
                             var utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
                             utterance.lang = 'en-US';
@@ -3174,10 +3152,7 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
                     feedback.style.color = isCorrect ? '#22c55e' : '#ef4444';
                 }
                 
-                // ===== 算分功能（新增） =====
-                if (!builderState.stats) {
-                    builderState.stats = { total: 0, correct: 0 };
-                }
+                // ===== 更新算分 =====
                 builderState.stats.total++;
                 if (isCorrect) {
                     builderState.stats.correct++;
@@ -3304,8 +3279,26 @@ window.currentFileName = window.opener.openerCurrentFileName || '';
             };
         }
         
-        // ===== 初始化 =====
-        renderSentenceList();
+        // ===== 綁定 Sentence List 控制按鈕 =====
+        document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
+            if (toggleSentencesAutoPlayFn) {
+                toggleSentencesAutoPlayFn();
+            }
+        });
+        
+        document.getElementById('sentencesStopBtn').addEventListener('click', function() {
+            if (stopSentencesAutoPlayFn) {
+                stopSentencesAutoPlayFn();
+            }
+        });
+        
+        document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
+            if (switchSentencesPlayModeFn) {
+                switchSentencesPlayModeFn();
+            }
+        });
+        
+        // ===== 初始化 Builder =====
         initBuilder();
     <\/script>
 </body>
