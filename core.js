@@ -262,23 +262,105 @@ function bindCoreEvents() {
     }
     
     if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            localStorage.setItem('savedLevel', currentLevel);
-            localStorage.setItem('savedFile', currentFileName);
-            alert('Progress saved!');
-        });
-    }
+    saveBtn.addEventListener('click', () => {
+        // 收集要儲存的參數
+        const level = currentLevel || '未選擇';
+        const file = currentFileName || '未選擇';
+        const wordCount = allWords.length || 0;
+        const sentenceCount = allSentences.length || 0;
+        const currentWord = filteredWords[currentWordIdx]?.word || '無';
+        const currentDay = filteredWords[currentWordIdx]?.day || '--';
+        const progress = filteredWords.length > 0 ? `${currentWordIdx + 1}/${filteredWords.length}` : '0/0';
+        
+        // ===== 儲存 Day 過濾狀態 =====
+        const daySelect = document.getElementById('daySelect');
+        const dayNum = document.getElementById('dayNum');
+        const dayFilterMode = daySelect ? daySelect.value : 'all';  // 'all' 或 'custom'
+        const dayFilterValue = dayFilterMode === 'custom' ? (dayNum ? dayNum.value : '1') : 'all';
+        
+        // ===== 儲存到 localStorage =====
+        localStorage.setItem('savedLevel', currentLevel || '');
+        localStorage.setItem('savedFile', currentFileName || '');
+        localStorage.setItem('savedDayMode', dayFilterMode);
+        localStorage.setItem('savedDayValue', dayFilterValue);
+        localStorage.setItem('savedWordIdx', currentWordIdx.toString());
+        
+        // 顯示對話框
+        alert(
+            '✅ Progress Saved!\n\n' +
+            '📊 儲存的參數：\n' +
+            '─────────────────────\n' +
+            '📁 Level (級別)       : ' + level + '\n' +
+            '📄 File (檔案)        : ' + file + '\n' +
+            '📝 Words (單字數)     : ' + wordCount + '\n' +
+            '✏️ Sentences (句子數)  : ' + sentenceCount + '\n' +
+            '📍 Current Word (當前) : ' + currentWord + '\n' +
+            '📅 Day (天數)         : ' + currentDay + '\n' +
+            '📊 Progress (進度)     : ' + progress + '\n' +
+            '🔍 Day Filter (過濾)   : ' + (dayFilterMode === 'all' ? 'All Words' : 'Day ' + dayFilterValue) + '\n' +
+            '─────────────────────\n' +
+            '💾 已儲存至瀏覽器！\n' +
+            '🔄 下次開啟頁面時會自動載入。'
+        );
+    });
+}
     
-    const savedLevel = localStorage.getItem('savedLevel');
-    const savedFile = localStorage.getItem('savedFile');
-    if (savedLevel && savedFile) {
-        levelSelect.value = savedLevel;
-        currentLevel = savedLevel;
-        loadFileListByLevel(savedLevel).then(() => {
-            fileSelect.value = savedFile;
-            if (savedFile) loadSelectedFile(savedFile);
-        });
-    }
+    // ===== 自動載入儲存的進度 =====
+const savedLevel = localStorage.getItem('savedLevel');
+const savedFile = localStorage.getItem('savedFile');
+const savedDayMode = localStorage.getItem('savedDayMode') || 'all';
+const savedDayValue = localStorage.getItem('savedDayValue') || '1';
+const savedWordIdx = parseInt(localStorage.getItem('savedWordIdx')) || 0;
+
+if (savedLevel && savedFile) {
+    levelSelect.value = savedLevel;
+    currentLevel = savedLevel;
+    loadFileListByLevel(savedLevel).then(() => {
+        fileSelect.value = savedFile;
+        if (savedFile) {
+            loadSelectedFile(savedFile).then(() => {
+                // ===== 載入完成後，恢復 Day 過濾狀態 =====
+                const daySelect = document.getElementById('daySelect');
+                const dayNum = document.getElementById('dayNum');
+                
+                if (daySelect) {
+                    daySelect.value = savedDayMode;
+                    // 觸發 change 事件讓 dayNum 更新
+                    daySelect.dispatchEvent(new Event('change'));
+                }
+                
+                if (dayNum) {
+                    dayNum.value = savedDayValue;
+                }
+                
+                // ===== 恢復過濾狀態 =====
+                if (savedDayMode === 'all') {
+                    filteredWords = JSON.parse(JSON.stringify(allWords));
+                } else {
+                    const day = Number(savedDayValue);
+                    if (!isNaN(day) && day > 0) {
+                        filteredWords = allWords.filter(item => item.day === day);
+                    } else {
+                        filteredWords = JSON.parse(JSON.stringify(allWords));
+                    }
+                }
+                
+                // ===== 恢復當前單字索引 =====
+                if (savedWordIdx < filteredWords.length) {
+                    currentWordIdx = savedWordIdx;
+                } else {
+                    currentWordIdx = 0;
+                }
+                
+                // ===== 重新顯示單字 =====
+                showWord();
+                updateInfoTip();
+                
+                console.log('✅ Progress restored: Day=' + savedDayMode + ', Value=' + savedDayValue + ', WordIdx=' + savedWordIdx);
+            });
+        }
+    });
+}
 }
 
 // ====================== 核心模組初始化 ======================
