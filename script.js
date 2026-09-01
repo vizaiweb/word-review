@@ -2786,532 +2786,537 @@ function showAllSentencesPopup() {
         </div>
     </div>
     
-    <script>
-        // ===== 直接從父視窗寫入資料（仿照 showAllWords） =====
-        window.allSentencesData = ${JSON.stringify(allSentences)};
-        window.currentLevel = "${currentLevel}";
-        window.currentFileName = "${currentFileName}";
-        window.escapeHtmlFn = ${escapeHtml.toString()};
-        window.speakOnceFn = ${speakOnce.toString()};
-        window.toggleSentencesAutoPlayFn = ${toggleSentencesAutoPlay.toString()};
-        window.stopSentencesAutoPlayFn = ${stopSentencesAutoPlay.toString()};
-        window.switchSentencesPlayModeFn = ${switchSentencesPlayMode.toString()};
-        window.getAvailableVoiceFn = ${getAvailableVoice.toString()};
-        window.getCantoneseVoiceFn = ${getCantoneseVoice.toString()};
-        window.synth = synth;
-        
-        // ===== 分頁切換 =====
-        document.querySelectorAll('.tab-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-                this.classList.add('active');
-                document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-                document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-                
-                if (this.dataset.tab === 'builder') {
-                    initBuilder();
-                }
-            });
+   <script>
+    // ===== 直接從父視窗寫入資料 =====
+    window.allSentencesData = ${JSON.stringify(allSentences)};
+    window.currentLevel = "${currentLevel}";
+    window.currentFileName = "${currentFileName}";
+    
+    // ===== 取得父視窗的 opener =====
+    var opener = window.opener;
+    
+    // ===== 在彈窗內定義 escapeHtml（避免傳遞函數問題） =====
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
         });
-        
-        // ===== Sentence Builder 邏輯 =====
-        var builderState = {
-            sentences: [],
-            currentIndex: 0,
-            sourceWords: [],
-            targetWords: [],
-            totalCount: 0,
-            isAnswered: false,
-            stats: {
-                total: 0,
-                correct: 0
+    }
+    
+    // ===== 分頁切換 =====
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+            
+            if (this.dataset.tab === 'builder') {
+                initBuilder();
             }
-        };
+        });
+    });
+    
+    // ===== 綁定 Sentence List 控制按鈕（透過 opener 呼叫父視窗函數） =====
+    document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
+        if (opener && opener.toggleSentencesAutoPlay) {
+            opener.toggleSentencesAutoPlay();
+        } else {
+            console.warn('toggleSentencesAutoPlay not available');
+        }
+    });
+    
+    document.getElementById('sentencesStopBtn').addEventListener('click', function() {
+        if (opener && opener.stopSentencesAutoPlay) {
+            opener.stopSentencesAutoPlay();
+        } else {
+            console.warn('stopSentencesAutoPlay not available');
+        }
+    });
+    
+    document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
+        if (opener && opener.switchSentencesPlayMode) {
+            opener.switchSentencesPlayMode();
+        } else {
+            console.warn('switchSentencesPlayMode not available');
+        }
+    });
+    
+    // ===== Sentence Builder 邏輯 =====
+    var builderState = {
+        sentences: [],
+        currentIndex: 0,
+        sourceWords: [],
+        targetWords: [],
+        totalCount: 0,
+        isAnswered: false,
+        stats: {
+            total: 0,
+            correct: 0
+        }
+    };
+    
+    function shuffleArray(arr) {
+        var shuffled = arr.slice();
+        for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = temp;
+        }
+        return shuffled;
+    }
+    
+    function splitSentence(sentence) {
+        return sentence.trim().split(/\\s+/).filter(function(p) { return p.length > 0; });
+    }
+    
+    function initBuilder() {
+        var container = document.getElementById('builderContainer');
+        if (!container) return;
         
-        function shuffleArray(arr) {
-            var shuffled = arr.slice();
-            for (var i = shuffled.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                var temp = shuffled[i];
-                shuffled[i] = shuffled[j];
-                shuffled[j] = temp;
-            }
-            return shuffled;
+        var sentences = window.allSentencesData || [];
+        if (sentences.length === 0) {
+            container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+            return;
         }
         
-        function splitSentence(sentence) {
-            return sentence.trim().split(/\\s+/).filter(function(p) { return p.length > 0; });
+        builderState.sentences = sentences;
+        builderState.totalCount = sentences.length;
+        builderState.currentIndex = 0;
+        loadSentence(0);
+    }
+    
+    function loadSentence(index) {
+        var sentences = builderState.sentences;
+        if (!sentences || sentences.length === 0 || index >= sentences.length) return;
+        
+        builderState.currentIndex = index;
+        var sentence = sentences[index];
+        var words = splitSentence(sentence.sentence_en);
+        builderState.sourceWords = shuffleArray(words.slice());
+        builderState.targetWords = words.map(function() { return null; });
+        builderState.isAnswered = false;
+        renderBuilder();
+    }
+    
+    function renderBuilder() {
+        var container = document.getElementById('builderContainer');
+        if (!container) return;
+        
+        var sentence = builderState.sentences[builderState.currentIndex];
+        if (!sentence) {
+            container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
+            return;
         }
         
-        function initBuilder() {
-            var container = document.getElementById('builderContainer');
-            if (!container) return;
-            
-            var sentences = window.allSentencesData || [];
-            if (sentences.length === 0) {
-                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
-                return;
-            }
-            
-            builderState.sentences = sentences;
-            builderState.totalCount = sentences.length;
-            builderState.currentIndex = 0;
-            loadSentence(0);
-        }
+        var total = builderState.totalCount;
+        var current = builderState.currentIndex + 1;
+        var sourceWords = builderState.sourceWords;
+        var targetWords = builderState.targetWords;
+        var isAnswered = builderState.isAnswered;
+        var stats = builderState.stats;
         
-        function loadSentence(index) {
-            var sentences = builderState.sentences;
-            if (!sentences || sentences.length === 0 || index >= sentences.length) return;
-            
-            builderState.currentIndex = index;
-            var sentence = sentences[index];
-            var words = splitSentence(sentence.sentence_en);
-            builderState.sourceWords = shuffleArray(words.slice());
-            builderState.targetWords = words.map(function() { return null; });
-            builderState.isAnswered = false;
-            renderBuilder();
-        }
-        
-        function renderBuilder() {
-            var container = document.getElementById('builderContainer');
-            if (!container) return;
-            
-            var sentence = builderState.sentences[builderState.currentIndex];
-            if (!sentence) {
-                container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No sentences available.</p>';
-                return;
-            }
-            
-            var total = builderState.totalCount;
-            var current = builderState.currentIndex + 1;
-            var sourceWords = builderState.sourceWords;
-            var targetWords = builderState.targetWords;
-            var isAnswered = builderState.isAnswered;
-            var stats = builderState.stats;
-            var escapeHtml = window.escapeHtmlFn || function(s) { return s; };
-            
-            var sourceHtml = '';
-            if (sourceWords.length === 0) {
-                sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All words placed)</span>';
-            } else {
-                sourceHtml = sourceWords.map(function(word, idx) {
-                    return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtml(word) + '</span>';
-                }).join('');
-            }
-            
-            var targetHtml = targetWords.map(function(word, idx) {
-                if (word !== null) {
-                    return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtml(word) + '</span>';
-                } else {
-                    return '<span class="word-token target-token empty-slot" data-target-index="' + idx + '">?</span>';
-                }
+        var sourceHtml = '';
+        if (sourceWords.length === 0) {
+            sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All words placed)</span>';
+        } else {
+            sourceHtml = sourceWords.map(function(word, idx) {
+                return '<span class="word-token source-token" data-source-index="' + idx + '">' + escapeHtml(word) + '</span>';
             }).join('');
-            
-            var allFilled = targetWords.every(function(w) { return w !== null; });
-            var isFirst = (builderState.currentIndex === 0);
-            var isLast = (builderState.currentIndex >= builderState.totalCount - 1);
-            
-            var feedbackText = '📝 Drag words to the slots';
-            if (isAnswered) {
-                var correctWords = splitSentence(sentence.sentence_en);
-                var isCorrect = true;
-                for (var i = 0; i < correctWords.length; i++) {
-                    if (targetWords[i] !== correctWords[i]) {
-                        isCorrect = false;
-                        break;
-                    }
-                }
-                feedbackText = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect, try again';
-            }
-            
-            var rateDisplay = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) + '%' : '--%';
-            
-            container.innerHTML = 
-                '<div class="sentence-builder">' +
-                    '<div class="builder-header">' +
-                        '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
-                        '<span class="score-text" id="builderStats">📊 Answered: ' + stats.total + ' | Correct: ' + stats.correct + ' | Rate: ' + rateDisplay + '</span>' +
-                        '<div class="builder-controls">' +
-                            '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="builder-meaning">' +
-                        '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
-                    '</div>' +
-                    '<div class="builder-source-area">' +
-                        '<div class="builder-dropzone source-dropzone" id="sourceDropzone">' +
-                            sourceHtml +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="builder-target-area">' +
-                        '<div class="builder-dropzone target-dropzone" id="targetDropzone">' +
-                            targetHtml +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="builder-actions">' +
-                        '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>Previous</button>' +
-                        '<button class="btn-shuffle" id="builderShuffleBtn">Shuffle</button>' +
-                        '<button class="btn-check" id="builderCheckBtn">Check Answer</button>' +
-                        '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>Next</button>' +
-                    '</div>' +
-                    '<div class="builder-feedback" id="builderFeedback">' + feedbackText + '</div>' +
-                '</div>';
-            
-            bindBuilderEvents();
         }
         
-        function bindBuilderEvents() {
-            var listenBtn = document.getElementById('builderListenBtn');
-            var speakOnce = window.speakOnceFn || null;
-            
-            if (listenBtn) {
-                listenBtn.onclick = function() {
-                    var sentence = builderState.sentences[builderState.currentIndex];
-                    if (sentence && sentence.sentence_en) {
-                        if (speakOnce) {
-                            speakOnce(sentence.sentence_en, null, 0.85);
-                        } else {
-                            var utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
-                            utterance.lang = 'en-US';
-                            utterance.rate = 0.85;
-                            speechSynthesis.speak(utterance);
-                        }
-                    }
-                };
+        var targetHtml = targetWords.map(function(word, idx) {
+            if (word !== null) {
+                return '<span class="word-token target-token" data-target-index="' + idx + '">' + escapeHtml(word) + '</span>';
+            } else {
+                return '<span class="word-token target-token empty-slot" data-target-index="' + idx + '">?</span>';
             }
-            
-            var prevBtn = document.getElementById('builderPrevBtn');
-            if (prevBtn) {
-                prevBtn.onclick = function() {
-                    if (builderState.currentIndex > 0) {
-                        builderState.currentIndex--;
-                        loadSentence(builderState.currentIndex);
-                    }
-                };
-            }
-            
-            var nextBtn = document.getElementById('builderNextBtn');
-            if (nextBtn) {
-                nextBtn.onclick = function() {
-                    if (builderState.currentIndex < builderState.totalCount - 1) {
-                        builderState.currentIndex++;
-                        loadSentence(builderState.currentIndex);
-                    }
-                };
-            }
-            
-            var shuffleBtn = document.getElementById('builderShuffleBtn');
-            if (shuffleBtn) {
-                shuffleBtn.onclick = function() {
-                    var sentence = builderState.sentences[builderState.currentIndex];
-                    var words = splitSentence(sentence.sentence_en);
-                    builderState.sourceWords = shuffleArray(words.slice());
-                    builderState.targetWords = words.map(function() { return null; });
-                    builderState.isAnswered = false;
-                    renderBuilder();
-                };
-            }
-            
-            var checkBtn = document.getElementById('builderCheckBtn');
-            if (checkBtn) {
-                checkBtn.onclick = function() {
-                    checkAnswer();
-                };
-            }
-            
-            // --- 拖拽邏輯 ---
-            var sourceDropzone = document.getElementById('sourceDropzone');
-            var targetDropzone = document.getElementById('targetDropzone');
-            if (!sourceDropzone && !targetDropzone) return;
-            
-            var dragData = null;
-            
-            function getDragData(e) {
-                var token = e.target.closest('.word-token');
-                if (!token) return null;
-                
-                var isSource = token.classList.contains('source-token');
-                var isTarget = token.classList.contains('target-token');
-                if (!isSource && !isTarget) return null;
-                
-                var index, type;
-                if (isSource) {
-                    index = parseInt(token.dataset.sourceIndex);
-                    type = 'source';
-                } else {
-                    index = parseInt(token.dataset.targetIndex);
-                    type = 'target';
-                }
-                if (isNaN(index)) return null;
-                
-                if (type === 'target' && builderState.targetWords[index] === null) return null;
-                
-                return {
-                    type: type,
-                    index: index,
-                    element: token,
-                    startX: e.clientX || e.touches[0].clientX,
-                    startY: e.clientY || e.touches[0].clientY
-                };
-            }
-            
-            function onDragStart(e) {
-                var data = getDragData(e);
-                if (!data) return;
-                dragData = data;
-                var el = data.element;
-                el.style.transition = 'none';
-                el.style.zIndex = '1000';
-                el.style.transform = 'translate(0, 0)';
-                el.classList.add('dragging');
-                if (e.type === 'mousedown') e.preventDefault();
-            }
-            
-            function onDragMove(e) {
-                if (!dragData) return;
-                e.preventDefault();
-                var clientX = e.clientX || (e.touches && e.touches[0].clientX);
-                var clientY = e.clientY || (e.touches && e.touches[0].clientY);
-                if (clientX === undefined) return;
-                var dx = clientX - dragData.startX;
-                var dy = clientY - dragData.startY;
-                dragData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-                
-                document.querySelectorAll('.word-token').forEach(function(t) { t.classList.remove('drag-over-me'); });
-                document.querySelectorAll('.empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
-                
-                var targetElement = null;
-                var targetType = null;
-                var targetIndex = null;
-                
-                var allTargets = document.querySelectorAll('.source-token, .target-token, .empty-slot');
-                allTargets.forEach(function(el) {
-                    if (el === dragData.element) return;
-                    var rect = el.getBoundingClientRect();
-                    var cx = rect.left + rect.width/2;
-                    var cy = rect.top + rect.height/2;
-                    var dist = Math.sqrt(Math.pow(clientX - cx, 2) + Math.pow(clientY - cy, 2));
-                    if (dist < 60) {
-                        targetElement = el;
-                    }
-                });
-                
-                if (targetElement) {
-                    targetElement.classList.add('drag-over-me');
-                    if (targetElement.classList.contains('source-token')) {
-                        targetType = 'source';
-                        targetIndex = parseInt(targetElement.dataset.sourceIndex);
-                    } else if (targetElement.classList.contains('target-token')) {
-                        targetType = 'target';
-                        targetIndex = parseInt(targetElement.dataset.targetIndex);
-                    } else if (targetElement.classList.contains('empty-slot')) {
-                        targetType = 'target';
-                        targetIndex = parseInt(targetElement.dataset.targetIndex);
-                    }
-                }
-                dragData.target = { type: targetType, index: targetIndex, element: targetElement };
-            }
-            
-            function playBeep(frequency, duration) {
-                try {
-                    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    var oscillator = audioCtx.createOscillator();
-                    var gainNode = audioCtx.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    oscillator.frequency.value = frequency;
-                    oscillator.type = 'sine';
-                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                    oscillator.start(audioCtx.currentTime);
-                    oscillator.stop(audioCtx.currentTime + duration);
-                } catch(e) {
-                    console.warn('Audio not supported');
+        }).join('');
+        
+        var allFilled = targetWords.every(function(w) { return w !== null; });
+        var isFirst = (builderState.currentIndex === 0);
+        var isLast = (builderState.currentIndex >= builderState.totalCount - 1);
+        
+        var feedbackText = '📝 Drag words to the slots';
+        if (isAnswered) {
+            var correctWords = splitSentence(sentence.sentence_en);
+            var isCorrect = true;
+            for (var i = 0; i < correctWords.length; i++) {
+                if (targetWords[i] !== correctWords[i]) {
+                    isCorrect = false;
+                    break;
                 }
             }
-            
-            function checkAnswer() {
+            feedbackText = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect, try again';
+        }
+        
+        var rateDisplay = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) + '%' : '--%';
+        
+        container.innerHTML = 
+            '<div class="sentence-builder">' +
+                '<div class="builder-header">' +
+                    '<span class="progress-text">📌 Sentence ' + current + ' / ' + total + '</span>' +
+                    '<span class="score-text" id="builderStats">📊 Answered: ' + stats.total + ' | Correct: ' + stats.correct + ' | Rate: ' + rateDisplay + '</span>' +
+                    '<div class="builder-controls">' +
+                        '<button id="builderListenBtn" title="Listen to sentence">🔊</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="builder-meaning">' +
+                    '<span class="meaning-text">📖 ' + escapeHtml(sentence.sentence_zh) + '</span>' +
+                '</div>' +
+                '<div class="builder-source-area">' +
+                    '<div class="builder-dropzone source-dropzone" id="sourceDropzone">' +
+                        sourceHtml +
+                    '</div>' +
+                '</div>' +
+                '<div class="builder-target-area">' +
+                    '<div class="builder-dropzone target-dropzone" id="targetDropzone">' +
+                        targetHtml +
+                    '</div>' +
+                '</div>' +
+                '<div class="builder-actions">' +
+                    '<button class="btn-prev" id="builderPrevBtn" ' + (isFirst ? 'disabled' : '') + '>Previous</button>' +
+                    '<button class="btn-shuffle" id="builderShuffleBtn">Shuffle</button>' +
+                    '<button class="btn-check" id="builderCheckBtn">Check Answer</button>' +
+                    '<button class="btn-next" id="builderNextBtn" ' + (isLast ? 'disabled' : '') + '>Next</button>' +
+                '</div>' +
+                '<div class="builder-feedback" id="builderFeedback">' + feedbackText + '</div>' +
+            '</div>';
+        
+        bindBuilderEvents();
+    }
+    
+    function bindBuilderEvents() {
+        var listenBtn = document.getElementById('builderListenBtn');
+        if (listenBtn) {
+            listenBtn.onclick = function() {
                 var sentence = builderState.sentences[builderState.currentIndex];
-                if (!sentence) return;
-                var correctWords = splitSentence(sentence.sentence_en);
-                var targetWords = builderState.targetWords;
-                
-                if (targetWords.some(function(w) { return w === null; })) {
-                    document.getElementById('builderFeedback').innerHTML = '⚠️ Please fill all slots before checking.';
-                    document.getElementById('builderFeedback').style.color = '#f59e0b';
-                    playBeep(400, 0.3);
-                    return;
-                }
-                
-                var isCorrect = true;
-                for (var i = 0; i < correctWords.length; i++) {
-                    if (targetWords[i] !== correctWords[i]) {
-                        isCorrect = false;
-                        break;
-                    }
-                }
-                
-                builderState.isAnswered = true;
-                
-                var feedback = document.getElementById('builderFeedback');
-                if (feedback) {
-                    feedback.innerHTML = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect. Try again!';
-                    feedback.style.color = isCorrect ? '#22c55e' : '#ef4444';
-                }
-                
-                // ===== 更新算分 =====
-                builderState.stats.total++;
-                if (isCorrect) {
-                    builderState.stats.correct++;
-                }
-                
-                var statsEl = document.getElementById('builderStats');
-                if (statsEl) {
-                    var total = builderState.stats.total;
-                    var correct = builderState.stats.correct;
-                    var rate = total > 0 ? Math.round((correct / total) * 100) + '%' : '--%';
-                    statsEl.textContent = '📊 Answered: ' + total + ' | Correct: ' + correct + ' | Rate: ' + rate;
-                }
-                
-                if (isCorrect) {
-                    playBeep(880, 0.2);
-                    setTimeout(function() { playBeep(1100, 0.15); }, 150);
-                } else {
-                    playBeep(440, 0.4);
-                }
-            }
-            
-            function onDragEnd(e) {
-                if (!dragData) return;
-                var el = dragData.element;
-                el.style.transition = 'all 0.2s';
-                el.style.transform = 'translate(0, 0)';
-                el.style.zIndex = '';
-                el.classList.remove('dragging');
-                document.querySelectorAll('.word-token, .empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
-                
-                var sourceType = dragData.type;
-                var sourceIndex = dragData.index;
-                var target = dragData.target;
-                
-                if (target && target.type !== null && target.index !== null) {
-                    var targetType = target.type;
-                    var targetIndex = target.index;
-                    
-                    if (sourceType === targetType && sourceIndex === targetIndex) {
-                        dragData = null;
-                        renderBuilder();
-                        return;
-                    }
-                    
-                    var sourceWords = builderState.sourceWords;
-                    var targetWords = builderState.targetWords;
-                    var sourceWord, targetWord;
-                    
-                    if (sourceType === 'source') {
-                        sourceWord = sourceWords[sourceIndex];
-                        if (sourceWord === undefined) { dragData = null; renderBuilder(); return; }
+                if (sentence && sentence.sentence_en) {
+                    if (opener && opener.speakOnce) {
+                        opener.speakOnce(sentence.sentence_en, null, 0.85);
                     } else {
-                        sourceWord = targetWords[sourceIndex];
-                        if (sourceWord === null) { dragData = null; renderBuilder(); return; }
-                    }
-                    
-                    if (targetType === 'source') {
-                        targetWord = sourceWords[targetIndex];
-                        if (targetWord === undefined) { dragData = null; renderBuilder(); return; }
-                    } else {
-                        targetWord = targetWords[targetIndex];
-                    }
-                    
-                    if (sourceType === 'source' && targetType === 'source') {
-                        var temp = sourceWords[sourceIndex];
-                        sourceWords[sourceIndex] = sourceWords[targetIndex];
-                        sourceWords[targetIndex] = temp;
-                    } else if (sourceType === 'target' && targetType === 'target') {
-                        if (targetWords[targetIndex] !== null) {
-                            var temp2 = targetWords[sourceIndex];
-                            targetWords[sourceIndex] = targetWords[targetIndex];
-                            targetWords[targetIndex] = temp2;
-                        } else {
-                            targetWords[targetIndex] = targetWords[sourceIndex];
-                            targetWords[sourceIndex] = null;
-                        }
-                    } else if (sourceType === 'source' && targetType === 'target') {
-                        if (targetWords[targetIndex] === null) {
-                            targetWords[targetIndex] = sourceWords[sourceIndex];
-                            sourceWords.splice(sourceIndex, 1);
-                        } else {
-                            var temp3 = sourceWords[sourceIndex];
-                            sourceWords[sourceIndex] = targetWords[targetIndex];
-                            targetWords[targetIndex] = temp3;
-                        }
-                    } else if (sourceType === 'target' && targetType === 'source') {
-                        if (sourceWords[targetIndex] === undefined) {
-                            dragData = null; renderBuilder(); return;
-                        }
-                        var temp4 = targetWords[sourceIndex];
-                        targetWords[sourceIndex] = sourceWords[targetIndex];
-                        sourceWords[targetIndex] = temp4;
+                        var utterance = new SpeechSynthesisUtterance(sentence.sentence_en);
+                        utterance.lang = 'en-US';
+                        utterance.rate = 0.85;
+                        speechSynthesis.speak(utterance);
                     }
                 }
-                
-                dragData = null;
-                renderBuilder();
-            }
-            
-            // 清理舊監聽器
-            if (window._builderDragCleanup) {
-                window._builderDragCleanup();
-            }
-            
-            document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(function(zone) {
-                zone.addEventListener('mousedown', onDragStart);
-                zone.addEventListener('touchstart', onDragStart, { passive: true });
-            });
-            
-            document.addEventListener('mousemove', onDragMove);
-            document.addEventListener('mouseup', onDragEnd);
-            document.addEventListener('touchmove', onDragMove, { passive: false });
-            document.addEventListener('touchend', onDragEnd, { passive: true });
-            
-            window._builderDragCleanup = function() {
-                document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(function(zone) {
-                    zone.removeEventListener('mousedown', onDragStart);
-                    zone.removeEventListener('touchstart', onDragStart);
-                });
-                document.removeEventListener('mousemove', onDragMove);
-                document.removeEventListener('mouseup', onDragEnd);
-                document.removeEventListener('touchmove', onDragMove);
-                document.removeEventListener('touchend', onDragEnd);
             };
         }
         
-        // ===== 綁定 Sentence List 控制按鈕 =====
-        var toggleFn = window.toggleSentencesAutoPlayFn || null;
-        var stopFn = window.stopSentencesAutoPlayFn || null;
-        var switchFn = window.switchSentencesPlayModeFn || null;
+        var prevBtn = document.getElementById('builderPrevBtn');
+        if (prevBtn) {
+            prevBtn.onclick = function() {
+                if (builderState.currentIndex > 0) {
+                    builderState.currentIndex--;
+                    loadSentence(builderState.currentIndex);
+                }
+            };
+        }
         
-        document.getElementById('sentencesPlayBtn').addEventListener('click', function() {
-            if (toggleFn) {
-                toggleFn();
+        var nextBtn = document.getElementById('builderNextBtn');
+        if (nextBtn) {
+            nextBtn.onclick = function() {
+                if (builderState.currentIndex < builderState.totalCount - 1) {
+                    builderState.currentIndex++;
+                    loadSentence(builderState.currentIndex);
+                }
+            };
+        }
+        
+        var shuffleBtn = document.getElementById('builderShuffleBtn');
+        if (shuffleBtn) {
+            shuffleBtn.onclick = function() {
+                var sentence = builderState.sentences[builderState.currentIndex];
+                var words = splitSentence(sentence.sentence_en);
+                builderState.sourceWords = shuffleArray(words.slice());
+                builderState.targetWords = words.map(function() { return null; });
+                builderState.isAnswered = false;
+                renderBuilder();
+            };
+        }
+        
+        var checkBtn = document.getElementById('builderCheckBtn');
+        if (checkBtn) {
+            checkBtn.onclick = function() {
+                checkAnswer();
+            };
+        }
+        
+        // --- 拖拽邏輯 ---
+        var sourceDropzone = document.getElementById('sourceDropzone');
+        var targetDropzone = document.getElementById('targetDropzone');
+        if (!sourceDropzone && !targetDropzone) return;
+        
+        var dragData = null;
+        
+        function getDragData(e) {
+            var token = e.target.closest('.word-token');
+            if (!token) return null;
+            
+            var isSource = token.classList.contains('source-token');
+            var isTarget = token.classList.contains('target-token');
+            if (!isSource && !isTarget) return null;
+            
+            var index, type;
+            if (isSource) {
+                index = parseInt(token.dataset.sourceIndex);
+                type = 'source';
+            } else {
+                index = parseInt(token.dataset.targetIndex);
+                type = 'target';
             }
+            if (isNaN(index)) return null;
+            
+            if (type === 'target' && builderState.targetWords[index] === null) return null;
+            
+            return {
+                type: type,
+                index: index,
+                element: token,
+                startX: e.clientX || e.touches[0].clientX,
+                startY: e.clientY || e.touches[0].clientY
+            };
+        }
+        
+        function onDragStart(e) {
+            var data = getDragData(e);
+            if (!data) return;
+            dragData = data;
+            var el = data.element;
+            el.style.transition = 'none';
+            el.style.zIndex = '1000';
+            el.style.transform = 'translate(0, 0)';
+            el.classList.add('dragging');
+            if (e.type === 'mousedown') e.preventDefault();
+        }
+        
+        function onDragMove(e) {
+            if (!dragData) return;
+            e.preventDefault();
+            var clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            var clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            if (clientX === undefined) return;
+            var dx = clientX - dragData.startX;
+            var dy = clientY - dragData.startY;
+            dragData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+            
+            document.querySelectorAll('.word-token').forEach(function(t) { t.classList.remove('drag-over-me'); });
+            document.querySelectorAll('.empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
+            
+            var targetElement = null;
+            var targetType = null;
+            var targetIndex = null;
+            
+            var allTargets = document.querySelectorAll('.source-token, .target-token, .empty-slot');
+            allTargets.forEach(function(el) {
+                if (el === dragData.element) return;
+                var rect = el.getBoundingClientRect();
+                var cx = rect.left + rect.width/2;
+                var cy = rect.top + rect.height/2;
+                var dist = Math.sqrt(Math.pow(clientX - cx, 2) + Math.pow(clientY - cy, 2));
+                if (dist < 60) {
+                    targetElement = el;
+                }
+            });
+            
+            if (targetElement) {
+                targetElement.classList.add('drag-over-me');
+                if (targetElement.classList.contains('source-token')) {
+                    targetType = 'source';
+                    targetIndex = parseInt(targetElement.dataset.sourceIndex);
+                } else if (targetElement.classList.contains('target-token')) {
+                    targetType = 'target';
+                    targetIndex = parseInt(targetElement.dataset.targetIndex);
+                } else if (targetElement.classList.contains('empty-slot')) {
+                    targetType = 'target';
+                    targetIndex = parseInt(targetElement.dataset.targetIndex);
+                }
+            }
+            dragData.target = { type: targetType, index: targetIndex, element: targetElement };
+        }
+        
+        function playBeep(frequency, duration) {
+            try {
+                var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                var oscillator = audioCtx.createOscillator();
+                var gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch(e) {
+                console.warn('Audio not supported');
+            }
+        }
+        
+        function checkAnswer() {
+            var sentence = builderState.sentences[builderState.currentIndex];
+            if (!sentence) return;
+            var correctWords = splitSentence(sentence.sentence_en);
+            var targetWords = builderState.targetWords;
+            
+            if (targetWords.some(function(w) { return w === null; })) {
+                document.getElementById('builderFeedback').innerHTML = '⚠️ Please fill all slots before checking.';
+                document.getElementById('builderFeedback').style.color = '#f59e0b';
+                playBeep(400, 0.3);
+                return;
+            }
+            
+            var isCorrect = true;
+            for (var i = 0; i < correctWords.length; i++) {
+                if (targetWords[i] !== correctWords[i]) {
+                    isCorrect = false;
+                    break;
+                }
+            }
+            
+            builderState.isAnswered = true;
+            
+            var feedback = document.getElementById('builderFeedback');
+            if (feedback) {
+                feedback.innerHTML = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect. Try again!';
+                feedback.style.color = isCorrect ? '#22c55e' : '#ef4444';
+            }
+            
+            // ===== 更新算分 =====
+            builderState.stats.total++;
+            if (isCorrect) {
+                builderState.stats.correct++;
+            }
+            
+            var statsEl = document.getElementById('builderStats');
+            if (statsEl) {
+                var total = builderState.stats.total;
+                var correct = builderState.stats.correct;
+                var rate = total > 0 ? Math.round((correct / total) * 100) + '%' : '--%';
+                statsEl.textContent = '📊 Answered: ' + total + ' | Correct: ' + correct + ' | Rate: ' + rate;
+            }
+            
+            if (isCorrect) {
+                playBeep(880, 0.2);
+                setTimeout(function() { playBeep(1100, 0.15); }, 150);
+            } else {
+                playBeep(440, 0.4);
+            }
+        }
+        
+        function onDragEnd(e) {
+            if (!dragData) return;
+            var el = dragData.element;
+            el.style.transition = 'all 0.2s';
+            el.style.transform = 'translate(0, 0)';
+            el.style.zIndex = '';
+            el.classList.remove('dragging');
+            document.querySelectorAll('.word-token, .empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
+            
+            var sourceType = dragData.type;
+            var sourceIndex = dragData.index;
+            var target = dragData.target;
+            
+            if (target && target.type !== null && target.index !== null) {
+                var targetType = target.type;
+                var targetIndex = target.index;
+                
+                if (sourceType === targetType && sourceIndex === targetIndex) {
+                    dragData = null;
+                    renderBuilder();
+                    return;
+                }
+                
+                var sourceWords = builderState.sourceWords;
+                var targetWords = builderState.targetWords;
+                var sourceWord, targetWord;
+                
+                if (sourceType === 'source') {
+                    sourceWord = sourceWords[sourceIndex];
+                    if (sourceWord === undefined) { dragData = null; renderBuilder(); return; }
+                } else {
+                    sourceWord = targetWords[sourceIndex];
+                    if (sourceWord === null) { dragData = null; renderBuilder(); return; }
+                }
+                
+                if (targetType === 'source') {
+                    targetWord = sourceWords[targetIndex];
+                    if (targetWord === undefined) { dragData = null; renderBuilder(); return; }
+                } else {
+                    targetWord = targetWords[targetIndex];
+                }
+                
+                if (sourceType === 'source' && targetType === 'source') {
+                    var temp = sourceWords[sourceIndex];
+                    sourceWords[sourceIndex] = sourceWords[targetIndex];
+                    sourceWords[targetIndex] = temp;
+                } else if (sourceType === 'target' && targetType === 'target') {
+                    if (targetWords[targetIndex] !== null) {
+                        var temp2 = targetWords[sourceIndex];
+                        targetWords[sourceIndex] = targetWords[targetIndex];
+                        targetWords[targetIndex] = temp2;
+                    } else {
+                        targetWords[targetIndex] = targetWords[sourceIndex];
+                        targetWords[sourceIndex] = null;
+                    }
+                } else if (sourceType === 'source' && targetType === 'target') {
+                    if (targetWords[targetIndex] === null) {
+                        targetWords[targetIndex] = sourceWords[sourceIndex];
+                        sourceWords.splice(sourceIndex, 1);
+                    } else {
+                        var temp3 = sourceWords[sourceIndex];
+                        sourceWords[sourceIndex] = targetWords[targetIndex];
+                        targetWords[targetIndex] = temp3;
+                    }
+                } else if (sourceType === 'target' && targetType === 'source') {
+                    if (sourceWords[targetIndex] === undefined) {
+                        dragData = null; renderBuilder(); return;
+                    }
+                    var temp4 = targetWords[sourceIndex];
+                    targetWords[sourceIndex] = sourceWords[targetIndex];
+                    sourceWords[targetIndex] = temp4;
+                }
+            }
+            
+            dragData = null;
+            renderBuilder();
+        }
+        
+        // 清理舊監聽器
+        if (window._builderDragCleanup) {
+            window._builderDragCleanup();
+        }
+        
+        document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(function(zone) {
+            zone.addEventListener('mousedown', onDragStart);
+            zone.addEventListener('touchstart', onDragStart, { passive: true });
         });
         
-        document.getElementById('sentencesStopBtn').addEventListener('click', function() {
-            if (stopFn) {
-                stopFn();
-            }
-        });
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd, { passive: true });
         
-        document.getElementById('sentencesModeSwitch').addEventListener('click', function() {
-            if (switchFn) {
-                switchFn();
-            }
-        });
-        
-        // ===== 初始化 Builder =====
-        initBuilder();
-    <\/script>
+        window._builderDragCleanup = function() {
+            document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(function(zone) {
+                zone.removeEventListener('mousedown', onDragStart);
+                zone.removeEventListener('touchstart', onDragStart);
+            });
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+        };
+    }
+    
+    // ===== 初始化 Builder =====
+    initBuilder();
+<\/script>
 </body>
 </html>`;
 
