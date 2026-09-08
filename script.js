@@ -549,7 +549,7 @@ function updateInfoTip() {
     
     if (currentFileName && filteredWords.length && filteredWords[currentWordIdx]) {
         const displayFile = removeFileExtension(currentFileName);
-        container.innerHTML = `${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
+        container.innerHTML = `${currentCategory} | ${currentLevel} | ${displayFile} | ${dayDisplay} | ${currentWordIdx + 1}/${filteredWords.length} words | ✏️ Sentences: ${allSentences.length}`;
     } else if (allSentences.length > 0) {
         container.innerHTML = `✨ Total ${allSentences.length} sentences available ✨`;
     } else {
@@ -1606,7 +1606,7 @@ for (let i = 0; i < allWords.length; i++) {
         <div class="container">
             <!-- Header -->
             <div class="header">
-                <h2>📖 ${currentLevel} - ${escapeHtml(fileNice)}</h2>
+                <h2>📝 ${currentCategory} - ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>Total ${allWords.length} words</p>
             </div>
             
