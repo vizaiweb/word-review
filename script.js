@@ -1489,22 +1489,22 @@ function showAllWords() {
     const fileNice = removeFileExtension(currentFileName);
     
     // ===== 生成 Words List 表格 =====
-let tableRows = '';
-for (let i = 0; i < allWords.length; i++) {
-    const w = allWords[i];
-    tableRows += `
-        <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
-            <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
-            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
-            <td style="padding: 10px 12px; text-align: center; width: 60px;">
-                <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
-            </td>
-        </tr>
-    `;
-}
+    let tableRows = '';
+    for (let i = 0; i < allWords.length; i++) {
+        const w = allWords[i];
+        tableRows += `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
+                <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
+                <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
+                <td style="padding: 10px 12px; text-align: center; width: 60px;">
+                    <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
+                </td>
+            </tr>
+        `;
+    }
     
-    // ===== 生成彈窗完整 HTML（雙分頁） =====
+    // ===== 生成彈窗完整 HTML（三分頁） =====
     const allHtml = `<!DOCTYPE html>
     <html>
     <head>
@@ -1576,6 +1576,109 @@ for (let i = 0; i < allWords.length; i++) {
             .quiz-footer { display: flex; justify-content: flex-end; padding: 4px 4px 0 4px; font-size: 14px; color: #64748b; }
             .quiz-footer .quiz-progress { font-weight: 500; color: #1e293b; }
             
+            /* ===== Spelling Panel ===== */
+            .spelling-builder { padding: 0 4px; }
+            .spelling-builder .builder-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9; }
+            .spelling-builder .builder-header .progress-text { font-weight: 600; color: #1e293b; font-size: 15px; }
+            .spelling-builder .builder-header .score-text { font-weight: 600; color: #22c55e; font-size: 15px; }
+            .spelling-builder .builder-header .builder-controls { display: flex; gap: 8px; align-items: center; }
+            .spelling-builder .builder-header .builder-controls button { background: none; border: none; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+            .spelling-builder .builder-header .builder-controls button:hover { background: #e2e8f0; }
+            .spelling-builder .builder-header .builder-controls button:active { transform: scale(0.9); }
+            
+            .spelling-builder .builder-meaning { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 18px; color: #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+            .spelling-builder .builder-meaning .meaning-text { font-weight: 500; }
+            
+            /* 模式切換 */
+            .spelling-builder .source-mode-bar { display: flex; gap: 8px; margin-bottom: 12px; justify-content: center; }
+            .spelling-builder .mode-btn { padding: 6px 20px; border: 2px solid #e2e8f0; border-radius: 40px; background: white; color: #64748b; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+            .spelling-builder .mode-btn:hover { border-color: #ff9a56; color: #ff6b35; }
+            .spelling-builder .mode-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; border-color: transparent; }
+            
+            .spelling-builder .builder-dropzone {
+                min-height: 80px;
+                background: #f8fafc;
+                border: 2px dashed #cbd5e1;
+                border-radius: 16px;
+                padding: 16px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 16px;
+                transition: all 0.2s;
+                position: relative;
+            }
+            .spelling-builder .builder-dropzone.drag-over { border-color: #ff9a56; background: #fff7ed; }
+            
+            .spelling-builder .source-area { margin-bottom: 16px; }
+            .spelling-builder .target-area { margin-bottom: 16px; border-top: 2px dashed #cbd5e1; padding-top: 16px; }
+            
+            .spelling-builder .word-token {
+                display: inline-block;
+                padding: 10px 16px;
+                background: white;
+                border: 2px solid #e2e8f0;
+                border-radius: 10px;
+                font-size: 18px;
+                font-weight: 600;
+                color: #1e293b;
+                user-select: none;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                transition: all 0.2s;
+                position: relative;
+                text-transform: uppercase;
+            }
+            .spelling-builder .word-token.dragging {
+                opacity: 0.7;
+                transform: scale(1.08);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+                z-index: 1000;
+                transition: none !important;
+                cursor: grabbing;
+            }
+            
+            /* 目標欄佔位符 */
+            .spelling-builder .target-token.empty-slot {
+                min-width: 32px;
+                color: #94a3b8;
+                text-align: center;
+                padding: 10px 8px;
+            }
+            
+            /* 分隔符 */
+            .spelling-builder .separator {
+                font-size: 20px;
+                font-weight: bold;
+                color: #94a3b8;
+                user-select: none;
+                margin: 0 4px;
+            }
+            
+            /* 拖拽懸停高亮 */
+            .word-token.drag-over-me,
+            .empty-slot.drag-over-me {
+                background: #ffedd5 !important;
+                border-color: #ff9a56 !important;
+                box-shadow: 0 0 0 3px #ff9a56 !important;
+                transform: scale(1.03);
+                transition: all 0.15s ease;
+            }
+            
+            .spelling-builder .builder-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+            .spelling-builder .builder-actions button { padding: 10px 24px; border: none; border-radius: 40px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: white; }
+            .spelling-builder .builder-actions button:hover { opacity: 0.85; transform: scale(0.97); }
+            .spelling-builder .builder-actions button:active { transform: scale(0.94); }
+            .spelling-builder .builder-actions .btn-prev { background: #3b82f6; }
+            .spelling-builder .builder-actions .btn-prev:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .spelling-builder .builder-actions .btn-next { background: #8b5cf6; }
+            .spelling-builder .builder-actions .btn-next:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
+            .spelling-builder .builder-actions .btn-shuffle { background: #f59e0b; }
+            .spelling-builder .builder-actions .btn-check { background: #22c55e; }
+            
+            .spelling-builder .builder-feedback { text-align: center; margin-top: 12px; font-size: 16px; font-weight: 600; min-height: 30px; color: #94a3b8; }
+            
             /* Common */
             .words-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
             .words-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -1599,6 +1702,9 @@ for (let i = 0; i < allWords.length; i++) {
                 .words-control-bar { gap: 8px; padding: 10px 12px; }
                 .words-control-bar .play-btn, .words-control-bar .stop-btn { padding: 6px 16px; font-size: 12px; }
                 .words-control-bar .mode-switch { font-size: 11px; min-width: 120px; padding: 4px 12px; }
+                .spelling-builder .word-token { font-size: 15px; padding: 8px 12px; }
+                .spelling-builder .target-token.empty-slot { min-width: 26px; padding: 8px 6px; }
+                .spelling-builder .builder-actions button { padding: 8px 16px; font-size: 13px; flex: 1; min-width: 60px; }
             }
         </style>
     </head>
@@ -1614,6 +1720,7 @@ for (let i = 0; i < allWords.length; i++) {
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="words">📖 Words List</button>
                 <button class="tab-btn" data-tab="quiz">✏️ Quiz</button>
+                <button class="tab-btn" data-tab="spelling">✏️ Spelling</button>
             </div>
             
             <!-- Tab Panels -->
@@ -1629,13 +1736,13 @@ for (let i = 0; i < allWords.length; i++) {
                     <div class="words-table-wrapper">
                         <table class="words-table">
                             <thead>
-    <tr>
-        <th>Day</th>
-        <th>Word</th>
-        <th>Meaning</th>
-        <th style="text-align: center; width: 70px;">Listen</th>
-    </tr>
-</thead>
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Word</th>
+                                    <th>Meaning</th>
+                                    <th style="text-align: center; width: 70px;">Listen</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 ${tableRows}
                             </tbody>
@@ -1673,6 +1780,11 @@ for (let i = 0; i < allWords.length; i++) {
                         <span class="quiz-progress" id="quizProgress">Progress: 0 / ${allWords.length}</span>
                     </div>
                 </div>
+                
+                <!-- Spelling Panel -->
+                <div id="tab-spelling" class="tab-panel">
+                    <div id="spellingContainer"></div>
+                </div>
             </div>
             
             <!-- Footer -->
@@ -1695,9 +1807,10 @@ for (let i = 0; i < allWords.length; i++) {
                     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                     document.getElementById('tab-' + this.dataset.tab).classList.add('active');
                     
-                    // 如果切換到 Quiz 分頁，初始化 Quiz
                     if (this.dataset.tab === 'quiz') {
                         initQuizInPopup();
+                    } else if (this.dataset.tab === 'spelling') {
+                        initSpelling();
                     }
                 });
             });
@@ -1729,31 +1842,30 @@ for (let i = 0; i < allWords.length; i++) {
                 return result;
             }
 
-
             function speakFullQuestionPopup(questionData) {
-    const no = questionData.wordIndex + 1;
-    const explanation = questionData.explanation || '';
-    const optA = questionData.options[0] || '';
-    const optB = questionData.options[1] || '';
-    const optC = questionData.options[2] || '';
-    
-    let text = 'Question ' + no + '. ' + explanation + '. ';
-    text += 'Option A: ' + optA + '. Option B: ' + optB + '. Option C: ' + optC + '.';
-    
-    if (window.opener && window.opener.speakOnce) {
-        window.opener.speakOnce(text, null, 0.85);
-    } else {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.75;
-        utterance.pitch = 1.0;
-        utterance.volume = 1;
-        const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.name && v.name.includes('Google US English')) || voices.find(v => v.lang && v.lang === 'en-US') || voices[0];
-        if (voice) utterance.voice = voice;
-        window.speechSynthesis.speak(utterance);
-    }
-}
+                const no = questionData.wordIndex + 1;
+                const explanation = questionData.explanation || '';
+                const optA = questionData.options[0] || '';
+                const optB = questionData.options[1] || '';
+                const optC = questionData.options[2] || '';
+                
+                let text = 'Question ' + no + '. ' + explanation + '. ';
+                text += 'Option A: ' + optA + '. Option B: ' + optB + '. Option C: ' + optC + '.';
+                
+                if (window.opener && window.opener.speakOnce) {
+                    window.opener.speakOnce(text, null, 0.85);
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.75;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1;
+                    const voices = window.speechSynthesis.getVoices();
+                    const voice = voices.find(v => v.name && v.name.includes('Google US English')) || voices.find(v => v.lang && v.lang === 'en-US') || voices[0];
+                    if (voice) utterance.voice = voice;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
 
             function generateQuizDataPopup(words) {
                 if (!words || words.length === 0) return [];
@@ -1888,15 +2000,15 @@ for (let i = 0; i < allWords.length; i++) {
                 });
                 
                 document.querySelectorAll('.listen-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const index = parseInt(this.dataset.quizIndex);
-        if (!isNaN(index) && quizDataPopup[index]) {
-            const q = quizDataPopup[index];
-            speakFullQuestionPopup(q);
-        }
-    });
-});
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const index = parseInt(this.dataset.quizIndex);
+                        if (!isNaN(index) && quizDataPopup[index]) {
+                            const q = quizDataPopup[index];
+                            speakFullQuestionPopup(q);
+                        }
+                    });
+                });
             }
             
             function initQuizInPopup() {
@@ -1925,11 +2037,6 @@ for (let i = 0; i < allWords.length; i++) {
                 let step = 0;
                 let repeatCount = 0;
                 let isCancelled = false;
-                
-                function cancelPlayback() {
-                    isCancelled = true;
-                    try { speechSynthesis.cancel(); } catch(e) {}
-                }
                 
                 function speakNext() {
                     if (isCancelled || (wordsAutoPlayStatePopup && (wordsAutoPlayStatePopup.isPaused || !wordsAutoPlayStatePopup.isPlaying))) {
@@ -2081,6 +2188,697 @@ for (let i = 0; i < allWords.length; i++) {
                 if (progressSpan) progressSpan.textContent = '0 / ' + window.allWordsData.length;
             }
             
+            // ===== 音效（複用） =====
+            function playBeep(frequency, duration) {
+                try {
+                    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    var oscillator = audioCtx.createOscillator();
+                    var gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = 'sine';
+                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + duration);
+                } catch(e) {
+                    console.warn('Audio not supported');
+                }
+            }
+            
+            // ===== Spelling 模組 =====
+            var spellingState = {
+                words: [],
+                currentIndex: 0,
+                totalCount: 0,
+                syllables: [],
+                letters: [],
+                hasSyllables: false,
+                sourceMode: 'letter',
+                sourceItems: [],
+                targetSlots: [],
+                isAnswered: false,
+                stats: { total: 0, correct: 0 }
+            };
+            
+            function splitWordToSyllables(word, syllable) {
+                if (syllable && String(syllable).trim() !== '') {
+                    return String(syllable).trim()
+                        .split('-')
+                        .filter(s => s.length > 0)
+                        .map(s => s.toLowerCase());
+                }
+                return [word.toLowerCase()];
+            }
+            
+            function syllablesToLetters(syllables) {
+                return syllables.join('').split('');
+            }
+            
+            function hasRealSyllables(word, syllable) {
+                return syllable && String(syllable).trim() !== '' && 
+                       splitWordToSyllables(word, syllable).length > 1;
+            }
+            
+            function buildSourceItems(letters, syllables, mode, hasSyllables) {
+                if (mode === 'letter' || !hasSyllables) {
+                    // Letter 模式，或無 syllable → 全拆
+                    return shuffleArrayPopup(letters.map((l, i) => ({ 
+                        type: 'letter', 
+                        value: l, 
+                        id: i 
+                    })));
+                } else {
+                    // Syllable 模式且有 syllable
+                    return shuffleArrayPopup(syllables.map((s, i) => ({ 
+                        type: 'syllable', 
+                        value: s, 
+                        length: s.length, 
+                        id: i 
+                    })));
+                }
+            }
+            
+            function getSyllableGroup(slotIdx) {
+                let start = 0;
+                for (let s = 0; s < spellingState.syllables.length; s++) {
+                    const len = spellingState.syllables[s].length;
+                    if (slotIdx >= start && slotIdx < start + len) {
+                        return { start: start, length: len, index: s };
+                    }
+                    start += len;
+                }
+                return null;
+            }
+            
+            function initSpelling() {
+                var words = window.allWordsData || [];
+                if (words.length === 0) {
+                    var container = document.getElementById('spellingContainer');
+                    if (container) {
+                        container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No words available.</p>';
+                    }
+                    return;
+                }
+                spellingState.words = words;
+                spellingState.totalCount = words.length;
+                spellingState.stats = { total: 0, correct: 0 };
+                // 只在第一次初始化時載入第 0 題
+                if (!spellingState._initialized) {
+                    spellingState._initialized = true;
+                    loadSpelling(0);
+                } else {
+                    renderSpelling();
+                }
+            }
+            
+            function loadSpelling(index) {
+                var w = spellingState.words[index];
+                if (!w) return;
+                
+                spellingState.currentIndex = index;
+                spellingState.syllables = splitWordToSyllables(w.word, w.syllable);
+                spellingState.letters = syllablesToLetters(spellingState.syllables);
+                spellingState.hasSyllables = hasRealSyllables(w.word, w.syllable);
+                spellingState.sourceItems = buildSourceItems(
+                    spellingState.letters, 
+                    spellingState.syllables, 
+                    spellingState.sourceMode,
+                    spellingState.hasSyllables
+                );
+                spellingState.targetSlots = spellingState.letters.map(() => null);
+                spellingState.isAnswered = false;
+                renderSpelling();
+            }
+            
+            function switchSourceMode(mode) {
+                if (spellingState.sourceMode === mode) return;
+                
+                spellingState.sourceMode = mode;
+                spellingState.targetSlots = spellingState.letters.map(() => null);
+                spellingState.isAnswered = false;
+                spellingState.sourceItems = buildSourceItems(
+                    spellingState.letters,
+                    spellingState.syllables,
+                    mode,
+                    spellingState.hasSyllables
+                );
+                renderSpelling();
+            }
+            
+            function renderSpelling() {
+                var container = document.getElementById('spellingContainer');
+                if (!container) return;
+                
+                var w = spellingState.words[spellingState.currentIndex];
+                if (!w) {
+                    container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No words available.</p>';
+                    return;
+                }
+                
+                var total = spellingState.totalCount;
+                var current = spellingState.currentIndex + 1;
+                var isFirst = (spellingState.currentIndex === 0);
+                var isLast = (spellingState.currentIndex >= total - 1);
+                
+                // ===== Source 區塊 =====
+                var sourceHtml = '';
+                if (spellingState.sourceItems.length === 0) {
+                    sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(All letters placed)</span>';
+                } else {
+                    sourceHtml = spellingState.sourceItems.map(function(item, idx) {
+                        if (item.type === 'letter') {
+                            return '<span class="word-token source-token" data-source-id="' + item.id + '" data-type="letter">' + escapeHtml(item.value.toUpperCase()) + '</span>';
+                        } else {
+                            return '<span class="word-token source-token" data-source-id="' + item.id + '" data-type="syllable" data-length="' + item.length + '">' + escapeHtml(item.value.toUpperCase()) + '</span>';
+                        }
+                    }).join('');
+                }
+                
+                // ===== Target 區塊 =====
+                var targetHtml = '';
+                var slotIdx = 0;
+                for (var s = 0; s < spellingState.syllables.length; s++) {
+                    var syllable = spellingState.syllables[s];
+                    for (var c = 0; c < syllable.length; c++) {
+                        var filled = spellingState.targetSlots[slotIdx];
+                        if (filled) {
+                            targetHtml += '<span class="word-token target-token" ' +
+                                'data-target-index="' + slotIdx + '" ' +
+                                'data-group-start="' + filled.groupStart + '" ' +
+                                'data-group-length="' + filled.groupLength + '">' + 
+                                escapeHtml(filled.value.toUpperCase()) + '</span>';
+                        } else {
+                            targetHtml += '<span class="word-token target-token empty-slot" ' +
+                                'data-target-index="' + slotIdx + '">?</span>';
+                        }
+                        slotIdx++;
+                    }
+                    // 只有「有真實音節」且不是最後一個音節時才加分隔符
+                    if (spellingState.hasSyllables && s < spellingState.syllables.length - 1) {
+                        targetHtml += '<span class="separator">-</span>';
+                    }
+                }
+                
+                var rateDisplay = spellingState.stats.total > 0 ? Math.round((spellingState.stats.correct / spellingState.stats.total) * 100) + '%' : '--%';
+                
+                var letterActive = spellingState.sourceMode === 'letter' ? ' active' : '';
+                var syllableActive = spellingState.sourceMode === 'syllable' ? ' active' : '';
+                
+                container.innerHTML = 
+                    '<div class="spelling-builder">' +
+                        '<div class="builder-header">' +
+                            '<span class="progress-text">📌 Word ' + current + ' / ' + total + '</span>' +
+                            '<span class="score-text" id="spellingStats">📊 Answered: ' + spellingState.stats.total + ' | Correct: ' + spellingState.stats.correct + ' | Rate: ' + rateDisplay + '</span>' +
+                            '<div class="builder-controls">' +
+                                '<button id="spellingListenBtn" title="Listen to word">🔊</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="builder-meaning">' +
+                            '<span class="meaning-text">📖 ' + escapeHtml(w.meaning) + '</span>' +
+                        '</div>' +
+                        '<div class="source-mode-bar">' +
+                            '<button class="mode-btn' + letterActive + '" data-mode="letter">🔤 Letters</button>' +
+                            '<button class="mode-btn' + syllableActive + '" data-mode="syllable">🔡 Syllables</button>' +
+                        '</div>' +
+                        '<div class="source-area">' +
+                            '<div class="builder-dropzone source-dropzone" id="spellingSourceDropzone">' +
+                                sourceHtml +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="target-area">' +
+                            '<div class="builder-dropzone target-dropzone" id="spellingTargetDropzone">' +
+                                targetHtml +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="builder-actions">' +
+                            '<button class="btn-prev" id="spellingPrevBtn" ' + (isFirst ? 'disabled' : '') + '>Previous</button>' +
+                            '<button class="btn-shuffle" id="spellingShuffleBtn">Shuffle</button>' +
+                            '<button class="btn-check" id="spellingCheckBtn">Check Answer</button>' +
+                            '<button class="btn-next" id="spellingNextBtn" ' + (isLast ? 'disabled' : '') + '>Next</button>' +
+                        '</div>' +
+                        '<div class="builder-feedback" id="spellingFeedback">📝 Drag letters to the slots</div>' +
+                    '</div>';
+                
+                bindSpellingEvents();
+            }
+            
+            function bindSpellingEvents() {
+                // ===== Listen =====
+                var listenBtn = document.getElementById('spellingListenBtn');
+                if (listenBtn) {
+                    listenBtn.onclick = function() {
+                        var w = spellingState.words[spellingState.currentIndex];
+                        if (w && w.word) {
+                            if (window.opener && window.opener.speakOnce) {
+                                window.opener.speakOnce(w.word, null, 0.85);
+                            } else {
+                                var utterance = new SpeechSynthesisUtterance(w.word);
+                                utterance.lang = 'en-US';
+                                utterance.rate = 0.85;
+                                speechSynthesis.speak(utterance);
+                            }
+                        }
+                    };
+                }
+                
+                // ===== Previous / Next =====
+                var prevBtn = document.getElementById('spellingPrevBtn');
+                if (prevBtn) {
+                    prevBtn.onclick = function() {
+                        if (spellingState.currentIndex > 0) {
+                            loadSpelling(spellingState.currentIndex - 1);
+                        }
+                    };
+                }
+                
+                var nextBtn = document.getElementById('spellingNextBtn');
+                if (nextBtn) {
+                    nextBtn.onclick = function() {
+                        if (spellingState.currentIndex < spellingState.totalCount - 1) {
+                            loadSpelling(spellingState.currentIndex + 1);
+                        }
+                    };
+                }
+                
+                // ===== Shuffle =====
+                var shuffleBtn = document.getElementById('spellingShuffleBtn');
+                if (shuffleBtn) {
+                    shuffleBtn.onclick = function() {
+                        spellingState.sourceItems = buildSourceItems(
+                            spellingState.letters,
+                            spellingState.syllables,
+                            spellingState.sourceMode,
+                            spellingState.hasSyllables
+                        );
+                        spellingState.targetSlots = spellingState.letters.map(() => null);
+                        spellingState.isAnswered = false;
+                        renderSpelling();
+                    };
+                }
+                
+                // ===== Check Answer =====
+                var checkBtn = document.getElementById('spellingCheckBtn');
+                if (checkBtn) {
+                    checkBtn.onclick = function() {
+                        checkSpellingAnswer();
+                    };
+                }
+                
+                // ===== 模式切換 =====
+                document.querySelectorAll('.spelling-builder .mode-btn').forEach(function(btn) {
+                    btn.onclick = function() {
+                        switchSourceMode(this.dataset.mode);
+                    };
+                });
+                
+                // ===== 拖拉邏輯 =====
+                bindSpellingDragEvents();
+            }
+            
+            function bindSpellingDragEvents() {
+                var sourceDropzone = document.getElementById('spellingSourceDropzone');
+                var targetDropzone = document.getElementById('spellingTargetDropzone');
+                if (!sourceDropzone && !targetDropzone) return;
+                
+                var dragData = null;
+                
+                function getDragData(e) {
+                    var token = e.target.closest('.word-token');
+                    if (!token) return null;
+                    
+                    var isSource = token.classList.contains('source-token');
+                    var isTarget = token.classList.contains('target-token');
+                    if (!isSource && !isTarget) return null;
+                    
+                    var index, type;
+                    if (isSource) {
+                        index = parseInt(token.dataset.sourceId);
+                        type = 'source';
+                    } else {
+                        // target-token 可能是已填或空 slot
+                        if (token.classList.contains('empty-slot')) return null;
+                        index = parseInt(token.dataset.targetIndex);
+                        type = 'target';
+                    }
+                    if (isNaN(index)) return null;
+                    
+                    if (type === 'target' && !spellingState.targetSlots[index]) return null;
+                    
+                    var clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                    var clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                    
+                    return {
+                        type: type,
+                        index: index,
+                        element: token,
+                        startX: clientX,
+                        startY: clientY
+                    };
+                }
+                
+                function onDragStart(e) {
+                    var data = getDragData(e);
+                    if (!data) return;
+                    dragData = data;
+                    var el = data.element;
+                    el.style.transition = 'none';
+                    el.style.zIndex = '1000';
+                    el.style.transform = 'translate(0, 0)';
+                    el.classList.add('dragging');
+                    if (e.type === 'mousedown') e.preventDefault();
+                }
+                
+                function onDragMove(e) {
+                    if (!dragData) return;
+                    e.preventDefault();
+                    var clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                    var clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                    if (clientX === undefined) return;
+                    var dx = clientX - dragData.startX;
+                    var dy = clientY - dragData.startY;
+                    dragData.element.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+                    
+                    document.querySelectorAll('.spelling-builder .word-token, .spelling-builder .empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
+                    
+                    var targetElement = null;
+                    var allTargets = document.querySelectorAll('.spelling-builder .source-token, .spelling-builder .target-token, .spelling-builder .empty-slot');
+                    allTargets.forEach(function(el) {
+                        if (el === dragData.element) return;
+                        var rect = el.getBoundingClientRect();
+                        var cx = rect.left + rect.width/2;
+                        var cy = rect.top + rect.height/2;
+                        var dist = Math.sqrt(Math.pow(clientX - cx, 2) + Math.pow(clientY - cy, 2));
+                        if (dist < 60) {
+                            targetElement = el;
+                        }
+                    });
+                    
+                    if (targetElement) {
+                        targetElement.classList.add('drag-over-me');
+                        dragData.targetElement = targetElement;
+                    } else {
+                        dragData.targetElement = null;
+                    }
+                }
+                
+                function onDragEnd(e) {
+                    if (!dragData) return;
+                    var el = dragData.element;
+                    el.style.transition = 'all 0.2s';
+                    el.style.transform = 'translate(0, 0)';
+                    el.style.zIndex = '';
+                    el.classList.remove('dragging');
+                    document.querySelectorAll('.spelling-builder .word-token, .spelling-builder .empty-slot').forEach(function(t) { t.classList.remove('drag-over-me'); });
+                    
+                    var targetElement = dragData.targetElement;
+                    
+                    if (!targetElement) {
+                        dragData = null;
+                        renderSpelling();
+                        return;
+                    }
+                    
+                    var sourceType = dragData.type;
+                    var sourceIndex = dragData.index;
+                    
+                    // 判斷目標類型
+                    var isTargetDropzone = targetElement.id === 'spellingTargetDropzone';
+                    var isSourceDropzone = targetElement.id === 'spellingSourceDropzone';
+                    var targetType = null;
+                    var targetIndex = null;
+                    
+                    if (isTargetDropzone) {
+                        targetType = 'target-zone';
+                    } else if (isSourceDropzone) {
+                        targetType = 'source-zone';
+                    } else if (targetElement.classList.contains('source-token')) {
+                        targetType = 'source';
+                        targetIndex = parseInt(targetElement.dataset.sourceId);
+                    } else if (targetElement.classList.contains('target-token')) {
+                        targetType = 'target';
+                        targetIndex = parseInt(targetElement.dataset.targetIndex);
+                    } else if (targetElement.classList.contains('empty-slot')) {
+                        targetType = 'target';
+                        targetIndex = parseInt(targetElement.dataset.targetIndex);
+                    }
+                    
+                    handleSpellingDrop(sourceType, sourceIndex, targetType, targetIndex);
+                    dragData = null;
+                }
+                
+                // 清理舊監聽器
+                if (window._spellingDragCleanup) {
+                    window._spellingDragCleanup();
+                }
+                
+                sourceDropzone.addEventListener('mousedown', onDragStart);
+                sourceDropzone.addEventListener('touchstart', onDragStart, { passive: true });
+                targetDropzone.addEventListener('mousedown', onDragStart);
+                targetDropzone.addEventListener('touchstart', onDragStart, { passive: true });
+                
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+                document.addEventListener('touchmove', onDragMove, { passive: false });
+                document.addEventListener('touchend', onDragEnd, { passive: true });
+                
+                window._spellingDragCleanup = function() {
+                    sourceDropzone.removeEventListener('mousedown', onDragStart);
+                    sourceDropzone.removeEventListener('touchstart', onDragStart);
+                    targetDropzone.removeEventListener('mousedown', onDragStart);
+                    targetDropzone.removeEventListener('touchstart', onDragStart);
+                    document.removeEventListener('mousemove', onDragMove);
+                    document.removeEventListener('mouseup', onDragEnd);
+                    document.removeEventListener('touchmove', onDragMove);
+                    document.removeEventListener('touchend', onDragEnd);
+                };
+            }
+            
+            function handleSpellingDrop(sourceType, sourceIndex, targetType, targetIndex) {
+                // ===== 情境 1：拖到 Target 區塊的某個 slot =====
+                if (targetType === 'target' || targetType === 'target-zone') {
+                    // 決定目標 slot
+                    var slotIdx = null;
+                    if (targetType === 'target') {
+                        slotIdx = targetIndex;
+                    } else {
+                        // 拖到 target zone 空白處 → 找第一個空 slot
+                        for (var i = 0; i < spellingState.targetSlots.length; i++) {
+                            if (spellingState.targetSlots[i] === null) {
+                                slotIdx = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (slotIdx === null) {
+                        renderSpelling();
+                        return;
+                    }
+                    
+                    // 取得拖曳的塊
+                    var draggedItem = null;
+                    if (sourceType === 'source') {
+                        var srcIdx = spellingState.sourceItems.findIndex(function(it) { return it.id === sourceIndex; });
+                        if (srcIdx === -1) { renderSpelling(); return; }
+                        draggedItem = spellingState.sourceItems[srcIdx];
+                    } else {
+                        // 從 target 拖來
+                        var filled = spellingState.targetSlots[sourceIndex];
+                        if (!filled) { renderSpelling(); return; }
+                        draggedItem = {
+                            type: filled.type,
+                            value: filled.value,
+                            id: filled.id,
+                            length: filled.groupLength
+                        };
+                    }
+                    
+                    // 檢查是否能放入
+                    if (draggedItem.type === 'letter') {
+                        // Letter → 目標 slot 為空即可
+                        if (spellingState.targetSlots[slotIdx] !== null) {
+                            // 交換
+                            var existing = spellingState.targetSlots[slotIdx];
+                            // 先把現有的放回來源或交換
+                            if (sourceType === 'source') {
+                                // 把 target 的放回 sourceItems，把 source 的放入 target
+                                var srcIdx2 = spellingState.sourceItems.findIndex(function(it) { return it.id === sourceIndex; });
+                                if (srcIdx2 === -1) { renderSpelling(); return; }
+                                spellingState.sourceItems[srcIdx2] = {
+                                    type: existing.type,
+                                    value: existing.value,
+                                    id: existing.id,
+                                    length: existing.groupLength
+                                };
+                                spellingState.targetSlots[slotIdx] = {
+                                    type: 'letter',
+                                    value: draggedItem.value,
+                                    id: draggedItem.id,
+                                    groupStart: slotIdx,
+                                    groupLength: 1
+                                };
+                            } else {
+                                // target → target 交換（僅 letter）
+                                if (existing.type === 'letter') {
+                                    var temp = spellingState.targetSlots[sourceIndex];
+                                    spellingState.targetSlots[sourceIndex] = spellingState.targetSlots[slotIdx];
+                                    spellingState.targetSlots[slotIdx] = temp;
+                                }
+                            }
+                        } else {
+                            // 空 slot → 直接放入
+                            if (sourceType === 'source') {
+                                var srcIdx3 = spellingState.sourceItems.findIndex(function(it) { return it.id === sourceIndex; });
+                                if (srcIdx3 === -1) { renderSpelling(); return; }
+                                spellingState.sourceItems.splice(srcIdx3, 1);
+                            } else {
+                                // target → target 移動（清空原本）
+                                spellingState.targetSlots[sourceIndex] = null;
+                            }
+                            spellingState.targetSlots[slotIdx] = {
+                                type: 'letter',
+                                value: draggedItem.value,
+                                id: draggedItem.id,
+                                groupStart: slotIdx,
+                                groupLength: 1
+                            };
+                        }
+                    } else {
+                        // Syllable 塊
+                        var group = getSyllableGroup(slotIdx);
+                        if (!group || group.length !== draggedItem.length) {
+                            // 群組不符，不動作
+                            renderSpelling();
+                            return;
+                        }
+                        
+                        // 檢查群組內所有 slot 是否為空（除了來源本身）
+                        var canPlace = true;
+                        for (var g = group.start; g < group.start + group.length; g++) {
+                            if (g === sourceIndex && sourceType === 'target') continue;
+                            if (spellingState.targetSlots[g] !== null) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        
+                        if (!canPlace) {
+                            renderSpelling();
+                            return;
+                        }
+                        
+                        // 若來源是 target，先清空來源佔用的所有 slot
+                        if (sourceType === 'target') {
+                            var srcGroup = getSyllableGroup(sourceIndex);
+                            if (srcGroup) {
+                                for (var sg = srcGroup.start; sg < srcGroup.start + srcGroup.length; sg++) {
+                                    spellingState.targetSlots[sg] = null;
+                                }
+                            }
+                        } else {
+                            // 從 source 移除
+                            var srcIdx4 = spellingState.sourceItems.findIndex(function(it) { return it.id === sourceIndex; });
+                            if (srcIdx4 === -1) { renderSpelling(); return; }
+                            spellingState.sourceItems.splice(srcIdx4, 1);
+                        }
+                        
+                        // 填入群組
+                        var syllableStr = draggedItem.value;
+                        for (var k = 0; k < group.length; k++) {
+                            spellingState.targetSlots[group.start + k] = {
+                                type: 'syllable',
+                                value: syllableStr[k],
+                                id: draggedItem.id,
+                                groupStart: group.start,
+                                groupLength: group.length
+                            };
+                        }
+                    }
+                    
+                    renderSpelling();
+                    return;
+                }
+                
+                // ===== 情境 2：拖到 Source 區塊 =====
+                if (targetType === 'source' || targetType === 'source-zone') {
+                    // 把 target 的塊放回來源
+                    if (sourceType === 'target') {
+                        var srcGroup2 = getSyllableGroup(sourceIndex);
+                        if (!srcGroup2) { renderSpelling(); return; }
+                        
+                        var filledBlock = spellingState.targetSlots[sourceIndex];
+                        if (!filledBlock) { renderSpelling(); return; }
+                        
+                        // 取出整個塊
+                        var blockValue = '';
+                        for (var b = srcGroup2.start; b < srcGroup2.start + srcGroup2.length; b++) {
+                            blockValue += spellingState.targetSlots[b].value;
+                            spellingState.targetSlots[b] = null;
+                        }
+                        
+                        // 加回來源
+                        spellingState.sourceItems.push({
+                            type: filledBlock.type,
+                            value: blockValue,
+                            id: filledBlock.id,
+                            length: srcGroup2.length
+                        });
+                        
+                        renderSpelling();
+                        return;
+                    }
+                    
+                    // source → source：不動作（或交換）
+                    renderSpelling();
+                    return;
+                }
+                
+                renderSpelling();
+            }
+            
+            function checkSpellingAnswer() {
+                if (spellingState.targetSlots.some(function(s) { return s === null; })) {
+                    var fb = document.getElementById('spellingFeedback');
+                    if (fb) {
+                        fb.innerHTML = '⚠️ Please fill all slots before checking.';
+                        fb.style.color = '#f59e0b';
+                    }
+                    playBeep(400, 0.3);
+                    return;
+                }
+                
+                var userLetters = spellingState.targetSlots.map(function(s) { return s.value.toLowerCase(); });
+                var isCorrect = userLetters.every(function(l, i) { return l === spellingState.letters[i]; });
+                
+                spellingState.isAnswered = true;
+                spellingState.stats.total++;
+                if (isCorrect) spellingState.stats.correct++;
+                
+                var fb2 = document.getElementById('spellingFeedback');
+                if (fb2) {
+                    fb2.innerHTML = isCorrect ? '✅ Correct! Well done!' : '❌ Incorrect. Try again!';
+                    fb2.style.color = isCorrect ? '#22c55e' : '#ef4444';
+                }
+                
+                if (isCorrect) {
+                    playBeep(880, 0.2);
+                    setTimeout(function() { playBeep(1100, 0.15); }, 150);
+                } else {
+                    playBeep(440, 0.4);
+                }
+                
+                // 更新統計
+                var statsEl = document.getElementById('spellingStats');
+                if (statsEl) {
+                    var total = spellingState.stats.total;
+                    var correct = spellingState.stats.correct;
+                    var rate = total > 0 ? Math.round((correct / total) * 100) + '%' : '--%';
+                    statsEl.textContent = '📊 Answered: ' + total + ' | Correct: ' + correct + ' | Rate: ' + rate;
+                }
+            }
+            
             // ===== 綁定事件 =====
             document.getElementById('wordsPlayBtn').addEventListener('click', toggleWordsAutoPlayPopup);
             document.getElementById('wordsStopBtn').addEventListener('click', stopWordsAutoPlayPopup);
@@ -2089,54 +2887,49 @@ for (let i = 0; i < allWords.length; i++) {
             // ===== 初始化 Quiz =====
             initQuizInPopup();
 
-            // ===== Listen 單字按鈕事件（複製 Quiz Listen 按鈕的模式） =====
-document.querySelectorAll('.listen-single-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const word = this.dataset.word;
-        const meaning = this.dataset.meaning;
-        
-        // 呼叫父視窗的 playSingleWord 函數
-        if (window.opener && typeof window.opener.playSingleWord === 'function') {
-            window.opener.playSingleWord(word, meaning);
-        } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
-            window.parent.playSingleWord(word, meaning);
-        } else {
-            alert('Audio function not available. Please refresh the page.');
-        }
-    });
-});
-
+            // ===== Listen 單字按鈕事件 =====
+            document.querySelectorAll('.listen-single-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const word = this.dataset.word;
+                    const meaning = this.dataset.meaning;
+                    
+                    if (window.opener && typeof window.opener.playSingleWord === 'function') {
+                        window.opener.playSingleWord(word, meaning);
+                    } else if (window.parent && typeof window.parent.playSingleWord === 'function') {
+                        window.parent.playSingleWord(word, meaning);
+                    } else {
+                        alert('Audio function not available. Please refresh the page.');
+                    }
+                });
+            });
         </script>
     </body>
     </html>`;
     
     // 開啟彈窗
-const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
-if (newWindow) {
-    // 將必要的函數傳遞給彈窗
-    newWindow.playSingleWord = playSingleWord;
-    newWindow.escapeHtml = escapeHtml;
-    newWindow.getAvailableVoice = getAvailableVoice;
-    newWindow.getCantoneseVoice = getCantoneseVoice;
-    newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
-    newWindow.stopWordsAutoPlay = stopWordsAutoPlay;
-    newWindow.switchWordsPlayMode = switchWordsPlayMode;
-    newWindow.initQuizTab = initQuizTab;
-    newWindow.speakOnce = speakOnce;
-    newWindow.stopAllReading = stopAllReading;
-    newWindow.quizData = quizData;
-    newWindow.quizGenerated = quizGenerated;
-    newWindow.currentQuestionIdx = currentQuestionIdx;
-    newWindow.allWordsData = allWords;
-    
-    newWindow.document.write(allHtml);
-    newWindow.document.close();
-    
-    // ... 後續設定（setTimeout 等）保持不變 ...
-} else {
-    alert("Popup blocked. Please allow popups for this site.");
-}
+    const newWindow = window.open('', '_blank', 'width=900,height=750,scrollbars=yes');
+    if (newWindow) {
+        newWindow.playSingleWord = playSingleWord;
+        newWindow.escapeHtml = escapeHtml;
+        newWindow.getAvailableVoice = getAvailableVoice;
+        newWindow.getCantoneseVoice = getCantoneseVoice;
+        newWindow.toggleWordsAutoPlay = toggleWordsAutoPlay;
+        newWindow.stopWordsAutoPlay = stopWordsAutoPlay;
+        newWindow.switchWordsPlayMode = switchWordsPlayMode;
+        newWindow.initQuizTab = initQuizTab;
+        newWindow.speakOnce = speakOnce;
+        newWindow.stopAllReading = stopAllReading;
+        newWindow.quizData = quizData;
+        newWindow.quizGenerated = quizGenerated;
+        newWindow.currentQuestionIdx = currentQuestionIdx;
+        newWindow.allWordsData = allWords;
+        
+        newWindow.document.write(allHtml);
+        newWindow.document.close();
+    } else {
+        alert("Popup blocked. Please allow popups for this site.");
+    }
 }
 
 // ====================== Show All Sentences 彈窗 ======================
