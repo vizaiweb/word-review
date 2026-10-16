@@ -802,10 +802,16 @@
 </div>
 <div class="footer">
     <a href="about.html">About</a> | <a href="privacy.html">Privacy Policy</a> | <a href="disclaimer.html">Disclaimer</a>
+      <!-- 只顯示當前頁面訪問量 -->
+    <div style="margin-top: 8px; font-size: 12px; color: #94a3b8;">
+        本頁訪問量 <span id="vercount_value_page_pv">Loading</span> 次
+    </div>
 </div>
 
 <!-- ===== 載入順序：先載入核心模組，再載入 UI 模組 ===== -->
 <script src="core.js"></script>
 <script src="script.js"></script>
+
+    <script defer src="https://events.vercount.one/js"></script>
 </body>
 </html>
