@@ -2284,29 +2284,28 @@ function showAllWords() {
         return [];
     }
     
-    // 判斷 syllable 是否有效：
-    // - 不能是空字串
-    // - 不能是 "--"（Excel 空值的佔位符）
-    // - 不能是 "-"
-    // - 不能是純符號（只有 - 或空格）
     var isSyllableValid = sylStr !== '' && 
                           sylStr !== '--' && 
                           sylStr !== '-' && 
                           /[a-zA-Z]/.test(sylStr);  // 至少要含一個英文字母
     
     if (isSyllableValid) {
+        // 【修改處】同時用 "-" 和空白 (space) 進行拆解
         var parts = sylStr
-            .split('-')
+            .split(/[- \s]+/)
             .map(function(s) { return s.trim().toLowerCase(); })
             .filter(function(s) { return s.length > 0; });
         if (parts.length > 1) {
             return parts;
         }
-        // 只有一個部分（沒有 - 分隔）→ 當作無 syllable 處理
     }
     
-    // 無 syllable 或拆分失敗 → 整個單詞作為一個音節
-    return [wordStr.toLowerCase()];
+    // 若沒有有效 syllable，則對單字本身進行相同處理
+    var wordParts = wordStr
+        .split(/[- \s]+/)
+        .map(function(s) { return s.trim().toLowerCase(); })
+        .filter(function(s) { return s.length > 0; });
+    return wordParts.length > 0 ? wordParts : [wordStr.toLowerCase()];
 }
 
 function syllablesToLetters(syllables) {
@@ -2327,23 +2326,23 @@ function hasRealSyllables(word, syllable) {
 }
             
             function buildSourceItems(letters, syllables, mode, hasSyllables) {
-                if (mode === 'letter' || !hasSyllables) {
-                    // Letter 模式，或無 syllable → 全拆
-                    return shuffleArrayPopup(letters.map((l, i) => ({ 
-                        type: 'letter', 
-                        value: l, 
-                        id: i 
-                    })));
-                } else {
-                    // Syllable 模式且有 syllable
-                    return shuffleArrayPopup(syllables.map((s, i) => ({ 
-                        type: 'syllable', 
-                        value: s, 
-                        length: s.length, 
-                        id: i 
-                    })));
-                }
-            }
+    if (mode === 'letter' || !hasSyllables) {
+        // Letter 模式，或無 syllable → 全拆成單一字母
+        return shuffleArrayPopup(letters.map((l, i) => ({ 
+            type: 'letter', 
+            value: l, 
+            id: i 
+        })));
+    } else {
+        // Syllable 模式且有 syllable → 依據拆分結果（meet, ing, neigh, bours）建立音節方塊
+        return shuffleArrayPopup(syllables.map((s, i) => ({ 
+            type: 'syllable', 
+            value: s, 
+            length: s.length, 
+            id: i 
+        })));
+    }
+}
             
             function getSyllableGroup(slotIdx) {
                 let start = 0;
