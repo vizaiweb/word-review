@@ -2275,36 +2275,16 @@ function showAllWords() {
     scored: false
 };
             
-                        function splitWordToSyllables(word, syllable) {
-                var wordStr = (word === null || word === undefined) ? '' : String(word).trim();
-                var sylStr = (syllable === null || syllable === undefined) ? '' : String(syllable).trim();
+                                    function splitWordToSyllables(word, syllable) {
+                if (!word) return [];
+                // 不管 excel 的 syllable 填什麼，我們直接拿最乾淨的 word 來處理
+                // 把底線或空格換成連字號，然後用連字號切開
+                var cleanWord = word.trim().toLowerCase();
+                // 如果資料庫的 syllable 是正確的（例如 meet-ing neigh-bours），就直接用
+                var target = (syllable && syllable.trim() !== '' && syllable !== '--') ? syllable.trim().toLowerCase() : cleanWord;
                 
-                // 防禦：word 必須存在
-                if (wordStr === '') {
-                    return [];
-                }
-                
-                // 判斷 syllable 是否有效
-                var isSyllableValid = sylStr !== '' && 
-                                      sylStr !== '--' && 
-                                      sylStr !== '-' && 
-                                      /[a-zA-Z]/.test(sylStr);
-                
-                if (isSyllableValid) {
-                    // 核心邏輯：將所有的「空白」和「連字號(-)」都視為分隔符，一次切乾淨
-                    var parts = sylStr.split(/[\s\-]+/).map(function(p) {
-                        return p.trim().toLowerCase();
-                    }).filter(function(p) {
-                        return p.length > 0;
-                    });
-                    
-                    if (parts.length > 0) {
-                        return parts;
-                    }
-                }
-                
-                // 無 syllable 或拆分失敗 → 整個單詞作為一個音節
-                return [wordStr.toLowerCase()];
+                // 把任何「空白」或「連字號」都當作切點
+                return target.split(/[\s\-]+/).filter(function(s) { return s.length > 0; });
             }
 
 function syllablesToLetters(syllables) {
