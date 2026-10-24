@@ -2275,17 +2275,39 @@ function showAllWords() {
     scored: false
 };
             
-                                    function splitWordToSyllables(word, syllable) {
-                if (!word) return [];
-                // 不管 excel 的 syllable 填什麼，我們直接拿最乾淨的 word 來處理
-                // 把底線或空格換成連字號，然後用連字號切開
-                var cleanWord = word.trim().toLowerCase();
-                // 如果資料庫的 syllable 是正確的（例如 meet-ing neigh-bours），就直接用
-                var target = (syllable && syllable.trim() !== '' && syllable !== '--') ? syllable.trim().toLowerCase() : cleanWord;
-                
-                // 把任何「空白」或「連字號」都當作切點
-                return target.split(/[\s\-]+/).filter(function(s) { return s.length > 0; });
-            }
+            function splitWordToSyllables(word, syllable) {
+    var wordStr = (word === null || word === undefined) ? '' : String(word).trim();
+    var sylStr = (syllable === null || syllable === undefined) ? '' : String(syllable).trim();
+    
+    // 防禦：word 必須存在
+    if (wordStr === '') {
+        return [];
+    }
+    
+    // 判斷 syllable 是否有效：
+    // - 不能是空字串
+    // - 不能是 "--"（Excel 空值的佔位符）
+    // - 不能是 "-"
+    // - 不能是純符號（只有 - 或空格）
+    var isSyllableValid = sylStr !== '' && 
+                          sylStr !== '--' && 
+                          sylStr !== '-' && 
+                          /[a-zA-Z]/.test(sylStr);  // 至少要含一個英文字母
+    
+    if (isSyllableValid) {
+        var parts = sylStr
+            .split('-')
+            .map(function(s) { return s.trim().toLowerCase(); })
+            .filter(function(s) { return s.length > 0; });
+        if (parts.length > 1) {
+            return parts;
+        }
+        // 只有一個部分（沒有 - 分隔）→ 當作無 syllable 處理
+    }
+    
+    // 無 syllable 或拆分失敗 → 整個單詞作為一個音節
+    return [wordStr.toLowerCase()];
+}
 
 function syllablesToLetters(syllables) {
     if (!syllables || syllables.length === 0) return [];
