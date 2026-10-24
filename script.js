@@ -2275,39 +2275,37 @@ function showAllWords() {
     scored: false
 };
             
-            function splitWordToSyllables(word, syllable) {
-    var wordStr = (word === null || word === undefined) ? '' : String(word).trim();
-    var sylStr = (syllable === null || syllable === undefined) ? '' : String(syllable).trim();
-    
-    // 防禦：word 必須存在
-    if (wordStr === '') {
-        return [];
-    }
-    
-    // 判斷 syllable 是否有效：
-    // - 不能是空字串
-    // - 不能是 "--"（Excel 空值的佔位符）
-    // - 不能是 "-"
-    // - 不能是純符號（只有 - 或空格）
-    var isSyllableValid = sylStr !== '' && 
-                          sylStr !== '--' && 
-                          sylStr !== '-' && 
-                          /[a-zA-Z]/.test(sylStr);  // 至少要含一個英文字母
-    
-    if (isSyllableValid) {
-        var parts = sylStr
-            .split('-')
-            .map(function(s) { return s.trim().toLowerCase(); })
-            .filter(function(s) { return s.length > 0; });
-        if (parts.length > 1) {
-            return parts;
-        }
-        // 只有一個部分（沒有 - 分隔）→ 當作無 syllable 處理
-    }
-    
-    // 無 syllable 或拆分失敗 → 整個單詞作為一個音節
-    return [wordStr.toLowerCase()];
-}
+                        function splitWordToSyllables(word, syllable) {
+                var wordStr = (word === null || word === undefined) ? '' : String(word).trim();
+                var sylStr = (syllable === null || syllable === undefined) ? '' : String(syllable).trim();
+                
+                // 防禦：word 必須存在
+                if (wordStr === '') {
+                    return [];
+                }
+                
+                // 判斷 syllable 是否有效
+                var isSyllableValid = sylStr !== '' && 
+                                      sylStr !== '--' && 
+                                      sylStr !== '-' && 
+                                      /[a-zA-Z]/.test(sylStr);
+                
+                if (isSyllableValid) {
+                    // 核心邏輯：將所有的「空白」和「連字號(-)」都視為分隔符，一次切乾淨
+                    var parts = sylStr.split(/[\s\-]+/).map(function(p) {
+                        return p.trim().toLowerCase();
+                    }).filter(function(p) {
+                        return p.length > 0;
+                    });
+                    
+                    if (parts.length > 0) {
+                        return parts;
+                    }
+                }
+                
+                // 無 syllable 或拆分失敗 → 整個單詞作為一個音節
+                return [wordStr.toLowerCase()];
+            }
 
 function syllablesToLetters(syllables) {
     if (!syllables || syllables.length === 0) return [];
