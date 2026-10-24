@@ -1659,11 +1659,11 @@ function showAllWords() {
             /* 空白膠囊 (對應空格) */
             .spelling-builder .separator-space {
                 display: inline-block;
-                width: 32px;
-                height: 46px;
+                width: 20px;
+                height: 40px;
                 background: white;
                 border: 2px solid #e2e8f0;
-                border-radius: 10px;
+                border-radius: 8px;
                 margin: 0 4px;
                 vertical-align: middle;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -1755,8 +1755,8 @@ function showAllWords() {
     padding: 5px 12px;
 }
 .spelling-builder .separator-space {
-    width: 24px;
-    height: 40px;
+    width: 16px;
+    height: 36px;
 }
                 .quiz-stats { gap: 12px; font-size: 13px; padding: 10px 14px; }
                 .quiz-table { font-size: 12px; min-width: 600px; }
@@ -2300,20 +2300,12 @@ function showAllWords() {
                 let syllables = [];
                 let separators = [];
                 
-                // 將多個空格替換為單個空格，避免解析出過多空格
-                targetStr = targetStr.replace(/\s+/g, ' ');
+                // 這裡只按照空格切割單字，保留 DIS-GUISE 作為一個完整的塊
+                let words = targetStr.split(/\s+/).filter(w => w.length > 0);
                 
-                // 先用空格分開單詞，再用 - 分開音節
-                let words = targetStr.split(' ');
-                words.forEach((w, wIdx) => {
-                    let parts = w.split('-').map(s => s.trim()).filter(s => s.length > 0);
-                    parts.forEach((p, pIdx) => {
-                        syllables.push(p);
-                        if (pIdx < parts.length - 1) {
-                            separators.push('dash');
-                        }
-                    });
-                    if (wIdx < words.length - 1) {
+                words.forEach((w, idx) => {
+                    syllables.push(w);
+                    if (idx < words.length - 1) {
                         separators.push('space');
                     }
                 });
@@ -2322,7 +2314,12 @@ function showAllWords() {
                     return { syllables: [wordStr], separators: [], letters: wordStr.split(''), hasSyllables: false };
                 }
 
-                let letters = syllables.join('').split('');
+                // 計算字母時，過濾掉 "-" 符號
+                let letters = [];
+                syllables.forEach(syl => {
+                    letters = letters.concat(syl.replace(/-/g, '').split(''));
+                });
+
                 let hasSyllables = syllables.length > 1;
                 
                 return { syllables, separators, letters, hasSyllables };
@@ -2341,7 +2338,7 @@ function showAllWords() {
                     return shuffleArrayPopup(syllables.map((s, i) => ({ 
                         type: 'syllable', 
                         value: s, 
-                        length: s.length, 
+                        length: s.replace(/-/g, '').length, 
                         id: i 
                     })));
                 }
@@ -2350,7 +2347,7 @@ function showAllWords() {
             function getSyllableGroup(slotIdx) {
                 let start = 0;
                 for (let s = 0; s < spellingState.syllables.length; s++) {
-                    const len = spellingState.syllables[s].length;
+                    const len = spellingState.syllables[s].replace(/-/g, '').length;
                     if (slotIdx >= start && slotIdx < start + len) {
                         return { start: start, length: len, index: s };
                     }
@@ -2472,8 +2469,10 @@ function showAllWords() {
                 var targetHtml = '';
                 var slotIdx = 0;
                 for (var s = 0; s < spellingState.syllables.length; s++) {
-                    var syllable = spellingState.syllables[s];
-                    for (var c = 0; c < syllable.length; c++) {
+                    var syllableText = spellingState.syllables[s];
+                    var cleanSyllable = syllableText.replace(/-/g, '');
+                    
+                    for (var c = 0; c < cleanSyllable.length; c++) {
                         var filled = spellingState.targetSlots[slotIdx];
                         if (filled) {
                             targetHtml += '<span class="word-token target-token" ' +
@@ -2486,12 +2485,16 @@ function showAllWords() {
                                 'data-target-index="' + slotIdx + '">?</span>';
                         }
                         slotIdx++;
+
+                        // 插入連字號
+                        if (c < cleanSyllable.length - 1 && syllableText.includes('-')) {
+                            targetHtml += '<span class="separator">-</span>';
+                        }
                     }
+                    
                     if (s < spellingState.syllables.length - 1) {
                         var sep = spellingState.separators[s];
-                        if (sep === 'dash') {
-                            targetHtml += '<span class="separator">-</span>';
-                        } else {
+                        if (sep === 'space') {
                             targetHtml += '<span class="separator-space"></span>';
                         }
                     }
@@ -2928,7 +2931,7 @@ function showAllWords() {
                         }
                         
                         // 填入群組
-                        var syllableStr = draggedItem.value;
+                        var syllableStr = draggedItem.value.replace(/-/g, '');
                         for (var k = 0; k < group.length; k++) {
                             spellingState.targetSlots[group.start + k] = {
                                 type: 'syllable',
