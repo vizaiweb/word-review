@@ -2290,7 +2290,7 @@ function showAllWords() {
                           /[a-zA-Z]/.test(sylStr);  // 至少要含一個英文字母
     
     if (isSyllableValid) {
-        // 【修改處】同時用 "-" 和空白 (space) 進行拆解
+        // 【修改處】同時用負號 "-" 和空白 "\s" 進行拆解，支援多重分隔
         var parts = sylStr
             .split(/[- \s]+/)
             .map(function(s) { return s.trim().toLowerCase(); })
@@ -2300,7 +2300,7 @@ function showAllWords() {
         }
     }
     
-    // 若沒有有效 syllable，則對單字本身進行相同處理
+    // 若沒有有效 syllable，則對單詞本身也同時以 "-" 和空白進行拆解
     var wordParts = wordStr
         .split(/[- \s]+/)
         .map(function(s) { return s.trim().toLowerCase(); })
