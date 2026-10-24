@@ -2279,7 +2279,6 @@ function showAllWords() {
     var wordStr = (word === null || word === undefined) ? '' : String(word).trim();
     var sylStr = (syllable === null || syllable === undefined) ? '' : String(syllable).trim();
     
-    // 防禦：word 必須存在
     if (wordStr === '') {
         return [];
     }
@@ -2287,12 +2286,12 @@ function showAllWords() {
     var isSyllableValid = sylStr !== '' && 
                           sylStr !== '--' && 
                           sylStr !== '-' && 
-                          /[a-zA-Z]/.test(sylStr);  // 至少要含一個英文字母
+                          /[a-zA-Z]/.test(sylStr);
     
     if (isSyllableValid) {
-        // 【修正處】使用 [-\s]+ 精確匹配連字號與空白，絕不包含字母 s
+        // 【絕對安全修改】直接用 [ -]（連字號或半形空格），絕對不會動到任何字母 s
         var parts = sylStr
-            .split(/[-\s]+/)
+            .split(/[- ]+/)
             .map(function(s) { return s.trim().toLowerCase(); })
             .filter(function(s) { return s.length > 0; });
         if (parts.length > 1) {
@@ -2300,9 +2299,8 @@ function showAllWords() {
         }
     }
     
-    // 若沒有有效 syllable，則對單字本身也以連字號與空白拆解
     var wordParts = wordStr
-        .split(/[-\s]+/)
+        .split(/[- ]+/)
         .map(function(s) { return s.trim().toLowerCase(); })
         .filter(function(s) { return s.length > 0; });
     return wordParts.length > 0 ? wordParts : [wordStr.toLowerCase()];
