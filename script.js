@@ -2323,22 +2323,52 @@ function hasRealSyllables(word, syllable) {
     return parts.length > 1;
 }
             
-            function buildSourceItems(letters, syllables, mode, hasSyllables) {
+    // ===== 計算並取得隨機預填的字母索引 =====
+function getPrefilledIndices(lettersLength, mode) {
+    if (mode !== 'letter') return [];
+    var prefillCount = 0;
+    if (lettersLength > 15) {
+        prefillCount = 4;
+    } else if (lettersLength > 11) {
+        prefillCount = 3;
+    } else if (lettersLength > 7) {
+        prefillCount = 2;
+    } else if (lettersLength > 3) {
+        prefillCount = 1;
+    }
+    
+    if (prefillCount === 0 || lettersLength === 0) return [];
+    
+    var indices = Array.from({length: lettersLength}, function(_, i) { return i; });
+    indices = shuffleArrayPopup(indices);
+    return indices.slice(0, prefillCount);
+}
+
+function buildSourceItems(letters, syllables, mode, hasSyllables, prefilledIndices) {
+    prefilledIndices = prefilledIndices || [];
     if (mode === 'letter' || !hasSyllables) {
-        // Letter 模式，或無 syllable → 全拆成單一字母
-        return shuffleArrayPopup(letters.map((l, i) => ({ 
-            type: 'letter', 
-            value: l, 
-            id: i 
-        })));
+        // Letter 模式下，排除已經被預填（prefill）到 target 區的字母
+        var items = [];
+        for (var i = 0; i < letters.length; i++) {
+            if (prefilledIndices.indexOf(i) === -1) {
+                items.push({
+                    type: 'letter',
+                    value: letters[i],
+                    id: i
+                });
+            }
+        }
+        return shuffleArrayPopup(items);
     } else {
-        // Syllable 模式且有 syllable → 依據拆分結果（meet, ing, neigh, bours）建立音節方塊
-        return shuffleArrayPopup(syllables.map((s, i) => ({ 
-            type: 'syllable', 
-            value: s, 
-            length: s.length, 
-            id: i 
-        })));
+        // Syllable 模式且有 syllable
+        return shuffleArrayPopup(syllables.map(function(s, i) {
+            return {
+                type: 'syllable',
+                value: s,
+                length: s.length,
+                id: i
+            };
+        }));
     }
 }
             
@@ -2391,29 +2421,29 @@ function hasRealSyllables(word, syllable) {
     spellingState.letters = syllablesToLetters(spellingState.syllables);
     spellingState.hasSyllables = hasRealSyllables(wordStr, syllableStr);
     
-    console.log('📝 loadSpelling:', {
-        word: wordStr,
-        syllable: syllableStr,
-        syllables: spellingState.syllables,
-        letters: spellingState.letters,
-        hasSyllables: spellingState.hasSyllables
-    });
+    spellingState.targetSlots = spellingState.letters.map(function() { return null; });
     
-    if (spellingState.letters.length === 0) {
-        var container = document.getElementById('spellingContainer');
-        if (container) {
-            container.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444;">⚠️ Word data error: "' + escapeHtml(wordStr) + '"</p>';
-        }
-        return;
+    // 取得預填索引（依據 letters 總數與當前模式）
+    var prefilledIndices = getPrefilledIndices(spellingState.letters.length, spellingState.sourceMode);
+    for (var i = 0; i < prefilledIndices.length; i++) {
+        var idx = prefilledIndices[i];
+        spellingState.targetSlots[idx] = {
+            type: 'letter',
+            value: spellingState.letters[idx],
+            id: idx,
+            groupStart: idx,
+            groupLength: 1
+        };
     }
     
     spellingState.sourceItems = buildSourceItems(
         spellingState.letters, 
         spellingState.syllables, 
         spellingState.sourceMode,
-        spellingState.hasSyllables
+        spellingState.hasSyllables,
+        prefilledIndices
     );
-    spellingState.targetSlots = spellingState.letters.map(function() { return null; });
+    
     spellingState.isAnswered = false;
     spellingState.revealedWord = false;
     spellingState.lastCheckCorrect = null;
@@ -2426,6 +2456,20 @@ function hasRealSyllables(word, syllable) {
     
     spellingState.sourceMode = mode;
     spellingState.targetSlots = spellingState.letters.map(function() { return null; });
+    
+    // 切換模式時重新計算預填
+    var prefilledIndices = getPrefilledIndices(spellingState.letters.length, mode);
+    for (var i = 0; i < prefilledIndices.length; i++) {
+        var idx = prefilledIndices[i];
+        spellingState.targetSlots[idx] = {
+            type: 'letter',
+            value: spellingState.letters[idx],
+            id: idx,
+            groupStart: idx,
+            groupLength: 1
+        };
+    }
+    
     spellingState.isAnswered = false;
     spellingState.revealedWord = false;
     spellingState.lastCheckCorrect = null;
@@ -2434,7 +2478,8 @@ function hasRealSyllables(word, syllable) {
         spellingState.letters,
         spellingState.syllables,
         mode,
-        spellingState.hasSyllables
+        spellingState.hasSyllables,
+        prefilledIndices
     );
     renderSpelling();
 }
