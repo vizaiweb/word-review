@@ -1807,6 +1807,10 @@ function showAllWords() {
                         <span>Answered: <span class="stat-number">0</span></span>
                         <span>Correct Rate: <span class="stat-number">--%</span></span>
                     </div>
+                    <!-- 新增的打亂/回復順序按鈕列 -->
+<div style="text-align: center; margin-bottom: 16px;">
+    <button id="quizShuffleToggleBtn" style="background: #f59e0b; color: white; border: none; border-radius: 40px; padding: 6px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;">🔀 Shuffle Questions</button>
+</div>
                     <div class="quiz-table-wrapper">
                         <table class="quiz-table">
                             <thead>
@@ -1869,6 +1873,10 @@ function showAllWords() {
             let quizDataPopup = [];
             let userAnswersPopup = {};
             let currentQuestionIdxPopup = 0;
+
+            // ===== 追蹤 Quiz 是否處於打亂狀態 =====
+let isQuizShuffled = false;
+let originalQuizDataPopup = []; // 用來備份原始順序
             
             function shuffleArrayPopup(arr) {
                 const shuffled = [...arr];
@@ -2061,15 +2069,51 @@ function showAllWords() {
                 });
             }
             
-            function initQuizInPopup() {
-                const words = window.allWordsData || [];
-                if (words.length > 0) {
-                    quizDataPopup = generateQuizDataPopup(words);
-                    userAnswersPopup = {};
-                    currentQuestionIdxPopup = 0;
-                    renderQuizTablePopup();
-                }
-            }
+           function initQuizInPopup() {
+    const words = window.allWordsData || [];
+    if (words.length > 0) {
+        quizDataPopup = generateQuizDataPopup(words);
+        originalQuizDataPopup = JSON.parse(JSON.stringify(quizDataPopup)); // 備份原始順序
+        isQuizShuffled = false;
+        updateShuffleButtonText();
+        userAnswersPopup = {};
+        currentQuestionIdxPopup = 0;
+        renderQuizTablePopup();
+    }
+}
+
+function toggleQuizShuffle() {
+    isQuizShuffled = !isQuizShuffled;
+    
+    if (isQuizShuffled) {
+        // 打亂題目順序（使用洗牌函數）
+        quizDataPopup = shuffleArrayPopup(quizDataPopup);
+    } else {
+        // 回復原始順序（透過備份還原）
+        quizDataPopup = JSON.parse(JSON.stringify(originalQuizDataPopup));
+    }
+    
+    currentQuestionIdxPopup = 0; // 重置到第一題
+    updateShuffleButtonText();
+    renderQuizTablePopup();
+}
+
+function updateShuffleButtonText() {
+    const btn = document.getElementById('quizShuffleToggleBtn');
+    if (btn) {
+        if (isQuizShuffled) {
+            btn.textContent = '🔄 Restore Order';
+            btn.style.background = '#3b82f6'; // 換個顏色代表可以還原
+        } else {
+            btn.textContent = '🔀 Shuffle Questions';
+            btn.style.background = '#f59e0b';
+        }
+    }
+}
+
+// 記得在初始化或綁定事件的地方加上這行：
+document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggleQuizShuffle);
+
             
             // ===== Words List 播放功能（彈窗內） =====
             let wordsAutoPlayStatePopup = {
