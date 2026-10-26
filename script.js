@@ -950,8 +950,8 @@ function showAllWords() {
                         'const idx = parseInt(this.dataset.quizIndex);' +
                         'const q = quizDataPopup[idx];' +
                         'if (q) {' +
-                            'const text = "Question " + (q.wordIndex + 1) + ". " + q.explanation;' +
-                            'const u = new SpeechSynthesisUtterance(text);' +
+                            'const speechText = "Question " + (q.wordIndex + 1) + ". " + q.explanation;' +
+                            'const u = new SpeechSynthesisUtterance(speechText);' +
                             'u.lang = "en-US";' +
                             'window.speechSynthesis.speak(u);' +
                         '}' +
