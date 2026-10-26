@@ -1488,21 +1488,40 @@ function showAllWords() {
     
     const fileNice = removeFileExtension(currentFileName);
     
-    // ===== 生成 Words List 表格 =====
-    let tableRows = '';
-    for (let i = 0; i < allWords.length; i++) {
-        const w = allWords[i];
-        tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
-                <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
-                <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
-                <td style="padding: 10px 12px; text-align: center; width: 60px;">
-                    <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
-                </td>
-            </tr>
-        `;
+  // ===== 生成 Words List 表格 =====
+let tableRows = '';
+for (let i = 0; i < allWords.length; i++) {
+    const w = allWords[i];
+    tableRows += `
+        <tr id="word_row_${i}" style="border-bottom: 1px solid #e2e8f0; transition: background-color 0.2s;">
+            <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
+            <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
+            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
+            <td style="padding: 10px 12px; text-align: center; width: 60px;">
+                <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
+            </td>
+        </tr>
+    `;
+}
+    // ===== Words List 朗讀高亮控制 =====
+function highlightWordRowPopup(index) {
+    const doc = document;
+    const total = window.allWordsData.length;
+    for (let i = 0; i < total; i++) {
+        const row = doc.getElementById('word_row_' + i);
+        if (row) {
+            if (i === index) {
+                // 高亮當前朗讀行（柔和的黃色背景）
+                row.style.backgroundColor = '#fff3cd';
+                row.style.fontWeight = 'bold';
+            } else {
+                // 還原其他行
+                row.style.backgroundColor = '';
+                row.style.fontWeight = 'normal';
+            }
+        }
     }
+}
     
     // ===== 生成彈窗完整 HTML（三分頁） =====
     const allHtml = `<!DOCTYPE html>
@@ -2168,44 +2187,44 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
             }
             
             function playNextWordPopup() {
-                if (!wordsAutoPlayStatePopup.isPlaying || wordsAutoPlayStatePopup.isPaused) return;
-                
-                const total = wordsAutoPlayStatePopup.totalCount;
-                if (wordsAutoPlayStatePopup.playedIndices.length >= total) {
-                    wordsAutoPlayStatePopup.isPlaying = false;
-                    wordsAutoPlayStatePopup.isPaused = false;
-                    if (wordsAutoPlayStatePopup.timeoutId) clearTimeout(wordsAutoPlayStatePopup.timeoutId);
-                    const playBtn = document.getElementById('wordsPlayBtn');
-                    const stopBtn = document.getElementById('wordsStopBtn');
-                    const modeSwitch = document.getElementById('wordsModeSwitch');
-                    if (playBtn) { playBtn.textContent = '▶️ Play All'; playBtn.disabled = false; playBtn.style.background = '#22c55e'; }
-                    if (stopBtn) stopBtn.disabled = true;
-                    if (modeSwitch) modeSwitch.disabled = false;
-                    return;
-                }
-                
-                let nextIndex;
-                if (wordsAutoPlayStatePopup.mode === 'sequential') {
-                    nextIndex = wordsAutoPlayStatePopup.playedIndices.length;
-                } else {
-                    if (wordsAutoPlayStatePopup.remainingIndices.length === 0) {
-                        wordsAutoPlayStatePopup.remainingIndices = Array.from({length: total}, (_, i) => i);
-                    }
-                    const randomPos = Math.floor(Math.random() * wordsAutoPlayStatePopup.remainingIndices.length);
-                    nextIndex = wordsAutoPlayStatePopup.remainingIndices[randomPos];
-                    wordsAutoPlayStatePopup.remainingIndices.splice(randomPos, 1);
-                }
-                
-                const wordData = window.allWordsData[nextIndex];
-                const progressSpan = document.getElementById('wordsProgress');
-                if (progressSpan) progressSpan.textContent = (wordsAutoPlayStatePopup.playedIndices.length + 1) + ' / ' + total;
-                
-                speakWordWithEnglishAndCantonesePopup(wordData.word, wordData.meaning, () => {
-                    wordsAutoPlayStatePopup.playedIndices.push(nextIndex);
-                    if (progressSpan) progressSpan.textContent = wordsAutoPlayStatePopup.playedIndices.length + ' / ' + total;
-                    wordsAutoPlayStatePopup.timeoutId = setTimeout(() => { playNextWordPopup(); }, 500);
-                });
-            }
+    if (!wordsAutoPlayStatePopup.isPlaying || wordsAutoPlayStatePopup.isPaused) return;
+    
+    const total = wordsAutoPlayStatePopup.totalCount;
+    if (wordsAutoPlayStatePopup.playedIndices.length >= total) {
+        // 播放結束，清除所有高亮
+        highlightWordRowPopup(-1);
+        wordsAutoPlayStatePopup.isPlaying = false;
+        // ... (保留原本的結束邏輯)
+        return;
+    }
+    
+    let nextIndex;
+    if (wordsAutoPlayStatePopup.mode === 'sequential') {
+        nextIndex = wordsAutoPlayStatePopup.playedIndices.length;
+    } else {
+        if (wordsAutoPlayStatePopup.remainingIndices.length === 0) {
+            wordsAutoPlayStatePopup.remainingIndices = Array.from({length: total}, (_, i) => i);
+        }
+        const randomPos = Math.floor(Math.random() * wordsAutoPlayStatePopup.remainingIndices.length);
+        nextIndex = wordsAutoPlayStatePopup.remainingIndices[randomPos];
+        wordsAutoPlayStatePopup.remainingIndices.splice(randomPos, 1);
+    }
+    
+    wordsAutoPlayStatePopup.currentIndex = nextIndex;
+    
+    // ===== 🎯 執行當前行的 HighLight =====
+    highlightWordRowPopup(nextIndex);
+    
+    const wordData = window.allWordsData[nextIndex];
+    const progressSpan = document.getElementById('wordsProgress');
+    if (progressSpan) progressSpan.textContent = (wordsAutoPlayStatePopup.playedIndices.length + 1) + ' / ' + total;
+    
+    speakWordWithEnglishAndCantonesePopup(wordData.word, wordData.meaning, () => {
+        wordsAutoPlayStatePopup.playedIndices.push(nextIndex);
+        if (progressSpan) progressSpan.textContent = wordsAutoPlayStatePopup.playedIndices.length + ' / ' + total;
+        wordsAutoPlayStatePopup.timeoutId = setTimeout(() => { playNextWordPopup(); }, 500);
+    });
+}
             
             function toggleWordsAutoPlayPopup() {
                 const playBtn = document.getElementById('wordsPlayBtn');
@@ -2241,21 +2260,34 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
             }
             
             function stopWordsAutoPlayPopup() {
-                try { speechSynthesis.cancel(); } catch(e) {}
-                if (wordsAutoPlayStatePopup.timeoutId) { clearTimeout(wordsAutoPlayStatePopup.timeoutId); wordsAutoPlayStatePopup.timeoutId = null; }
-                wordsAutoPlayStatePopup.isPlaying = false;
-                wordsAutoPlayStatePopup.isPaused = false;
-                wordsAutoPlayStatePopup.playedIndices = [];
-                wordsAutoPlayStatePopup.remainingIndices = [];
-                const playBtn = document.getElementById('wordsPlayBtn');
-                const stopBtn = document.getElementById('wordsStopBtn');
-                const modeSwitch = document.getElementById('wordsModeSwitch');
-                if (playBtn) { playBtn.textContent = '▶️ Play All'; playBtn.disabled = false; playBtn.style.background = '#22c55e'; }
-                if (stopBtn) stopBtn.disabled = true;
-                if (modeSwitch) modeSwitch.disabled = false;
-                const progressSpan = document.getElementById('wordsProgress');
-                if (progressSpan) progressSpan.textContent = '0 / ' + window.allWordsData.length;
-            }
+    try { speechSynthesis.cancel(); } catch(e) {}
+    if (wordsAutoPlayStatePopup.timeoutId) { 
+        clearTimeout(wordsAutoPlayStatePopup.timeoutId); 
+        wordsAutoPlayStatePopup.timeoutId = null; 
+    }
+    wordsAutoPlayStatePopup.isPlaying = false;
+    wordsAutoPlayStatePopup.isPaused = false;
+    wordsAutoPlayStatePopup.playedIndices = [];
+    wordsAutoPlayStatePopup.remainingIndices = [];
+    
+    // 清除所有行的高亮
+    highlightWordRowPopup(-1);
+    
+    const playBtn = document.getElementById('wordsPlayBtn');
+    const stopBtn = document.getElementById('wordsStopBtn');
+    const modeSwitch = document.getElementById('wordsModeSwitch');
+    if (playBtn) { 
+        playBtn.textContent = '▶️ Play All'; 
+        playBtn.disabled = false; 
+        playBtn.style.background = '#22c55e'; 
+    }
+    if (stopBtn) stopBtn.disabled = true;
+    if (modeSwitch) modeSwitch.disabled = false;
+    const progressSpan = document.getElementById('wordsProgress');
+    if (progressSpan) {
+        progressSpan.textContent = '0 / ' + window.allWordsData.length;
+    }
+}
             
             function switchWordsPlayModePopup() {
                 const modeSwitch = document.getElementById('wordsModeSwitch');
