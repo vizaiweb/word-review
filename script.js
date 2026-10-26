@@ -529,7 +529,7 @@ function stopAllReading() {
     try { synth.cancel(); } catch(e) {}
 }
 
-// ====================== 彈窗函數 (Show All Words) ======================
+// ====================== 彈窗函數 (Show All Words - 含 Words List, Quiz, Spelling) ======================
 function playSingleWord(word, meaning) {
     if (!word) return;
     stopAllReading();
@@ -601,19 +601,42 @@ function showAllWords() {
             .header { background: linear-gradient(135deg, #ff9a56, #ff6b35); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
             .header h2 { color: white; font-size: 20px; font-weight: 600; }
             .header p { color: rgba(255,255,255,0.8); font-size: 14px; }
+            
             .tab-bar { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; gap: 4px; }
-            .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; background: transparent; color: #64748b; }
+            .tab-btn { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; background: transparent; color: #64748b; transition: all 0.25s ease; }
+            .tab-btn:hover { color: #1e293b; background: rgba(255,255,255,0.5); }
             .tab-btn.active { background: linear-gradient(135deg, #ff9a56, #ff6b35); color: white; box-shadow: 0 2px 8px rgba(255,107,53,0.3); }
-            .tab-panel { display: none; padding: 16px 20px 0 20px; }
+            
+            .tab-panel { display: none; padding: 16px 20px 0 20px; animation: fadeIn 0.3s ease; }
             .tab-panel.active { display: block; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            
             .words-control-bar { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
             .play-btn { background: #22c55e; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
             .stop-btn { background: #ef4444; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
             .stop-btn:disabled { background: #f0a3a3; cursor: not-allowed; }
             .mode-switch { background: #333; color: white; border: none; border-radius: 40px; padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer; }
-            .words-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
-            .words-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-            .words-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+            
+            .words-table-wrapper, .quiz-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+            .words-table, .quiz-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+            .words-table thead th, .quiz-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+            .words-table tbody td, .quiz-table tbody td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+            
+            .quiz-stats { display: flex; justify-content: center; gap: 30px; background: #f8fafc; padding: 12px 20px; border-radius: 12px; margin-bottom: 16px; font-size: 15px; font-weight: 500; color: #1e293b; flex-wrap: wrap; }
+            .quiz-stats .stat-number { color: #ff6b35; font-weight: 700; }
+            
+            /* Spelling 模組樣式 */
+            .spelling-builder { padding: 0 4px; }
+            .builder-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9; }
+            .builder-meaning { background: #f8fafc; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 18px; color: #334155; }
+            .builder-dropzone { min-height: 80px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 16px; }
+            .word-token { display: inline-block; padding: 10px 16px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 18px; font-weight: 600; color: #1e293b; cursor: grab; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-transform: uppercase; }
+            .empty-slot { min-width: 36px; padding: 10px 8px; background: #f1f5f9; border: 2px dashed #94a3b8; border-radius: 10px; color: #94a3b8; text-align: center; }
+            .builder-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+            .builder-actions button { padding: 10px 24px; border: none; border-radius: 40px; font-size: 15px; font-weight: 600; cursor: pointer; color: white; }
+            .btn-prev { background: #3b82f6; } .btn-shuffle { background: #f59e0b; } .btn-check { background: #22c55e; } .btn-next { background: #8b5cf6; }
+            .builder-feedback { text-align: center; margin-top: 12px; font-size: 16px; font-weight: 600; min-height: 30px; color: #94a3b8; }
+
             .footer { padding: 16px 20px; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
             .close-btn { background: #ff6b35; color: white; border: none; border-radius: 40px; padding: 8px 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
         </style>
@@ -624,10 +647,15 @@ function showAllWords() {
                 <h2>📝 ${currentCategory} - ${currentLevel} - ${escapeHtml(fileNice)}</h2>
                 <p>Total ${allWords.length} words</p>
             </div>
+            
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="words">📖 Words List</button>
+                <button class="tab-btn" data-tab="quiz">✏️ Quiz</button>
+                <button class="tab-btn" data-tab="spelling">✏️ Spelling</button>
             </div>
+            
             <div class="tab-content">
+                <!-- Words List Panel -->
                 <div id="tab-words" class="tab-panel active">
                     <div class="words-control-bar">
                         <button id="wordsPlayBtn" class="play-btn">▶️ Play All</button>
@@ -651,7 +679,44 @@ function showAllWords() {
                         </table>
                     </div>
                 </div>
+                
+                <!-- Quiz Panel -->
+                <div id="tab-quiz" class="tab-panel">
+                    <div class="quiz-stats" id="quizStats">
+                        <span>Total Questions: <span class="stat-number">${allWords.length}</span></span>
+                        <span>Answered: <span class="stat-number">0</span></span>
+                        <span>Correct Rate: <span class="stat-number">--%</span></span>
+                    </div>
+                    <div style="text-align: center; margin-bottom: 16px;">
+                        <button id="quizShuffleToggleBtn" style="background: #f59e0b; color: white; border: none; border-radius: 40px; padding: 6px 20px; font-size: 14px; font-weight: 600; cursor: pointer;">🔀 Shuffle Questions</button>
+                    </div>
+                    <div class="quiz-table-wrapper">
+                        <table class="quiz-table">
+                            <thead>
+                                <tr>
+                                    <th>No.</th>
+                                    <th>Explanation</th>
+                                    <th>Option A</th>
+                                    <th>Option B</th>
+                                    <th>Option C</th>
+                                    <th>Your Answer</th>
+                                    <th>Result</th>
+                                    <th>Listen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quizBody">
+                                <tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">Loading quiz data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Spelling Panel -->
+                <div id="tab-spelling" class="tab-panel">
+                    <div id="spellingContainer"></div>
+                </div>
             </div>
+            
             <div class="footer">
                 <button class="close-btn" onclick="window.close()">Close</button>
             </div>
@@ -668,8 +733,17 @@ function showAllWords() {
                 const voices = window.speechSynthesis.getVoices();
                 return voices.find(v => v.lang === 'yue' || v.lang === 'zh-HK') || voices[0];
             }
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/[&<>]/g, function(m) {
+                    if (m === '&') return '&amp;';
+                    if (m === '<') return '&lt;';
+                    if (m === '>') return '&gt;';
+                    return m;
+                });
+            }
 
-            // 🎯 Words List 行高亮控制
+            // ===== 1. Words List 自動播放與行高亮控制 =====
             function highlightWordRowPopup(index) {
                 const total = window.allWordsData.length;
                 for (let i = 0; i < total; i++) {
@@ -839,6 +913,251 @@ function showAllWords() {
                 }
             }
 
+            // ===== 2. Quiz 測驗邏輯 =====
+            let quizDataPopup = [];
+            let currentQuestionIdxPopup = 0;
+            let isQuizShuffled = false;
+            let originalQuizDataPopup = [];
+
+            function shuffleArrayPopup(arr) {
+                const shuffled = [...arr];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+            }
+
+            function generateQuizDataPopup(words) {
+                if (!words || words.length === 0) return [];
+                const data = [];
+                for (let i = 0; i < words.length; i++) {
+                    const correctWord = words[i].word.toUpperCase();
+                    const explanation = words[i].englishExplanation || words[i].meaning || '';
+                    const candidates = words.map((w, idx) => ({ word: w.word.toUpperCase(), idx })).filter(item => item.word !== correctWord);
+                    const shuffled = shuffleArrayPopup(candidates);
+                    let wrongOptions = shuffled.slice(0, 2).map(item => item.word);
+                    while (wrongOptions.length < 2) wrongOptions.push('---');
+                    
+                    let options = shuffleArrayPopup([correctWord, ...wrongOptions]);
+                    const correctIndex = options.indexOf(correctWord);
+                    const correctLabel = String.fromCharCode(65 + correctIndex);
+                    
+                    data.push({
+                        wordIndex: i,
+                        word: words[i].word,
+                        explanation: explanation,
+                        options: options,
+                        correctLabel: correctLabel,
+                        userAnswer: null
+                    });
+                }
+                return data;
+            }
+
+            function renderQuizTablePopup() {
+                const container = document.getElementById('quizBody');
+                if (!container) return;
+                if (!quizDataPopup.length) {
+                    container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">No quiz data available.</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                for (let i = 0; i < quizDataPopup.length; i++) {
+                    const q = quizDataPopup[i];
+                    const isCurrent = (i === currentQuestionIdxPopup);
+                    const isAnswered = (q.userAnswer !== null);
+                    let resultDisplay = '';
+                    if (isAnswered) {
+                        resultDisplay = q.userAnswer === q.correctLabel ? '<span style="color:#22c55e;">✔</span>' : '<span style="color:#ef4444;">✘</span>';
+                    }
+                    
+                    html += `<tr style="${isCurrent ? 'background:#fff3cd;' : ''}" data-index="${i}">
+                        <td style="text-align:center;font-weight:600;color:#64748b;">${i + 1}</td>
+                        <td style="text-align:left;">${escapeHtml(q.explanation)}</td>`;
+                    
+                    for (let optIdx = 0; optIdx < q.options.length; optIdx++) {
+                        const opt = q.options[optIdx];
+                        const label = String.fromCharCode(65 + optIdx);
+                        let bgStyle = '';
+                        if (isAnswered) {
+                            if (opt === q.options[q.correctLabel.charCodeAt(0) - 65]) bgStyle = 'background:#dcfce7;color:#15803d;';
+                            if (q.userAnswer === label && q.userAnswer !== q.correctLabel) bgStyle = 'background:#fee2e2;color:#dc2626;';
+                        }
+                        html += `<td class="col-option" data-quiz-index="${i}" data-option-label="${label}" style="text-align:center;font-weight:600;cursor:pointer;${bgStyle}">${escapeHtml(opt)}</td>`;
+                    }
+                    
+                    html += `<td style="text-align:center;font-weight:500;">${isAnswered ? q.userAnswer : '<span style="color:#94a3b8;">--</span>'}</td>
+                             <td style="text-align:center;font-size:18px;">${resultDisplay}</td>
+                             <td style="text-align:center;"><button class="listen-btn" data-quiz-index="${i}" style="background:none;border:none;cursor:pointer;font-size:16px;">🔊</button></td>
+                    </tr>`;
+                }
+                container.innerHTML = html;
+                
+                // 綁定 Quiz 事件
+                document.querySelectorAll('#quizBody tr').forEach(row => {
+                    row.onclick = function(e) {
+                        if (e.target.closest('.col-option') || e.target.closest('.listen-btn')) return;
+                        currentQuestionIdxPopup = parseInt(this.dataset.index);
+                        renderQuizTablePopup();
+                    };
+                });
+                
+                document.querySelectorAll('.col-option').forEach(cell => {
+                    cell.onclick = function(e) {
+                        e.stopPropagation();
+                        const idx = parseInt(this.dataset.quizIndex);
+                        const label = this.dataset.optionLabel;
+                        if (quizDataPopup[idx] && quizDataPopup[idx].userAnswer === null) {
+                            quizDataPopup[idx].userAnswer = label;
+                            renderQuizTablePopup();
+                        }
+                    };
+                });
+
+                document.querySelectorAll('.listen-btn').forEach(btn => {
+                    btn.onclick = function(e) {
+                        e.stopPropagation();
+                        const idx = parseInt(this.dataset.quizIndex);
+                        const q = quizDataPopup[idx];
+                        if (q) {
+                            const text = `Question ${q.wordIndex + 1}. ${q.explanation}. Option A: ${q.options[0]}. Option B: ${q.options[1]}. Option C: ${q.options[2]}.`;
+                            const u = new SpeechSynthesisUtterance(text);
+                            u.lang = 'en-US';
+                            window.speechSynthesis.speak(u);
+                        }
+                    };
+                });
+            }
+
+            function initQuizInPopup() {
+                if (window.allWordsData.length > 0) {
+                    quizDataPopup = generateQuizDataPopup(window.allWordsData);
+                    originalQuizDataPopup = JSON.parse(JSON.stringify(quizDataPopup));
+                    renderQuizTablePopup();
+                }
+            }
+
+            document.getElementById('quizShuffleToggleBtn').onclick = function() {
+                isQuizShuffled = !isQuizShuffled;
+                quizDataPopup = isQuizShuffled ? shuffleArrayPopup(quizDataPopup) : JSON.parse(JSON.stringify(originalQuizDataPopup));
+                this.textContent = isQuizShuffled ? '🔄 Restore Order' : '🔀 Shuffle Questions';
+                this.style.background = isQuizShuffled ? '#3b82f6' : '#f59e0b';
+                renderQuizTablePopup();
+            };
+
+            // ===== 3. Spelling 拼寫邏輯 =====
+            function initSpelling() {
+                const container = document.getElementById('spellingContainer');
+                if (!container) return;
+                const words = window.allWordsData || [];
+                if (!words.length) {
+                    container.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">No words available.</p>';
+                    return;
+                }
+                
+                let spellingIdx = 0;
+                function loadSpellingCard(idx) {
+                    const w = words[idx];
+                    const letters = w.word.toLowerCase().split('');
+                    const shuffledLetters = shuffleArrayPopup(letters);
+                    let targetSlots = new Array(letters.length).fill(null);
+                    
+                    container.innerHTML = `
+                        <div class="spelling-builder">
+                            <div class="builder-header">
+                                <span>📌 Word ${idx + 1} / ${words.length}</span>
+                                <button id="spellListen" style="background:none;border:none;cursor:pointer;font-size:20px;">🔊</button>
+                            </div>
+                            <div class="builder-meaning">📖 ${escapeHtml(w.meaning)}</div>
+                            <div class="builder-dropzone" id="sourceZone">
+                                ${shuffledLetters.map((l, i) => `<span class="word-token" data-letter="${l}" data-id="${i}">${l.toUpperCase()}</span>`).join('')}
+                            </div>
+                            <div class="builder-dropzone" id="targetZone" style="border-style:dashed;">
+                                ${targetSlots.map(() => `<span class="empty-slot">?</span>`).join('')}
+                            </div>
+                            <div class="builder-actions">
+                                <button class="btn-prev" ${idx === 0 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn-check">Check Answer</button>
+                                <button class="btn-next" ${idx === words.length - 1 ? 'disabled' : ''}>Next</button>
+                            </div>
+                            <div class="builder-feedback" id="spellFeedback">Click letters to place them</div>
+                        </div>
+                    `;
+
+                    document.getElementById('spellListen').onclick = () => {
+                        const u = new SpeechSynthesisUtterance(w.word);
+                        u.lang = 'en-US';
+                        window.speechSynthesis.speak(u);
+                    };
+
+                    container.querySelector('.btn-prev').onclick = () => { if (idx > 0) loadSpellingCard(idx - 1); };
+                    container.querySelector('.btn-next').onclick = () => { if (idx < words.length - 1) loadSpellingCard(idx + 1); };
+
+                    // 簡易點擊填入互動
+                    const sourceTokens = container.querySelectorAll('#sourceZone .word-token');
+                    sourceTokens.forEach(token => {
+                        token.onclick = function() {
+                            const emptyIdx = targetSlots.indexOf(null);
+                            if (emptyIdx !== -1) {
+                                targetSlots[emptyIdx] = this.dataset.letter;
+                                this.style.display = 'none';
+                                updateTargetView();
+                            }
+                        };
+                    });
+
+                    function updateTargetView() {
+                        const targetZone = container.getElementById ? container.querySelector('#targetZone') : document.getElementById('targetZone');
+                        if(!targetZone) return;
+                        targetZone.innerHTML = targetSlots.map((l, i) => l ? `<span class="word-token" data-target-idx="${i}" style="background:#dcfce7;color:#15803d;">${l.toUpperCase()}</span>` : `<span class="empty-slot">?</span>`).join('');
+                        
+                        targetZone.querySelectorAll('.word-token').forEach(t => {
+                            t.onclick = function() {
+                                const tIdx = parseInt(this.dataset.targetIdx);
+                                targetSlots[tIdx] = null;
+                                updateTargetView();
+                                // 恢復 source 顯示
+                                sourceTokens.forEach(st => { st.style.display = 'inline-block'; });
+                            };
+                        });
+                    }
+
+                    container.querySelector('.btn-check').onclick = () => {
+                        const userStr = targetSlots.join('');
+                        const correctStr = w.word.toLowerCase();
+                        const fb = document.getElementById('spellFeedback');
+                        if (userStr === correctStr) {
+                            fb.innerHTML = '✅ Correct! Well done!';
+                            fb.style.color = '#22c55e';
+                        } else {
+                            fb.innerHTML = '❌ Incorrect. Try again!';
+                            fb.style.color = '#ef4444';
+                        }
+                    };
+                }
+                loadSpellingCard(0);
+            }
+
+            // ===== 分頁切換控制 =====
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                    const tabName = this.dataset.tab;
+                    document.getElementById('tab-' + tabName).classList.add('active');
+                    
+                    if (tabName === 'quiz' && quizDataPopup.length === 0) {
+                        initQuizInPopup();
+                    } else if (tabName === 'spelling') {
+                        initSpelling();
+                    }
+                });
+            });
+
+            // ===== 事件綁定 =====
             document.getElementById('wordsPlayBtn').addEventListener('click', toggleWordsAutoPlayPopup);
             document.getElementById('wordsStopBtn').addEventListener('click', stopWordsAutoPlayPopup);
             document.getElementById('wordsModeSwitch').addEventListener('click', switchWordsPlayModePopup);
