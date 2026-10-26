@@ -950,7 +950,7 @@ function showAllWords() {
                         'const idx = parseInt(this.dataset.quizIndex);' +
                         'const q = quizDataPopup[idx];' +
                         'if (q) {' +
-                            'const text = "Question " + (q.wordIndex + 1) + ". " + q.explanation + ". Option A: " + q.options[0] + ". Option B: " + q.options[1] + ". Option C: " + q.options[2] + ".";' +
+                            'const text = "Question " + (q.wordIndex + 1) + ". " + q.explanation;' +
                             'const u = new SpeechSynthesisUtterance(text);' +
                             'u.lang = "en-US";' +
                             'window.speechSynthesis.speak(u);' +
