@@ -1488,13 +1488,12 @@ function showAllWords() {
     
     const fileNice = removeFileExtension(currentFileName);
     
-    // ===== 生成 Words List 表格 =====
+        // ===== 生成 Words List 表格 =====
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
         tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
+            <tr id="word_row_${i}" style="border-bottom: 1px solid #e2e8f0; transition: background-color 0.3s ease;">            <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
                 <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
                 <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
                 <td style="padding: 10px 12px; text-align: center; width: 60px;">
@@ -2167,6 +2166,25 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                 speakNext();
             }
             
+                        // 高亮當前行
+            function highlightCurrentWordRow(index) {
+                clearWordHighlight(); // 先清除所有高亮
+                const row = document.getElementById('word_row_' + index);
+                if (row) {
+                    row.style.backgroundColor = '#fff3cd'; // 淡淡的黃色
+                }
+            }
+
+            // 清除所有行的高亮
+            function clearWordHighlight() {
+                const tableBody = document.querySelector('.words-table tbody');
+                if (tableBody) {
+                    Array.from(tableBody.children).forEach(tr => {
+                        tr.style.backgroundColor = '';
+                    });
+                }
+            }
+
             function playNextWordPopup() {
                 if (!wordsAutoPlayStatePopup.isPlaying || wordsAutoPlayStatePopup.isPaused) return;
                 
@@ -2196,10 +2214,12 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                     wordsAutoPlayStatePopup.remainingIndices.splice(randomPos, 1);
                 }
                 
+                                // 新增：高亮當前行
+                highlightCurrentWordRow(nextIndex);
+
                 const wordData = window.allWordsData[nextIndex];
                 const progressSpan = document.getElementById('wordsProgress');
                 if (progressSpan) progressSpan.textContent = (wordsAutoPlayStatePopup.playedIndices.length + 1) + ' / ' + total;
-                
                 speakWordWithEnglishAndCantonesePopup(wordData.word, wordData.meaning, () => {
                     wordsAutoPlayStatePopup.playedIndices.push(nextIndex);
                     if (progressSpan) progressSpan.textContent = wordsAutoPlayStatePopup.playedIndices.length + ' / ' + total;
@@ -2253,8 +2273,11 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                 if (playBtn) { playBtn.textContent = '▶️ Play All'; playBtn.disabled = false; playBtn.style.background = '#22c55e'; }
                 if (stopBtn) stopBtn.disabled = true;
                 if (modeSwitch) modeSwitch.disabled = false;
-                const progressSpan = document.getElementById('wordsProgress');
+                                const progressSpan = document.getElementById('wordsProgress');
                 if (progressSpan) progressSpan.textContent = '0 / ' + window.allWordsData.length;
+                
+                // 新增：停止播放時清除高光
+                clearWordHighlight();
             }
             
             function switchWordsPlayModePopup() {
