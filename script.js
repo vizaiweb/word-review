@@ -2166,8 +2166,30 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                 }
                 speakNext();
             }
+
+
+                        // 高亮當前行
+            function highlightCurrentWordRow(index) {
+                // 先清除所有高亮
+                clearWordHighlight();
+                
+                // 找到對應的列
+                const row = document.getElementById('word_row_' + index);
+                if (row) {
+                    row.style.backgroundColor = '#fff3cd'; // 這是淡淡的黃色，跟 Quiz 一樣
+                    // 也可以讓字體顏色變深，更明顯
+                    row.style.transition = 'background-color 0.3s ease';
+                }
+            }
+
+            // 清除所有行的高亮
+            function clearWordHighlight() {
+                document.querySelectorAll('.words-table tbody tr').forEach(tr => {
+                    tr.style.backgroundColor = '';
+                });
+            }
             
-            function playNextWordPopup() {
+                       function playNextWordPopup() {
                 if (!wordsAutoPlayStatePopup.isPlaying || wordsAutoPlayStatePopup.isPaused) return;
                 
                 const total = wordsAutoPlayStatePopup.totalCount;
@@ -2181,6 +2203,9 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                     if (playBtn) { playBtn.textContent = '▶️ Play All'; playBtn.disabled = false; playBtn.style.background = '#22c55e'; }
                     if (stopBtn) stopBtn.disabled = true;
                     if (modeSwitch) modeSwitch.disabled = false;
+                    
+                    // 播放結束，清除高亮
+                    clearWordHighlight();
                     return;
                 }
                 
@@ -2195,6 +2220,9 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                     nextIndex = wordsAutoPlayStatePopup.remainingIndices[randomPos];
                     wordsAutoPlayStatePopup.remainingIndices.splice(randomPos, 1);
                 }
+                
+                // 新增：高亮當前行
+                highlightCurrentWordRow(nextIndex);
                 
                 const wordData = window.allWordsData[nextIndex];
                 const progressSpan = document.getElementById('wordsProgress');
@@ -2240,7 +2268,7 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                 }
             }
             
-            function stopWordsAutoPlayPopup() {
+                        function stopWordsAutoPlayPopup() {
                 try { speechSynthesis.cancel(); } catch(e) {}
                 if (wordsAutoPlayStatePopup.timeoutId) { clearTimeout(wordsAutoPlayStatePopup.timeoutId); wordsAutoPlayStatePopup.timeoutId = null; }
                 wordsAutoPlayStatePopup.isPlaying = false;
@@ -2255,6 +2283,9 @@ document.getElementById('quizShuffleToggleBtn').addEventListener('click', toggle
                 if (modeSwitch) modeSwitch.disabled = false;
                 const progressSpan = document.getElementById('wordsProgress');
                 if (progressSpan) progressSpan.textContent = '0 / ' + window.allWordsData.length;
+                
+                // 清除高亮
+                clearWordHighlight();
             }
             
             function switchWordsPlayModePopup() {
@@ -3615,15 +3646,19 @@ function showAllSentencesPopup() {
 
     const fileNice = removeFileExtension(currentFileNameForSentences);
     
-    // ===== 拼接句子列表 =====
+       // ===== 生成 Words List 表格 =====
     let tableRows = '';
-    for (let i = 0; i < allSentences.length; i++) {
-        const s = allSentences[i];
+    for (let i = 0; i < allWords.length; i++) {
+        const w = allWords[i];
+        // 在 tr 加上 id="word_row_${i}"
         tableRows += `
-            <tr id="sentence_row_${i}" style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 12px; text-align: center; width: 60px;">${i + 1}</td>
-                <td style="padding: 12px; font-weight: bold; color: #b45309;">${escapeHtml(s.sentence_en)}</td>
-                <td style="padding: 12px; color: #334155;">${escapeHtml(s.sentence_zh)}</td>
+            <tr id="word_row_${i}" style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
+                <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
+                <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
+                <td style="padding: 10px 12px; text-align: center; width: 60px;">
+                    <button class="listen-single-btn" data-word="${escapeHtml(w.word)}" data-meaning="${escapeHtml(w.meaning)}" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px;">🔊</button>
+                </td>
             </tr>
         `;
     }
