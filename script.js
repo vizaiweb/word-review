@@ -1488,12 +1488,13 @@ function showAllWords() {
     
     const fileNice = removeFileExtension(currentFileName);
     
-    // ===== 生成 Words List 表格 =====
+            // ===== 生成 Words List 表格 =====
     let tableRows = '';
     for (let i = 0; i < allWords.length; i++) {
         const w = allWords[i];
+        // 關鍵：加上 id="word_row_${i}"
         tableRows += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
+            <tr id="word_row_${i}" style="border-bottom: 1px solid #e2e8f0; transition: background 0.3s;">
                 <td style="padding: 10px 12px; text-align: center; width: 60px;">${w.day}</td>
                 <td style="padding: 10px 12px; font-weight: bold; color: #dc2626;">${escapeHtml(w.word.toUpperCase())}</td>
                 <td style="padding: 10px 12px; color: #334155;">${escapeHtml(w.meaning)}</td>
